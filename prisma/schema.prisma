@@ -51,9 +51,21 @@ model User {
   accounts       Account[]
   sessions       Session[]
   payslips       Payslip[]
+  contracts      Contract[]
+  certificates   Certificate[]
   role           String    @default("user") // "user", "admin"
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
+  companyName    String?     // Nom de l'entreprise (désormais facultatif)
+  passwordHash   String
+  resetToken     String?    // Pour la réinitialisation de mot de passe
+  resetExpires   DateTime?  // Date d'expiration du token
+  
+  // Informations additionnelles pour l'employeur
+  employerSiret  String?    // Format SIRET : 14 chiffres
+  employerUrssaf String?    // Format URSSAF : 9 chiffres
+  employerAddress String?   // Adresse de l'entreprise
+  employerPhone  String?    // Téléphone de l'entreprise
 }
 
 model VerificationToken {
@@ -66,27 +78,135 @@ model VerificationToken {
 
 // Modèle pour les fiches de paie
 model Payslip {
-  id                  String   @id @default(cuid())
-  userId              String
-  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                          String   @id @default(cuid())
+  createdAt                   DateTime @default(now())
+  updatedAt                   DateTime @updatedAt
+
+  // Relation avec l'utilisateur
+  userId                      String
+  user                        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Informations employeur
+  employerName                String
+  employerAddress             String
+  employerSiret               String   // Format SIRET : 14 chiffres
+  employerUrssaf              String   // Format URSSAF : 9 chiffres
+
+  // Informations salarié
+  employeeName                String
+  employeeAddress             String
+  employeePosition            String
+  employeeSocialSecurityNumber String   // Format NIR : 15 chiffres
+  isExecutive                 Boolean  @default(false)
+
+  // Période
+  periodStart                 DateTime
+  periodEnd                   DateTime
+  paymentDate                 DateTime
+  fiscalYear                  Int      // Année fiscale (2023, 2024, 2025)
+
+  // Rémunération
+  hourlyRate                  Float    // 2 décimales pour le taux horaire
+  hoursWorked                 Float    // 2 décimales pour les heures
+  grossSalary                 Float    // 2 décimales pour les salaires
+  netSalary                   Float
+  employerCost                Float
+
+  // Cotisations
+  employeeContributions       Float
+  employerContributions       Float
+  contributionsDetails        String   // JSON string
+
+  // Congés payés
+  paidLeaveAcquired          Float
+  paidLeaveTaken             Float
+  paidLeaveRemaining         Float
+
+  // Cumuls
+  cumulativeGrossSalary      Float
+  cumulativeNetSalary        Float
   
-  // Métadonnées
-  fileName            String
-  filePath            String
-  createdAt           DateTime @default(now())
+  // Période des cumuls
+  cumulativePeriodStart      DateTime  // Début de période des cumuls (normalement 1er janvier)
+  cumulativePeriodEnd        DateTime  // Fin de période des cumuls (normalement 31 décembre)
+
+  pdfUrl                      String?  // URL du PDF stocké dans Supabase
+
+  @@index([employeeName])
+  @@index([periodStart])
+  @@index([periodEnd])
+  @@index([userId])
+  @@index([fiscalYear])
+}
+
+// Modèle pour les contrats de travail
+model Contract {
+  id                String   @id @default(cuid())
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
   
-  // Données de l'employeur
-  employerName        String
-  employerSiret       String
+  // Relation avec l'utilisateur
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   
-  // Données de l'employé
-  employeeFirstName   String
-  employeeLastName    String
-  employeePosition    String
+  // Informations employeur
+  employerName      String
+  employerAddress   String
+  employerSiret     String
+  employerUrssaf    String
   
-  // Données de salaire
-  period              String
-  grossSalary         Float
-  netToPay            Float
-  paymentDate         String
+  // Informations salarié
+  employeeName      String
+  employeeAddress   String
+  employeePosition  String
+  employeeSocialSecurityNumber String
+  
+  // Informations contrat
+  contractType      String   // "CDI", "CDD", "Temps partiel", "Temps complet"
+  startDate         DateTime
+  endDate           DateTime? // Null pour CDI
+  trialPeriod       Int?     // Période d'essai en jours
+  salary            Float    // Salaire brut
+  workingHours      Float?   // Heures de travail hebdomadaires
+  jobDescription    String   // Description du poste
+  collectiveAgreement String? // Convention collective
+  
+  pdfUrl            String?  // URL du PDF stocké dans Supabase
+  
+  @@index([userId])
+  @@index([employeeName])
+  @@index([contractType])
+}
+
+// Modèle pour les attestations
+model Certificate {
+  id                String   @id @default(cuid())
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  // Relation avec l'utilisateur
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Informations employeur
+  employerName      String
+  employerAddress   String
+  employerSiret     String
+  
+  // Informations salarié
+  employeeName      String
+  employeePosition  String
+  
+  // Informations attestation
+  certificateType   String   // "Travail", "Salaire", "Congés payés"
+  issueDate         DateTime
+  startDate         DateTime? // Date de début si pertinent
+  endDate           DateTime? // Date de fin si pertinent
+  content           String   // Contenu de l'attestation
+  
+  pdfUrl            String?  // URL du PDF stocké dans Supabase
+  
+  @@index([userId])
+  @@index([employeeName])
+  @@index([certificateType])
 }

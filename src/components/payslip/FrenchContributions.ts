@@ -248,62 +248,51 @@ export const getContributionsByCategory = (category: ContributionCategory): Cont
   return DEFAULT_FRENCH_CONTRIBUTIONS.filter(contribution => contribution.category === category);
 };
 
-// Calcule le montant d'une cotisation
-export const calculateContributionAmount = (
-  contribution: Contribution, 
-  grossSalary: number
-): {employeeAmount: number; employerAmount: number} => {
-  let base = grossSalary;
+// Calcule le montant d'une cotisation en fonction du salaire brut
+const calculateContributionAmount = (contribution: Contribution, grossSalary: number): { employeeAmount: number; employerAmount: number } => {
+  let base = 0;
   
-  // Déterminer l'assiette de cotisation
-  if (contribution.baseType === 'plafond') {
-    base = Math.min(grossSalary, SOCIAL_SECURITY_CAP);
-  } else if (contribution.baseType === 'trancheA') {
-    base = Math.min(grossSalary, SOCIAL_SECURITY_CAP);
-  } else if (contribution.baseType === 'trancheB') {
-    base = Math.max(0, Math.min(grossSalary, SOCIAL_SECURITY_CAP * 8) - SOCIAL_SECURITY_CAP);
+  switch (contribution.baseType) {
+    case 'total':
+      base = grossSalary;
+      break;
+    case 'plafond':
+      base = Math.min(grossSalary, SOCIAL_SECURITY_CAP);
+      break;
+    case 'trancheA':
+      base = Math.min(grossSalary, SOCIAL_SECURITY_CAP);
+      break;
+    case 'trancheB':
+      base = Math.max(0, Math.min(grossSalary - SOCIAL_SECURITY_CAP, SOCIAL_SECURITY_CAP * 7));
+      break;
   }
   
-  // Calculer les montants
-  const employeeAmount = base * (contribution.employeeRate / 100);
-  const employerAmount = base * (contribution.employerRate / 100);
-  
   return {
-    employeeAmount,
-    employerAmount
+    employeeAmount: (base * contribution.employeeRate) / 100,
+    employerAmount: (base * contribution.employerRate) / 100
   };
 };
 
-// Calculer le total des cotisations (salariales et patronales)
-export const calculateTotalContributions = (
-  contributions: Contribution[],
-  grossSalary: number
-): {
-  totalEmployeeContributions: number;
-  totalEmployerContributions: number;
-  detailedContributions: Array<{
-    contribution: Contribution;
-    employeeAmount: number;
-    employerAmount: number;
-  }>
-} => {
+// Calcule toutes les cotisations pour un salaire brut donné
+export const calculateTotalContributions = (contributions: Contribution[], grossSalary: number) => {
   let totalEmployeeContributions = 0;
   let totalEmployerContributions = 0;
   const detailedContributions = [];
-  
+
   for (const contribution of contributions) {
-    const { employeeAmount, employerAmount } = calculateContributionAmount(contribution, grossSalary);
-    
-    totalEmployeeContributions += employeeAmount;
-    totalEmployerContributions += employerAmount;
-    
-    detailedContributions.push({
-      contribution,
-      employeeAmount,
-      employerAmount
-    });
+    if (contribution.isRequired) {
+      const amounts = calculateContributionAmount(contribution, grossSalary);
+      totalEmployeeContributions += amounts.employeeAmount;
+      totalEmployerContributions += amounts.employerAmount;
+      
+      detailedContributions.push({
+        contribution,
+        employeeAmount: amounts.employeeAmount,
+        employerAmount: amounts.employerAmount
+      });
+    }
   }
-  
+
   return {
     totalEmployeeContributions,
     totalEmployerContributions,
