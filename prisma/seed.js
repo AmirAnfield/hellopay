@@ -1,20 +1,18 @@
 // prisma/seed.js
 const { PrismaClient } = require('@prisma/client');
-const crypto = require('crypto');
+const bcrypt = require('bcrypt');
 
 const prisma = new PrismaClient();
 
-// Fonction simple pour hacher un mot de passe
-function hashPassword(password) {
-  return crypto.createHash('sha256').update(password).digest('hex');
-}
-
 async function main() {
-  const passwordHash = hashPassword('HelloPay2024!');
+  // Utilisation de bcrypt avec un salt de 10 rounds
+  const passwordHash = await bcrypt.hash('Password123', 10);
 
   await prisma.user.upsert({
     where: { email: 'test@hellopay.fr' },
-    update: {},
+    update: {
+      passwordHash
+    },
     create: {
       name: 'Utilisateur Test',
       email: 'test@hellopay.fr',

@@ -1,13 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { Home, FileText, User, LogOut, Info, MessageCircle, CreditCard } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { useState } from 'react';
 import { ChevronDown, Menu, X } from 'lucide-react';
-import Image from 'next/image';
 
 export function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -32,7 +30,6 @@ export function Navbar() {
           <div className="flex">
             <div className="flex-shrink-0 flex items-center">
               <Link href="/" className="flex items-center">
-                <Image src="/logo.svg" alt="HelloPay Logo" width={32} height={32} className="mr-2" />
                 <span className="text-xl font-bold text-primary">HelloPay</span>
               </Link>
             </div>
