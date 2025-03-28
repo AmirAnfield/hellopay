@@ -42,9 +42,9 @@ model Session {
 }
 
 model User {
-  id             String    @id @default(cuid())
+  id             String         @id @default(cuid())
   name           String?
-  email          String?   @unique
+  email          String?        @unique
   emailVerified  DateTime?
   hashedPassword String?
   image          String?
@@ -53,19 +53,13 @@ model User {
   payslips       Payslip[]
   contracts      Contract[]
   certificates   Certificate[]
-  role           String    @default("user") // "user", "admin"
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-  companyName    String?     // Nom de l'entreprise (désormais facultatif)
+  companies      Company[]      // Relation avec les entreprises
+  role           String         @default("user") // "user", "admin"
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
   passwordHash   String
-  resetToken     String?    // Pour la réinitialisation de mot de passe
-  resetExpires   DateTime?  // Date d'expiration du token
-  
-  // Informations additionnelles pour l'employeur
-  employerSiret  String?    // Format SIRET : 14 chiffres
-  employerUrssaf String?    // Format URSSAF : 9 chiffres
-  employerAddress String?   // Adresse de l'entreprise
-  employerPhone  String?    // Téléphone de l'entreprise
+  resetToken     String?        // Pour la réinitialisation de mot de passe
+  resetExpires   DateTime?      // Date d'expiration du token
 }
 
 model VerificationToken {
@@ -76,23 +70,122 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
-// Modèle pour les fiches de paie
+// Nouveau modèle pour les entreprises
+model Company {
+  id                String     @id @default(cuid())
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+  
+  // Informations de l'entreprise
+  name              String     // Raison sociale
+  siret             String     // Format SIRET : 14 chiffres
+  address           String     // Adresse complète
+  city              String     // Ville
+  postalCode        String     // Code postal
+  country           String     @default("France")
+  
+  // Informations complémentaires
+  activityCode      String?    // Code APE/NAF
+  urssafNumber      String?    // Numéro URSSAF
+  legalForm         String?    // Forme juridique (SARL, SAS, etc.)
+  vatNumber         String?    // Numéro de TVA intracommunautaire
+  phoneNumber       String?    // Téléphone
+  email             String?    // Email de contact
+  website           String?    // Site web
+  iban              String?    // IBAN pour les paiements
+  bic               String?    // BIC pour les paiements
+  
+  // Représentant légal
+  legalRepresentative String?  // Nom du représentant légal
+  legalRepresentativeRole String? // Fonction du représentant légal
+  
+  // Relations
+  userId            String     // Propriétaire de l'entreprise
+  user              User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  employees         Employee[] // Liste des salariés
+  payslips          Payslip[]  // Liste des bulletins de paie
+  contracts         Contract[] // Liste des contrats
+  certificates      Certificate[] // Liste des attestations
+  
+  @@index([userId])
+  @@index([siret])
+  @@index([name])
+}
+
+// Nouveau modèle pour les salariés
+model Employee {
+  id                        String     @id @default(cuid())
+  createdAt                 DateTime   @default(now())
+  updatedAt                 DateTime   @updatedAt
+  
+  // Informations personnelles
+  firstName                 String
+  lastName                  String
+  address                   String
+  city                      String
+  postalCode                String
+  country                   String     @default("France")
+  email                     String?
+  phoneNumber               String?
+  birthDate                 DateTime?
+  birthPlace                String?
+  nationality               String?
+  socialSecurityNumber      String     // NIR: 15 chiffres
+  
+  // Informations professionnelles  
+  position                  String     // Poste occupé
+  department                String?    // Service
+  contractType              String     // CDI, CDD, etc.
+  isExecutive               Boolean    @default(false) // Cadre ou non
+  startDate                 DateTime   // Date d'embauche
+  endDate                   DateTime?  // Date de fin (null pour CDI)
+  trialPeriodEndDate        DateTime?  // Date de fin période d'essai
+  
+  // Informations de rémunération
+  hourlyRate                Float      // Taux horaire
+  monthlyHours              Float      @default(151.67) // Heures mensuelles contractuelles
+  baseSalary                Float      // Salaire de base mensuel brut
+  bonusAmount               Float?     // Montant de la prime mensuelle
+  bonusDescription          String?    // Description de la prime
+  
+  // Informations bancaires
+  iban                      String?    // IBAN pour le virement de salaire
+  bic                       String?    // BIC pour le virement de salaire
+  
+  // Relations
+  companyId                 String     // Entreprise employeuse
+  company                   Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  payslips                  Payslip[]  // Bulletins de paie associés
+  
+  // Champs pour la gestion des congés payés
+  paidLeaveBalance          Float      @default(0) // Solde actuel de congés payés
+  
+  @@index([companyId])
+  @@index([socialSecurityNumber])
+  @@index([lastName])
+}
+
+// Modèle pour les fiches de paie (mis à jour)
 model Payslip {
   id                          String   @id @default(cuid())
   createdAt                   DateTime @default(now())
   updatedAt                   DateTime @updatedAt
 
-  // Relation avec l'utilisateur
+  // Relations
   userId                      String
   user                        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companyId                   String?
+  company                     Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  employeeId                  String?
+  employee                    Employee? @relation(fields: [employeeId], references: [id], onDelete: SetNull)
 
-  // Informations employeur
+  // Informations employeur (maintenues pour rétrocompatibilité)
   employerName                String
   employerAddress             String
   employerSiret               String   // Format SIRET : 14 chiffres
   employerUrssaf              String   // Format URSSAF : 9 chiffres
 
-  // Informations salarié
+  // Informations salarié (maintenues pour rétrocompatibilité)
   employeeName                String
   employeeAddress             String
   employeePosition            String
@@ -136,18 +229,22 @@ model Payslip {
   @@index([periodStart])
   @@index([periodEnd])
   @@index([userId])
+  @@index([companyId])
+  @@index([employeeId])
   @@index([fiscalYear])
 }
 
-// Modèle pour les contrats de travail
+// Modèle pour les contrats de travail (mis à jour)
 model Contract {
   id                String   @id @default(cuid())
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
   
-  // Relation avec l'utilisateur
+  // Relations
   userId            String
   user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companyId         String?
+  company           Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
   
   // Informations employeur
   employerName      String
@@ -174,19 +271,22 @@ model Contract {
   pdfUrl            String?  // URL du PDF stocké dans Supabase
   
   @@index([userId])
+  @@index([companyId])
   @@index([employeeName])
   @@index([contractType])
 }
 
-// Modèle pour les attestations
+// Modèle pour les attestations (mis à jour)
 model Certificate {
   id                String   @id @default(cuid())
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
   
-  // Relation avec l'utilisateur
+  // Relations
   userId            String
   user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companyId         String?
+  company           Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
   
   // Informations employeur
   employerName      String
@@ -207,6 +307,7 @@ model Certificate {
   pdfUrl            String?  // URL du PDF stocké dans Supabase
   
   @@index([userId])
+  @@index([companyId])
   @@index([employeeName])
   @@index([certificateType])
 }

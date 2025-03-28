@@ -1,414 +1,400 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
-import { User, Building, Bell, Shield, CreditCard, Save, CheckCircle } from 'lucide-react';
+import { Badge } from "@/components/ui/badge";
+import { Loader2, User, Settings, CreditCard, Bell, Mail, Check, AlertTriangle } from "lucide-react";
+import { useToast } from "@/components/ui/use-toast";
+
+interface UserData {
+  firstName: string;
+  lastName: string;
+  email: string;
+  emailVerified: boolean;
+  jobTitle?: string;
+  company?: string;
+  phoneNumber?: string;
+}
 
 export default function ProfilePage() {
-  const [activeTab, setActiveTab] = useState('personnel');
-  const [saving, setSaving] = useState(false);
-  const [success, setSuccess] = useState(false);
-  
-  // Données fictives du profil
-  const [profileData, setProfileData] = useState({
-    // Informations personnelles
-    firstName: 'Thomas',
-    lastName: 'Dubois',
-    email: 'thomas.dubois@exemple.fr',
-    phoneNumber: '06 12 34 56 78',
+  const router = useRouter();
+  const { toast } = useToast();
+  const [user, setUser] = useState<UserData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("general");
+  const [emailNotifications, setEmailNotifications] = useState(true);
+  const [marketingEmails, setMarketingEmails] = useState(false);
+
+  useEffect(() => {
+    // Vérifier si l'utilisateur est connecté
+    const authStatus = localStorage.getItem("isAuthenticated") === "true";
     
-    // Informations entreprise
-    companyName: 'Dubois Consulting',
-    siret: '12345678901234',
-    companyAddress: '42 Rue des Entrepreneurs',
-    companyCity: 'Paris',
-    companyPostcode: '75001',
+    if (!authStatus) {
+      toast({
+        variant: "destructive",
+        title: "Accès refusé",
+        description: "Vous devez être connecté pour accéder à cette page."
+      });
+      router.push("/auth/login");
+      return;
+    }
     
-    // Notifications
-    emailNotifications: true,
-    newPayslipNotifications: true,
-    marketingNotifications: false,
-    
-    // Sécurité et confidentialité
-    twoFactorAuth: false,
-    dataRetention: 'one_year',
-    anonymousStats: true,
-    
-    // Facturation
-    billingAddress: '42 Rue des Entrepreneurs, 75001 Paris',
-    billingEmail: 'facturation@dubois-consulting.fr',
-    vatNumber: 'FR12345678901',
-    
-    // Notes et préférences
-    notes: 'Préfère les communications par email.'
-  });
-  
-  // Gestionnaire de modification des champs
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setProfileData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    // Récupérer les informations de l'utilisateur
+    const userData = localStorage.getItem("user");
+    if (userData) {
+      try {
+        const parsedUser = JSON.parse(userData) as UserData;
+        setUser(parsedUser);
+        setIsLoading(false);
+      } catch (error) {
+        console.error("Erreur lors de la récupération des données utilisateur:", error);
+        toast({
+          variant: "destructive",
+          title: "Erreur",
+          description: "Impossible de récupérer vos informations. Veuillez vous reconnecter."
+        });
+        router.push("/auth/login");
+      }
+    } else {
+      // Si pas de données utilisateur, créer un utilisateur fictif pour la démo
+      setUser({
+        firstName: "Marie",
+        lastName: "Dupont",
+        email: "marie.dupont@example.com",
+        emailVerified: true,
+        jobTitle: "Responsable RH",
+        company: "Tech Solutions",
+        phoneNumber: "06 12 34 56 78"
+      });
+      setIsLoading(false);
+    }
+  }, [router, toast]);
+
+  const handleSaveProfile = () => {
+    toast({
+      title: "Profil mis à jour",
+      description: "Vos informations personnelles ont été mises à jour avec succès."
+    });
+
+    // En production, envoyez les données à l'API et mettez à jour le localStorage
+    if (user) {
+      localStorage.setItem("user", JSON.stringify(user));
+    }
   };
-  
-  // Gestionnaire de modification des switchs
-  const handleSwitchChange = (name: string, checked: boolean) => {
-    setProfileData(prev => ({
-      ...prev,
-      [name]: checked
-    }));
+
+  const handleVerifyEmail = () => {
+    toast({
+      title: "Email de vérification envoyé",
+      description: "Veuillez vérifier votre boîte mail pour confirmer votre adresse email."
+    });
   };
-  
-  // Simulation de sauvegarde
-  const handleSave = () => {
-    setSaving(true);
-    setSuccess(false);
-    
-    // Simulation d'une requête API
-    setTimeout(() => {
-      setSaving(false);
-      setSuccess(true);
-      
-      // Masquer le message de succès après 3 secondes
-      setTimeout(() => {
-        setSuccess(false);
-      }, 3000);
-    }, 1500);
+
+  const handlePasswordChange = () => {
+    toast({
+      title: "Email envoyé",
+      description: "Un lien pour réinitialiser votre mot de passe vous a été envoyé par email."
+    });
   };
-  
+
+  const handleSaveNotifications = () => {
+    toast({
+      title: "Préférences de notification mises à jour",
+      description: "Vos préférences de notification ont été enregistrées."
+    });
+  };
+
+  if (isLoading) {
+    return (
+      <div className="container py-10 flex items-center justify-center min-h-[calc(100vh-8rem)]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
   return (
-    <div className="container mx-auto px-4 py-8 max-w-5xl">
-      <h1 className="text-3xl font-bold mb-6">Mon Profil</h1>
-      
-      <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
-        <Tabs 
-          value={activeTab} 
-          onValueChange={setActiveTab} 
-          className="w-full"
-        >
-          <TabsList className="flex w-full p-0 bg-gray-50 border-b border-gray-200">
-            <TabsTrigger 
-              value="personnel" 
-              className="flex items-center gap-2 flex-1 rounded-none border-r border-gray-200 py-3 data-[state=active]:bg-white data-[state=active]:shadow-none"
-            >
+    <div className="container py-10">
+      <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-2">
+          <h1 className="text-3xl font-bold tracking-tight">Mon profil</h1>
+          <p className="text-muted-foreground">
+            Gérez vos informations personnelles et vos préférences
+          </p>
+        </div>
+
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="mb-6">
+            <TabsTrigger value="general" className="flex items-center gap-2">
               <User className="h-4 w-4" />
-              Personnel
+              Informations personnelles
             </TabsTrigger>
-            <TabsTrigger 
-              value="entreprise" 
-              className="flex items-center gap-2 flex-1 rounded-none border-r border-gray-200 py-3 data-[state=active]:bg-white data-[state=active]:shadow-none"
-            >
-              <Building className="h-4 w-4" />
-              Entreprise
-            </TabsTrigger>
-            <TabsTrigger 
-              value="notifications" 
-              className="flex items-center gap-2 flex-1 rounded-none border-r border-gray-200 py-3 data-[state=active]:bg-white data-[state=active]:shadow-none"
-            >
-              <Bell className="h-4 w-4" />
-              Notifications
-            </TabsTrigger>
-            <TabsTrigger 
-              value="securite" 
-              className="flex items-center gap-2 flex-1 rounded-none border-r border-gray-200 py-3 data-[state=active]:bg-white data-[state=active]:shadow-none"
-            >
-              <Shield className="h-4 w-4" />
+            <TabsTrigger value="security" className="flex items-center gap-2">
+              <Settings className="h-4 w-4" />
               Sécurité
             </TabsTrigger>
-            <TabsTrigger 
-              value="facturation" 
-              className="flex items-center gap-2 flex-1 rounded-none py-3 data-[state=active]:bg-white data-[state=active]:shadow-none"
-            >
+            <TabsTrigger value="billing" className="flex items-center gap-2">
               <CreditCard className="h-4 w-4" />
               Facturation
             </TabsTrigger>
+            <TabsTrigger value="notifications" className="flex items-center gap-2">
+              <Bell className="h-4 w-4" />
+              Notifications
+            </TabsTrigger>
           </TabsList>
-          
-          <div className="p-6">
-            {success && (
-              <div className="bg-green-50 text-green-700 p-4 rounded-md flex items-center mb-6">
-                <CheckCircle className="h-5 w-5 mr-2" />
-                Modifications enregistrées avec succès
-              </div>
-            )}
-            
-            <TabsContent value="personnel" className="mt-0 space-y-6">
-              <div className="grid md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <Label htmlFor="firstName">Prénom</Label>
-                  <Input 
-                    id="firstName" 
-                    name="firstName" 
-                    value={profileData.firstName}
-                    onChange={handleChange}
-                  />
+
+          {/* Informations personnelles */}
+          <TabsContent value="general">
+            <Card>
+              <CardHeader>
+                <CardTitle>Informations personnelles</CardTitle>
+                <CardDescription>
+                  Mettez à jour vos informations personnelles et professionnelles
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="firstName">Prénom</Label>
+                    <Input 
+                      id="firstName" 
+                      value={user?.firstName || ""} 
+                      onChange={(e) => setUser(user ? {...user, firstName: e.target.value} : null)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="lastName">Nom</Label>
+                    <Input 
+                      id="lastName" 
+                      value={user?.lastName || ""} 
+                      onChange={(e) => setUser(user ? {...user, lastName: e.target.value} : null)}
+                    />
+                  </div>
                 </div>
+
                 <div className="space-y-2">
-                  <Label htmlFor="lastName">Nom</Label>
-                  <Input 
-                    id="lastName" 
-                    name="lastName" 
-                    value={profileData.lastName}
-                    onChange={handleChange}
-                  />
-                </div>
-              </div>
-              
-              <div className="grid md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="email">Adresse e-mail</Label>
+                    {user?.emailVerified ? (
+                      <Badge variant="outline" className="text-green-500 border-green-200 bg-green-50 dark:bg-green-950 dark:border-green-800">
+                        <Check className="h-3 w-3 mr-1" /> Vérifiée
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-amber-500 border-amber-200 bg-amber-50 dark:bg-amber-950 dark:border-amber-800">
+                        <AlertTriangle className="h-3 w-3 mr-1" /> Non vérifiée
+                      </Badge>
+                    )}
+                  </div>
                   <Input 
                     id="email" 
-                    name="email" 
-                    type="email"
-                    value={profileData.email}
-                    onChange={handleChange}
+                    type="email" 
+                    value={user?.email || ""} 
+                    onChange={(e) => setUser(user ? {...user, email: e.target.value, emailVerified: false} : null)}
                   />
+                  {!user?.emailVerified && (
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="mt-2"
+                      onClick={handleVerifyEmail}
+                    >
+                      <Mail className="h-4 w-4 mr-2" />
+                      Vérifier cette adresse
+                    </Button>
+                  )}
                 </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="jobTitle">Poste</Label>
+                    <Input 
+                      id="jobTitle" 
+                      value={user?.jobTitle || ""} 
+                      onChange={(e) => setUser(user ? {...user, jobTitle: e.target.value} : null)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="company">Entreprise</Label>
+                    <Input 
+                      id="company" 
+                      value={user?.company || ""} 
+                      onChange={(e) => setUser(user ? {...user, company: e.target.value} : null)}
+                    />
+                  </div>
+                </div>
+
                 <div className="space-y-2">
-                  <Label htmlFor="phoneNumber">Téléphone</Label>
+                  <Label htmlFor="phoneNumber">Numéro de téléphone</Label>
                   <Input 
                     id="phoneNumber" 
-                    name="phoneNumber" 
-                    value={profileData.phoneNumber}
-                    onChange={handleChange}
+                    value={user?.phoneNumber || ""} 
+                    onChange={(e) => setUser(user ? {...user, phoneNumber: e.target.value} : null)}
                   />
                 </div>
-              </div>
-              
-              <div className="pt-4">
-                <h3 className="text-lg font-semibold mb-2">Mot de passe</h3>
-                <Button variant="outline">Modifier le mot de passe</Button>
-              </div>
-            </TabsContent>
-            
-            <TabsContent value="entreprise" className="mt-0 space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="companyName">Nom de l&apos;entreprise</Label>
-                <Input 
-                  id="companyName" 
-                  name="companyName" 
-                  value={profileData.companyName}
-                  onChange={handleChange}
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="siret">Numéro SIRET</Label>
-                <Input 
-                  id="siret" 
-                  name="siret" 
-                  value={profileData.siret}
-                  onChange={handleChange}
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="companyAddress">Adresse</Label>
-                <Input 
-                  id="companyAddress" 
-                  name="companyAddress" 
-                  value={profileData.companyAddress}
-                  onChange={handleChange}
-                />
-              </div>
-              
-              <div className="grid md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <Label htmlFor="companyCity">Ville</Label>
-                  <Input 
-                    id="companyCity" 
-                    name="companyCity" 
-                    value={profileData.companyCity}
-                    onChange={handleChange}
-                  />
+              </CardContent>
+              <CardFooter>
+                <Button onClick={handleSaveProfile}>Enregistrer les modifications</Button>
+              </CardFooter>
+            </Card>
+          </TabsContent>
+
+          {/* Sécurité */}
+          <TabsContent value="security">
+            <Card>
+              <CardHeader>
+                <CardTitle>Sécurité</CardTitle>
+                <CardDescription>
+                  Gérez la sécurité de votre compte et modifiez votre mot de passe
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="space-y-4">
+                  <h3 className="text-lg font-medium">Changer votre mot de passe</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Pour des raisons de sécurité, vous recevrez un email contenant un lien pour réinitialiser votre mot de passe.
+                  </p>
+                  <Button variant="outline" onClick={handlePasswordChange}>
+                    Réinitialiser mon mot de passe
+                  </Button>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="companyPostcode">Code postal</Label>
-                  <Input 
-                    id="companyPostcode" 
-                    name="companyPostcode" 
-                    value={profileData.companyPostcode}
-                    onChange={handleChange}
-                  />
-                </div>
-              </div>
-            </TabsContent>
-            
-            <TabsContent value="notifications" className="mt-0 space-y-6">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-base font-medium">Notifications par email</h3>
-                    <p className="text-sm text-gray-500">Recevoir les notifications importantes par email</p>
+
+                <Separator />
+
+                <div className="space-y-4">
+                  <h3 className="text-lg font-medium">Sessions actives</h3>
+                  <div className="rounded-md border p-4">
+                    <div className="flex flex-col space-y-2">
+                      <p className="font-medium">Session actuelle</p>
+                      <p className="text-sm text-muted-foreground">
+                        Dernière connexion: {new Date().toLocaleDateString()} à {new Date().toLocaleTimeString()}
+                      </p>
+                      <div className="flex items-center gap-2 text-sm">
+                        <Badge variant="outline">Chrome</Badge>
+                        <Badge variant="outline">macOS</Badge>
+                        <Badge variant="outline">Paris, France</Badge>
+                      </div>
+                    </div>
                   </div>
-                  <Switch
-                    checked={profileData.emailNotifications}
-                    onCheckedChange={(checked) => handleSwitchChange('emailNotifications', checked)}
-                  />
                 </div>
-                
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-base font-medium">Nouvelles fiches de paie</h3>
-                    <p className="text-sm text-gray-500">Être notifié lorsqu&apos;une nouvelle fiche de paie est générée</p>
+
+                <Separator />
+
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-lg font-medium">Authentification à deux facteurs</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Ajoutez une couche de sécurité supplémentaire à votre compte
+                      </p>
+                    </div>
+                    <Switch id="2fa" />
                   </div>
-                  <Switch
-                    checked={profileData.newPayslipNotifications}
-                    onCheckedChange={(checked) => handleSwitchChange('newPayslipNotifications', checked)}
-                  />
                 </div>
-                
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-base font-medium">Communications marketing</h3>
-                    <p className="text-sm text-gray-500">Recevoir des informations sur les nouvelles fonctionnalités et offres</p>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Facturation */}
+          <TabsContent value="billing">
+            <Card>
+              <CardHeader>
+                <CardTitle>Facturation</CardTitle>
+                <CardDescription>
+                  Gérez votre plan d&apos;abonnement et vos informations de paiement
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="rounded-md border p-4">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="font-medium">Plan Actuel: Gratuit</p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Vous utilisez actuellement le plan gratuit limité à 3 fiches de paie par mois
+                      </p>
+                    </div>
+                    <Button variant="outline">Mettre à niveau</Button>
                   </div>
-                  <Switch
-                    checked={profileData.marketingNotifications}
-                    onCheckedChange={(checked) => handleSwitchChange('marketingNotifications', checked)}
-                  />
                 </div>
-              </div>
-            </TabsContent>
-            
-            <TabsContent value="securite" className="mt-0 space-y-6">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-base font-medium">Authentification à deux facteurs</h3>
-                    <p className="text-sm text-gray-500">Sécurisez davantage votre compte avec l&apos;authentification 2FA</p>
+
+                <Separator />
+
+                <div className="space-y-4">
+                  <h3 className="text-lg font-medium">Méthodes de paiement</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Vous n&apos;avez pas encore ajouté de méthode de paiement
+                  </p>
+                  <Button variant="outline">
+                    <CreditCard className="h-4 w-4 mr-2" />
+                    Ajouter une carte de crédit
+                  </Button>
+                </div>
+
+                <Separator />
+
+                <div className="space-y-4">
+                  <h3 className="text-lg font-medium">Historique de facturation</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Vous n&apos;avez pas encore d&apos;historique de facturation
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Notifications */}
+          <TabsContent value="notifications">
+            <Card>
+              <CardHeader>
+                <CardTitle>Notifications</CardTitle>
+                <CardDescription>
+                  Configurez comment et quand vous souhaitez être notifié
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <h3 className="font-medium">Notifications par email</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Recevez des notifications par email concernant votre compte
+                      </p>
+                    </div>
+                    <Switch 
+                      id="email-notifications" 
+                      checked={emailNotifications}
+                      onCheckedChange={setEmailNotifications}
+                    />
                   </div>
-                  <Switch
-                    checked={profileData.twoFactorAuth}
-                    onCheckedChange={(checked) => handleSwitchChange('twoFactorAuth', checked)}
-                  />
                 </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="dataRetention">Conservation des données</Label>
-                  <select 
-                    id="dataRetention"
-                    name="dataRetention"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                    value={profileData.dataRetention}
-                    onChange={handleChange}
-                  >
-                    <option value="six_months">6 mois</option>
-                    <option value="one_year">1 an (recommandé)</option>
-                    <option value="two_years">2 ans</option>
-                    <option value="five_years">5 ans</option>
-                  </select>
-                  <p className="text-xs text-gray-500">Durée de conservation des données après résiliation</p>
-                </div>
-                
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-base font-medium">Statistiques anonymes</h3>
-                    <p className="text-sm text-gray-500">Partager des statistiques d&apos;utilisation anonymes pour améliorer le service</p>
+
+                <Separator />
+
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <h3 className="font-medium">Emails marketing</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Recevez des emails concernant les nouveautés et offres spéciales
+                      </p>
+                    </div>
+                    <Switch 
+                      id="marketing-emails" 
+                      checked={marketingEmails}
+                      onCheckedChange={setMarketingEmails}
+                    />
                   </div>
-                  <Switch
-                    checked={profileData.anonymousStats}
-                    onCheckedChange={(checked) => handleSwitchChange('anonymousStats', checked)}
-                  />
                 </div>
-              </div>
-              
-              <div className="pt-4">
-                <h3 className="text-lg font-semibold mb-2">Sessions actives</h3>
-                <Button variant="outline" className="mr-2">Voir les appareils connectés</Button>
-                <Button variant="destructive">Déconnecter tous les appareils</Button>
-              </div>
-            </TabsContent>
-            
-            <TabsContent value="facturation" className="mt-0 space-y-6">
-              <div className="p-4 bg-gray-50 rounded-lg mb-4">
-                <h3 className="font-medium mb-2">Abonnement actuel</h3>
-                <div className="flex justify-between items-center">
-                  <div>
-                    <span className="font-semibold text-lg">Plan Pro</span>
-                    <p className="text-sm text-gray-500">Facturé mensuellement</p>
-                  </div>
-                  <Button variant="outline" size="sm">Changer d&apos;offre</Button>
-                </div>
-              </div>
-              
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="billingAddress">Adresse de facturation</Label>
-                  <Textarea
-                    id="billingAddress"
-                    name="billingAddress"
-                    value={profileData.billingAddress}
-                    onChange={handleChange}
-                    rows={3}
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="billingEmail">Email de facturation</Label>
-                  <Input
-                    id="billingEmail"
-                    name="billingEmail"
-                    value={profileData.billingEmail}
-                    onChange={handleChange}
-                    type="email"
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="vatNumber">Numéro de TVA (optionnel)</Label>
-                  <Input
-                    id="vatNumber"
-                    name="vatNumber"
-                    value={profileData.vatNumber}
-                    onChange={handleChange}
-                  />
-                </div>
-              </div>
-              
-              <div className="pt-4">
-                <h3 className="text-lg font-semibold mb-2">Historique de facturation</h3>
-                <Button variant="outline">Voir les factures</Button>
-              </div>
-            </TabsContent>
-          </div>
-          
-          <div className="p-6 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
-            <div className="space-y-2">
-              <Label htmlFor="notes">Notes et préférences</Label>
-              <Textarea
-                id="notes"
-                name="notes"
-                value={profileData.notes}
-                onChange={handleChange}
-                rows={2}
-                className="max-w-md"
-                placeholder="Informations complémentaires, préférences..."
-              />
-            </div>
-            
-            <Button 
-              onClick={handleSave} 
-              disabled={saving}
-              className="ml-4"
-            >
-              {saving ? (
-                <>Enregistrement...</>
-              ) : (
-                <>
-                  <Save className="mr-2 h-4 w-4" />
-                  Enregistrer les modifications
-                </>
-              )}
-            </Button>
-          </div>
+              </CardContent>
+              <CardFooter>
+                <Button onClick={handleSaveNotifications}>Enregistrer les préférences</Button>
+              </CardFooter>
+            </Card>
+          </TabsContent>
         </Tabs>
       </div>
     </div>

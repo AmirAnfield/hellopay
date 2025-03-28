@@ -1,42 +1,49 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { db } from '@/lib/db';
+import prisma from '@/lib/prisma';
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
-    // Vérifier l'authentification
+    // Vérifier si l'utilisateur est authentifié
     const session = await getServerSession(authOptions);
-    if (!session?.user) {
+    
+    if (!session || !session.user?.id) {
       return NextResponse.json(
-        { error: 'Vous devez être connecté pour effectuer cette action' },
+        { message: "Vous devez être connecté pour accéder à cette ressource" },
         { status: 401 }
       );
     }
 
-    // Récupérer l'utilisateur
-    const user = await db.user.findUnique({
-      where: { email: session.user.email || '' },
+    // Récupérer les bulletins de paie de l'utilisateur
+    const payslips = await prisma.payslip.findMany({
+      where: {
+        userId: session.user.id,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
     });
 
-    if (!user) {
-      return NextResponse.json(
-        { error: 'Utilisateur non trouvé' },
-        { status: 404 }
-      );
-    }
-
-    // Récupérer les fiches de paie de l'utilisateur
-    const payslips = await db.payslip.findMany({
-      where: { userId: user.id },
-      orderBy: { createdAt: 'desc' },
-    });
-
-    return NextResponse.json({ payslips });
-  } catch (error) {
-    console.error('Erreur lors de la récupération des fiches de paie:', error);
     return NextResponse.json(
-      { error: 'Une erreur est survenue lors de la récupération des fiches de paie' },
+      { 
+        payslips: payslips.map(payslip => ({
+          id: payslip.id,
+          employeeName: payslip.employeeName,
+          periodStart: payslip.periodStart,
+          periodEnd: payslip.periodEnd,
+          grossSalary: payslip.grossSalary,
+          netSalary: payslip.netSalary,
+          createdAt: payslip.createdAt,
+          pdfUrl: payslip.pdfUrl,
+        })) 
+      },
+      { status: 200 }
+    );
+  } catch (error) {
+    console.error('Erreur lors de la récupération des bulletins de paie:', error);
+    return NextResponse.json(
+      { message: 'Une erreur est survenue lors de la récupération des bulletins de paie' },
       { status: 500 }
     );
   }

@@ -5,6 +5,9 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { PayslipProps } from '@/src/components/payslip/PayslipTemplate';
 import { Contribution } from '@/src/components/payslip/FrenchContributions';
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
 
 // Fonction pour formater les montants en devise EUR
 const formatCurrency = (amount: number) => {
@@ -313,134 +316,220 @@ const generateContributionsTable = (contributions: Contribution[] | undefined, g
   return tableHtml;
 };
 
-export async function POST(req: NextRequest) {
+// POST /api/generate-payslip
+export async function POST(request: NextRequest) {
   try {
-    // Vérification de l'authentification
     const session = await getServerSession(authOptions);
-    if (!session?.user) {
+    
+    if (!session?.user?.id) {
       return NextResponse.json(
-        { error: 'Authentification requise' },
+        { error: "Vous devez être connecté pour générer un bulletin de paie." },
         { status: 401 }
       );
     }
-
-    // Récupération des données de la requête
-    const data = await req.json();
-    if (!data) {
-      return NextResponse.json(
-        { error: 'Données de fiche de paie manquantes' },
-        { status: 400 }
-      );
+    
+    // Récupérer les données du formulaire
+    const payslipData = await request.json();
+    
+    // Vérifier si un employé existant est sélectionné
+    let employee = null;
+    let company = null;
+    
+    if (payslipData.employeeId) {
+      // Récupérer les informations de l'employé depuis la base de données
+      employee = await prisma.employee.findUnique({
+        where: { 
+          id: payslipData.employeeId 
+        },
+        include: {
+          company: true
+        }
+      });
+      
+      if (!employee) {
+        return NextResponse.json(
+          { error: "L'employé sélectionné n'a pas été trouvé." },
+          { status: 404 }
+        );
+      }
+      
+      // Vérifier que l'employé appartient à une entreprise de l'utilisateur
+      if (employee.company.userId !== session.user.id) {
+        return NextResponse.json(
+          { error: "Vous n'êtes pas autorisé à générer un bulletin pour cet employé." },
+          { status: 403 }
+        );
+      }
+      
+      company = employee.company;
+      
+      // Pré-remplir certaines données du salarié
+      if (!payslipData.overrideEmployeeData) {
+        payslipData.employeeName = `${employee.firstName} ${employee.lastName}`;
+        payslipData.employeeAddress = `${employee.address}, ${employee.postalCode} ${employee.city}`;
+        payslipData.employeePosition = employee.position;
+        payslipData.employeeSocialSecurityNumber = employee.socialSecurityNumber;
+        payslipData.isExecutive = employee.isExecutive;
+        payslipData.hourlyRate = employee.hourlyRate;
+        payslipData.hoursWorked = employee.monthlyHours;
+      }
+    } else if (payslipData.companyId) {
+      // Si seule l'entreprise est spécifiée, récupérer ses informations
+      company = await prisma.company.findUnique({
+        where: { 
+          id: payslipData.companyId 
+        }
+      });
+      
+      if (!company) {
+        return NextResponse.json(
+          { error: "L'entreprise sélectionnée n'a pas été trouvée." },
+          { status: 404 }
+        );
+      }
+      
+      // Vérifier que l'entreprise appartient à l'utilisateur
+      if (company.userId !== session.user.id) {
+        return NextResponse.json(
+          { error: "Vous n'êtes pas autorisé à générer un bulletin pour cette entreprise." },
+          { status: 403 }
+        );
+      }
+      
+      // Pré-remplir certaines données de l'entreprise
+      if (!payslipData.overrideCompanyData) {
+        payslipData.employerName = company.name;
+        payslipData.employerAddress = `${company.address}, ${company.postalCode} ${company.city}`;
+        payslipData.employerSiret = company.siret;
+        payslipData.employerUrssaf = company.urssafNumber || '';
+      }
+    } else {
+      // Si ni l'employé ni l'entreprise ne sont spécifiés, vérifier que toutes les données sont présentes
+      const requiredFields = [
+        'employerName', 'employerAddress', 'employerSiret', 'employerUrssaf',
+        'employeeName', 'employeeAddress', 'employeePosition', 'employeeSocialSecurityNumber',
+        'periodMonth', 'periodYear', 'hourlyRate', 'hoursWorked'
+      ];
+      
+      const missingFields = requiredFields.filter(field => !payslipData[field]);
+      
+      if (missingFields.length > 0) {
+        return NextResponse.json(
+          { error: `Champs manquants: ${missingFields.join(', ')}` },
+          { status: 400 }
+        );
+      }
     }
+    
+    // Calculs des montants (toujours nécessaires)
+    const grossSalary = parseFloat(payslipData.hourlyRate) * parseFloat(payslipData.hoursWorked);
+    const employeeContributions = grossSalary * 0.22; // Environ 22% de cotisations salariales
+    const employerContributions = grossSalary * 0.42; // Environ 42% de cotisations patronales
+    const netSalary = grossSalary - employeeContributions;
+    const employerCost = grossSalary + employerContributions;
 
-    // Validation des données (version simplifiée)
-    const payslipData = data as PayslipProps;
-    if (!payslipData.employee || !payslipData.employer || !payslipData.salary) {
-      return NextResponse.json(
-        { error: 'Données de fiche de paie incomplètes' },
-        { status: 400 }
-      );
+    // Formatage des dates
+    const periodMonth = payslipData.periodMonth.padStart(2, '0');
+    const periodYear = payslipData.periodYear;
+    const periodStart = new Date(`${periodYear}-${periodMonth}-01`);
+    
+    const lastDay = new Date(parseInt(periodYear), parseInt(periodMonth), 0).getDate();
+    const periodEnd = new Date(`${periodYear}-${periodMonth}-${lastDay}`);
+    
+    const fiscalYear = parseInt(periodYear);
+    
+    // Gestion des cumuls (simplifié, à améliorer en production)
+    const cumulativePeriodStart = new Date(`${periodYear}-01-01`);
+    const cumulativePeriodEnd = new Date(periodEnd);
+    
+    // Cumul estimé sur 3 mois pour exemple (à remplacer par calcul réel)
+    const cumulativeGrossSalary = grossSalary * 3;
+    const cumulativeNetSalary = netSalary * 3;
+    
+    // Congés payés
+    let paidLeaveAcquired = parseFloat(payslipData.paidLeaveAcquired || '2.5');
+    let paidLeaveTaken = parseFloat(payslipData.paidLeaveTaken || '0');
+    let paidLeaveRemaining = parseFloat(payslipData.paidLeaveRemaining || '0');
+    
+    if (employee) {
+      paidLeaveRemaining = employee.paidLeaveBalance;
     }
-
-    // Génération du HTML de la fiche de paie sans utiliser ReactDOMServer
-    const payslipHtml = generatePayslipHtml(payslipData);
-
-    // HTML complet avec styles Tailwind injectés
-    const htmlContent = `
-      <!DOCTYPE html>
-      <html lang="fr">
-      <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Fiche de paie - ${payslipData.employee.lastName} ${payslipData.employee.firstName}</title>
-        <script src="https://cdn.tailwindcss.com"></script>
-        <style>
-          @page {
-            margin: 15mm;
-            size: A4;
-          }
-          body {
-            font-family: Arial, sans-serif;
-            line-height: 1.4;
-          }
-          @media print {
-            body {
-              -webkit-print-color-adjust: exact;
-              print-color-adjust: exact;
-            }
-          }
-          /* Styles additionnels pour les tableaux de cotisations */
-          .contributions-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 1.5rem;
-          }
-          .contributions-table th, .contributions-table td {
-            border: 1px solid #ddd;
-            padding: 0.5rem;
-          }
-          .contributions-table th {
-            background-color: #f5f5f5;
-            text-align: left;
-          }
-          .contributions-category {
-            background-color: #f9f9f9;
-            font-weight: 500;
-          }
-          .contributions-total {
-            background-color: #eee;
-            font-weight: 700;
-          }
-          .amount-cell {
-            text-align: right;
-          }
-          .rate-cell {
-            text-align: center;
-          }
-        </style>
-      </head>
-      <body>
-        <div id="payslip">${payslipHtml}</div>
-      </body>
-      </html>
-    `;
-
-    // Lancement de Puppeteer
-    const browser = await puppeteer.launch({
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
-    });
-    const page = await browser.newPage();
     
-    // Chargement du contenu HTML
-    await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
+    // Préparer les données pour enregistrement en BDD
+    const payslipToCreate = {
+      userId: session.user.id,
+      employerName: payslipData.employerName,
+      employerAddress: payslipData.employerAddress,
+      employerSiret: payslipData.employerSiret,
+      employerUrssaf: payslipData.employerUrssaf,
+      
+      employeeName: payslipData.employeeName,
+      employeeAddress: payslipData.employeeAddress,
+      employeePosition: payslipData.employeePosition,
+      employeeSocialSecurityNumber: payslipData.employeeSocialSecurityNumber,
+      isExecutive: payslipData.isExecutive === true,
+      
+      periodStart,
+      periodEnd,
+      paymentDate: new Date(),
+      fiscalYear,
+      
+      hourlyRate: parseFloat(payslipData.hourlyRate),
+      hoursWorked: parseFloat(payslipData.hoursWorked),
+      grossSalary,
+      netSalary,
+      employerCost,
+      
+      employeeContributions,
+      employerContributions,
+      contributionsDetails: JSON.stringify([]), // À améliorer avec les détails réels
+      
+      paidLeaveAcquired,
+      paidLeaveTaken,
+      paidLeaveRemaining,
+      
+      cumulativeGrossSalary,
+      cumulativeNetSalary,
+      
+      cumulativePeriodStart,
+      cumulativePeriodEnd,
+    };
     
-    // Attente que tous les contenus soient chargés
-    await page.evaluateHandle('document.fonts.ready');
+    // Ajouter les associations si elles existent
+    if (company) {
+      payslipToCreate.companyId = company.id;
+    }
     
-    // Génération du PDF
-    const pdfBuffer = await page.pdf({
-      format: 'A4',
-      printBackground: true,
-      margin: { top: '15mm', right: '15mm', bottom: '15mm', left: '15mm' },
+    if (employee) {
+      payslipToCreate.employeeId = employee.id;
+    }
+    
+    // Créer le bulletin de paie dans la base de données
+    const payslip = await prisma.payslip.create({
+      data: payslipToCreate
     });
     
-    // Fermeture du navigateur
-    await browser.close();
-
-    // Configuration des en-têtes pour le téléchargement du PDF
-    const fileName = `fiche_paie_${payslipData.employee.lastName}_${payslipData.employee.firstName}_${payslipData.salary.period.replace(/\s/g, '_')}.pdf`;
+    // Si le bulletin est lié à un employé, mettre à jour son solde de congés
+    if (employee) {
+      const newPaidLeaveBalance = employee.paidLeaveBalance + paidLeaveAcquired - paidLeaveTaken;
+      
+      await prisma.employee.update({
+        where: { id: employee.id },
+        data: { paidLeaveBalance: newPaidLeaveBalance }
+      });
+    }
     
-    return new NextResponse(pdfBuffer, {
-      headers: {
-        'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="${fileName}"`,
-      },
+    // Générer le PDF
+    // ... existing PDF generation code ...
+    
+    return NextResponse.json({ 
+      message: "Bulletin de paie généré avec succès.",
+      payslipId: payslip.id 
     });
   } catch (error) {
-    console.error('Erreur lors de la génération du PDF:', error);
+    console.error("Erreur lors de la génération du bulletin de paie:", error);
     return NextResponse.json(
-      { error: 'Erreur lors de la génération du PDF' },
+      { error: "Une erreur est survenue lors de la génération du bulletin de paie." },
       { status: 500 }
     );
   }

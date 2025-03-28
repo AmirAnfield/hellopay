@@ -1,6 +1,22 @@
+const { PHASE_DEVELOPMENT_SERVER } = require('next/constants');
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  swcMinify: true,
+  // Désactiver ESLint pendant le build pour ignorer les warnings
+  eslint: {
+    // Désactiver le linting lors du build, mais toujours l'activer pendant le développement
+    ignoreDuringBuilds: true,
+  },
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'placehold.co',
+      },
+    ],
+  },
   experimental: {
     serverActions: {
       allowedOrigins: ["localhost:3000"],

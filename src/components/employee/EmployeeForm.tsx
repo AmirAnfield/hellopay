@@ -1,3 +1,5 @@
+"use client";
+
 import React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -17,30 +19,18 @@ const employeeSchema = z.object({
   email: z.string().email('Email invalide'),
   phone: z.string().min(1, 'Le téléphone est requis'),
   birthDate: z.string().min(1, 'La date de naissance est requise'),
-  address: z.object({
-    street: z.string().min(1, 'La rue est requise'),
-    zipCode: z.string().min(5, 'Le code postal est requis'),
-    city: z.string().min(1, 'La ville est requise'),
-    country: z.string().min(1, 'Le pays est requis'),
-  }),
+  address: z.string().min(1, 'L\'adresse est requise'),
+  postalCode: z.string().min(5, 'Le code postal est requis'),
+  city: z.string().min(1, 'La ville est requise'),
+  country: z.string().default('France'),
   socialSecurityNumber: z.string().min(13, 'Le numéro de sécurité sociale doit comporter au moins 13 caractères'),
   position: z.string().min(1, 'Le poste est requis'),
   department: z.string().min(1, 'Le département est requis'),
   hireDate: z.string().min(1, 'La date d\'embauche est requise'),
-  contractType: z.enum(['cdi', 'cdd', 'intern', 'apprentice', 'freelance'], {
-    errorMap: () => ({ message: 'Veuillez sélectionner un type de contrat valide' }),
-  }),
-  salary: z.object({
-    base: z.string().min(1, 'Le salaire de base est requis'),
-    frequency: z.enum(['hourly', 'monthly', 'yearly'], {
-      errorMap: () => ({ message: 'Veuillez sélectionner une fréquence valide' }),
-    }),
-    currency: z.string().min(1, 'La devise est requise'),
-  }),
-  bankInfo: z.object({
-    iban: z.string().min(1, 'L\'IBAN est requis'),
-    bic: z.string().min(8, 'Le BIC doit contenir au moins 8 caractères'),
-  }),
+  contractType: z.string().min(1, 'Le type de contrat est requis'),
+  baseSalary: z.string().min(1, 'Le salaire de base est requis'),
+  iban: z.string().min(1, 'L\'IBAN est requis'),
+  bic: z.string().min(8, 'Le BIC doit contenir au moins 8 caractères'),
 });
 
 type EmployeeFormValues = z.infer<typeof employeeSchema>;
@@ -61,7 +51,7 @@ export function EmployeeForm({
     register,
     handleSubmit,
     setValue,
-    formState: { errors, isSubmitting },
+    formState: { errors },
     watch,
   } = useForm<EmployeeFormValues>({
     resolver: zodResolver(employeeSchema),
@@ -71,34 +61,24 @@ export function EmployeeForm({
       email: '',
       phone: '',
       birthDate: '',
-      address: {
-        street: '',
-        zipCode: '',
-        city: '',
-        country: 'France',
-      },
+      address: '',
+      postalCode: '',
+      city: '',
+      country: 'France',
       socialSecurityNumber: '',
       position: '',
       department: '',
       hireDate: '',
-      contractType: 'cdi',
-      salary: {
-        base: '',
-        frequency: 'monthly',
-        currency: 'EUR',
-      },
-      bankInfo: {
-        iban: '',
-        bic: '',
-      },
+      contractType: 'CDI',
+      baseSalary: '',
+      iban: '',
+      bic: '',
     },
   });
   
   const processSubmit = (data: EmployeeFormValues) => {
     onSubmit(data);
   };
-  
-  const contractType = watch('contractType');
   
   return (
     <form onSubmit={handleSubmit(processSubmit)} className="space-y-8">
@@ -111,22 +91,6 @@ export function EmployeeForm({
         </TabsList>
         
         <TabsContent value="personal" className="space-y-4">
-          <div className="space-y-4">
-            <h3 className="font-medium text-gray-700 text-lg border-b pb-2">Informations personnelles</h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 mb-1">
-                  Prénom*
-                </label>
-                <input
-                  id="firstName"
-                  type="text"
-                  className={`w-full p-2 border rounded-md ${errors.firstName ? 'border-red-500' : 'border-gray-300'}`}
-                  {...register('firstName')}
-                />
-                {errors.firstName && <p className="mt-1 text-sm text-red-600">{errors.firstName.message}</p>}
-              </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="firstName">Prénom *</Label>
@@ -134,8 +98,8 @@ export function EmployeeForm({
                 id="firstName"
                 placeholder="Prénom"
                 {...register("firstName")}
-                error={errors.firstName?.message}
               />
+              {errors.firstName && <p className="text-sm text-red-500">{errors.firstName.message}</p>}
             </div>
             
             <div className="space-y-2">
@@ -144,8 +108,8 @@ export function EmployeeForm({
                 id="lastName"
                 placeholder="Nom"
                 {...register("lastName")}
-                error={errors.lastName?.message}
               />
+              {errors.lastName && <p className="text-sm text-red-500">{errors.lastName.message}</p>}
             </div>
             
             <div className="space-y-2">
@@ -154,8 +118,8 @@ export function EmployeeForm({
                 id="birthDate"
                 type="date"
                 {...register("birthDate")}
-                error={errors.birthDate?.message}
               />
+              {errors.birthDate && <p className="text-sm text-red-500">{errors.birthDate.message}</p>}
             </div>
             
             <div className="space-y-2">
@@ -164,8 +128,8 @@ export function EmployeeForm({
                 id="socialSecurityNumber"
                 placeholder="Numéro de sécurité sociale"
                 {...register("socialSecurityNumber")}
-                error={errors.socialSecurityNumber?.message}
               />
+              {errors.socialSecurityNumber && <p className="text-sm text-red-500">{errors.socialSecurityNumber.message}</p>}
             </div>
           </div>
         </TabsContent>
@@ -179,18 +143,18 @@ export function EmployeeForm({
                 type="email"
                 placeholder="Email"
                 {...register("email")}
-                error={errors.email?.message}
               />
+              {errors.email && <p className="text-sm text-red-500">{errors.email.message}</p>}
             </div>
             
             <div className="space-y-2">
-              <Label htmlFor="phone">Téléphone</Label>
+              <Label htmlFor="phone">Téléphone *</Label>
               <Input
                 id="phone"
                 placeholder="Téléphone"
                 {...register("phone")}
-                error={errors.phone?.message}
               />
+              {errors.phone && <p className="text-sm text-red-500">{errors.phone.message}</p>}
             </div>
             
             <div className="space-y-2 md:col-span-2">
@@ -199,8 +163,8 @@ export function EmployeeForm({
                 id="address"
                 placeholder="Adresse"
                 {...register("address")}
-                error={errors.address?.message}
               />
+              {errors.address && <p className="text-sm text-red-500">{errors.address.message}</p>}
             </div>
             
             <div className="space-y-2">
@@ -209,8 +173,8 @@ export function EmployeeForm({
                 id="postalCode"
                 placeholder="Code postal"
                 {...register("postalCode")}
-                error={errors.postalCode?.message}
               />
+              {errors.postalCode && <p className="text-sm text-red-500">{errors.postalCode.message}</p>}
             </div>
             
             <div className="space-y-2">
@@ -219,8 +183,8 @@ export function EmployeeForm({
                 id="city"
                 placeholder="Ville"
                 {...register("city")}
-                error={errors.city?.message}
               />
+              {errors.city && <p className="text-sm text-red-500">{errors.city.message}</p>}
             </div>
           </div>
         </TabsContent>
@@ -233,15 +197,35 @@ export function EmployeeForm({
                 id="position"
                 placeholder="Fonction"
                 {...register("position")}
-                error={errors.position?.message}
               />
+              {errors.position && <p className="text-sm text-red-500">{errors.position.message}</p>}
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="department">Département *</Label>
+              <Input
+                id="department"
+                placeholder="Département"
+                {...register("department")}
+              />
+              {errors.department && <p className="text-sm text-red-500">{errors.department.message}</p>}
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="hireDate">Date d&apos;embauche *</Label>
+              <Input
+                id="hireDate"
+                type="date"
+                {...register("hireDate")}
+              />
+              {errors.hireDate && <p className="text-sm text-red-500">{errors.hireDate.message}</p>}
             </div>
             
             <div className="space-y-2">
               <Label htmlFor="contractType">Type de contrat *</Label>
               <Select
-                onValueChange={(value) => setValue('contractType', value as 'CDI' | 'CDD' | 'Intérim' | 'Stage' | 'Alternance')}
-                defaultValue={initialData?.contractType}
+                onValueChange={(value) => setValue('contractType', value)}
+                defaultValue={watch('contractType')}
               >
                 <SelectTrigger id="contractType">
                   <SelectValue placeholder="Sélectionner un type de contrat" />
@@ -254,66 +238,50 @@ export function EmployeeForm({
                   <SelectItem value="Alternance">Alternance</SelectItem>
                 </SelectContent>
               </Select>
-              {errors.contractType?.message && (
-                <p className="text-red-500 text-xs mt-1">{errors.contractType?.message}</p>
-              )}
+              {errors.contractType && <p className="text-sm text-red-500">{errors.contractType.message}</p>}
             </div>
             
             <div className="space-y-2">
-              <Label htmlFor="startDate">Date de début de contrat *</Label>
+              <Label htmlFor="baseSalary">Salaire de base *</Label>
               <Input
-                id="startDate"
-                type="date"
-                {...register("startDate")}
-                error={errors.startDate?.message}
+                id="baseSalary"
+                placeholder="Salaire de base"
+                {...register("baseSalary")}
               />
+              {errors.baseSalary && <p className="text-sm text-red-500">{errors.baseSalary.message}</p>}
             </div>
-            
-            {(contractType === 'CDD' || contractType === 'Intérim' || contractType === 'Stage') && (
-              <div className="space-y-2">
-                <Label htmlFor="endDate">Date de fin de contrat *</Label>
-                <Input
-                  id="endDate"
-                  type="date"
-                  {...register("endDate")}
-                  error={errors.endDate?.message}
-                />
-              </div>
-            )}
           </div>
         </TabsContent>
         
         <TabsContent value="banking" className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="iban">IBAN</Label>
+              <Label htmlFor="iban">IBAN *</Label>
               <Input
                 id="iban"
                 placeholder="IBAN"
                 {...register("iban")}
-                error={errors.iban?.message}
               />
+              {errors.iban && <p className="text-sm text-red-500">{errors.iban.message}</p>}
             </div>
             
-            <div className="space-y-2">
-              <Label htmlFor="bic">BIC/SWIFT</Label>
+            <div className="space-y-2 md:col-span-2">
+              <Label htmlFor="bic">BIC *</Label>
               <Input
                 id="bic"
-                placeholder="BIC/SWIFT"
+                placeholder="BIC"
                 {...register("bic")}
-                error={errors.bic?.message}
               />
+              {errors.bic && <p className="text-sm text-red-500">{errors.bic.message}</p>}
             </div>
           </div>
         </TabsContent>
       </Tabs>
       
-      <div className="flex justify-end space-x-2">
-        <Button type="button" variant="outline">
-          Annuler
-        </Button>
+      <div className="flex justify-end gap-4">
+        <Button type="button" variant="outline">Annuler</Button>
         <Button type="submit" disabled={isLoading}>
-          {isLoading ? "Enregistrement..." : initialData?.firstName ? "Mettre à jour" : "Ajouter l'employé"}
+          {isLoading ? "Enregistrement..." : "Enregistrer"}
         </Button>
       </div>
     </form>
