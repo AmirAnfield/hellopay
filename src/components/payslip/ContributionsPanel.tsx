@@ -46,14 +46,16 @@ interface ContributionsPanelProps {
     totalEmployerContributions: number;
   }) => void;
   initialContributions?: Contribution[];
+  activeTabCategory?: ContributionCategory;
 }
 
 export default function ContributionsPanel({
   grossSalary,
   onContributionsChange,
   initialContributions = DEFAULT_FRENCH_CONTRIBUTIONS,
+  activeTabCategory = 'securite_sociale',
 }: ContributionsPanelProps) {
-  const [activeTab, setActiveTab] = useState<ContributionCategory>('securite_sociale');
+  const [activeTab, setActiveTab] = useState<ContributionCategory>(activeTabCategory);
   const [contributions, setContributions] = useState<Contribution[]>(
     initialContributions.map(c => ({ ...c }))
   );

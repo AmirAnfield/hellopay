@@ -5,14 +5,13 @@ import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { useState } from 'react';
-import { ChevronDown, Menu, X } from 'lucide-react';
+import { ChevronDown, Menu, X, PlayCircle } from 'lucide-react';
 
 export function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const pathname = usePathname();
   const { data: session, status } = useSession();
-  const isAuthenticated = status === "authenticated";
 
   const handleSignOut = async () => {
     await signOut({ redirect: true, callbackUrl: "/" });
@@ -43,6 +42,18 @@ export function Navbar() {
                 }`}
               >
                 Tarifs
+              </Link>
+
+              <Link
+                href="/demo"
+                className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${
+                  isActive('/demo')
+                    ? 'border-primary text-gray-900'
+                    : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                }`}
+              >
+                <PlayCircle className="mr-1 h-4 w-4" />
+                Démo
               </Link>
 
               <Link
@@ -158,6 +169,17 @@ export function Navbar() {
               }`}
             >
               Tarifs
+            </Link>
+            <Link
+              href="/demo"
+              className={`flex items-center pl-3 pr-4 py-2 border-l-4 text-base font-medium ${
+                isActive('/demo')
+                  ? 'border-primary text-primary bg-primary-50'
+                  : 'border-transparent text-gray-500 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-700'
+              }`}
+            >
+              <PlayCircle className="mr-2 h-4 w-4" />
+              Démo
             </Link>
             <Link
               href="/faq"

@@ -1,4 +1,94 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# HelloPay - Solution de fiches de paie
+
+HelloPay est une application moderne de gestion de paie conçue pour simplifier la création et la gestion des fiches de paie pour les PME françaises.
+
+## MVP 0.5 - Amélioration de l'UX/UI
+
+Cette version se concentre sur l'amélioration de l'expérience utilisateur et de l'interface graphique, avec une approche "zero friction" inspirée des standards SaaS modernes comme Notion, Stripe, Deel, PayFit, Qonto et Alan.
+
+### Nouvelles fonctionnalités
+
+- **Parcours utilisateur complet et fluide**
+  - Onboarding en plusieurs étapes guidées
+  - Dashboard interactif avec statistiques en temps réel
+  - Navigation améliorée sans rechargement de page
+  - Formulaires intelligents avec calculs automatiques
+
+- **Interface moderne et responsive**
+  - Design inspiré des standards SaaS modernes
+  - Animations et transitions fluides
+  - Composants interactifs (cartes, tableaux, filtres)
+  - Expérience mobile optimisée
+
+- **Gestion des employés**
+  - Interface de liste avec filtres et tri
+  - Formulaire de création avec onglets organisés
+  - Affichage adaptatif (liste/cartes) selon la taille d'écran
+  - Fonctionnalités de recherche et de filtrage avancées
+
+- **Gestion des fiches de paie**
+  - Calculateur interactif en temps réel
+  - Visualisation des charges et cotisations
+  - Workflow simplifié de création de fiches de paie
+  - Vue synthétique des données salariales
+
+### Parcours utilisateur
+
+1. **Onboarding**
+   - Configuration de l'entreprise
+   - Paramètres utilisateur
+   - Guide de démarrage
+
+2. **Dashboard**
+   - Vue d'ensemble de l'activité
+   - Statistiques des employés et des fiches de paie
+   - Actions rapides et raccourcis
+
+3. **Gestion des employés**
+   - Ajout d'employés avec informations personnelles, professionnelles et salariales
+   - Liste des employés avec filtre par département et type de contrat
+   - Actions rapides (voir, modifier, supprimer)
+
+4. **Création de fiches de paie**
+   - Sélection d'employé
+   - Configuration de la période
+   - Calcul automatique des cotisations
+   - Aperçu en temps réel
+
+## Technologies utilisées
+
+- **Framework**: Next.js avec App Router
+- **Base de données**: Supabase
+- **Styling**: Tailwind CSS
+- **Composants**: shadcn/ui
+- **Authentication**: Supabase Auth
+
+## Installation et démarrage
+
+```bash
+# Installer les dépendances
+npm install
+
+# Lancer le serveur de développement
+npm run dev
+
+# Ouvrir dans le navigateur
+# http://localhost:3000
+```
+
+## Structure des fichiers
+
+- `app/` - Routes de l'application
+  - `auth/` - Pages d'authentification et d'onboarding
+  - `dashboard/` - Interface principale de l'application
+    - `employees/` - Gestion des employés
+    - `payslips/` - Gestion des fiches de paie
+
+- `components/` - Composants réutilisables
+  - `ui/` - Composants UI génériques
+
+- `lib/` - Utilitaires et services
+  - `supabase.ts` - Client Supabase
 
 ## Getting Started
 
