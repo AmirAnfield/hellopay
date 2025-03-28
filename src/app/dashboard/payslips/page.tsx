@@ -1,467 +1,271 @@
-'use client'
+'use client';
 
-import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
-import { 
-  PlusCircle, 
-  Search, 
-  Filter, 
-  Download, 
-  Calendar, 
-  ChevronDown, 
-  Check, 
-  FileText,
-  Eye,
-  Pencil,
-  Trash2,
-  XCircle,
-  ArrowUpDown,
-  CheckCircle2,
-  Clock
-} from 'lucide-react'
-import Link from 'next/link'
-import { toast } from 'sonner'
+import React, { useState, useEffect } from 'react';
+import { useSession } from 'next-auth/react';
+import { redirect } from 'next/navigation';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Input } from '@/components/ui/input';
+import { FileText, Download, Trash2, Search, FileDown, AlertCircle } from 'lucide-react';
+import { toast } from 'sonner';
+import { format } from 'date-fns';
+import { fr } from 'date-fns/locale';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
-interface Payslip {
-  id: string
-  employeeName: string
-  period: string
-  created_at: string
-  grossSalary: number
-  netSalary: number
-  status: 'draft' | 'pending' | 'completed'
-}
+// Type pour les fiches de paie
+type Payslip = {
+  id: string;
+  employerName: string;
+  employerSiret: string;
+  employeeFirstName: string;
+  employeeLastName: string;
+  employeePosition: string;
+  period: string;
+  grossSalary: number;
+  netToPay: number;
+  paymentDate: string;
+  createdAt: string;
+  fileName: string;
+};
 
-export default function PayslipsPage() {
-  const router = useRouter()
-  const [payslips, setPayslips] = useState<Payslip[]>([])
-  const [loading, setLoading] = useState(true)
-  const [searchTerm, setSearchTerm] = useState('')
-  const [statusFilter, setStatusFilter] = useState<string>('all')
-  const [period, setPeriod] = useState<string>('all')
-  const [sortField, setSortField] = useState<keyof Payslip>('created_at')
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
+export default function PayslipsDashboard() {
+  const { data: session, status } = useSession();
+  const [payslips, setPayslips] = useState<Payslip[]>([]);
+  const [filteredPayslips, setFilteredPayslips] = useState<Payslip[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [payslipToDelete, setPayslipToDelete] = useState<string | null>(null);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   
-  // Liste des périodes pour le filtre (généré dynamiquement à partir des données)
-  const [availablePeriods, setAvailablePeriods] = useState<string[]>([])
-  
+  // Rediriger vers la page de connexion si l'utilisateur n'est pas connecté
+  if (status === 'unauthenticated') {
+    redirect('/auth/login');
+  }
+
+  // Charger les fiches de paie
   useEffect(() => {
-    async function fetchPayslips() {
-      setLoading(true)
-      
+    const fetchPayslips = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession()
-        
-        if (!session) {
-          router.push('/auth/login')
-          return
-        }
-        
-        let query = supabase
-          .from('payslips')
-          .select('*')
-          .eq('userId', session.user.id)
-        
-        const { data, error } = await query
-        
-        if (error) {
-          throw error
-        }
-        
-        if (data) {
-          // Formater les données
-          const formattedPayslips: Payslip[] = data.map((p: any) => ({
-            id: p.id,
-            employeeName: p.employeeName || 'Employé inconnu',
-            period: p.period || 'Période inconnue',
-            created_at: p.created_at,
-            grossSalary: p.grossSalary || 0,
-            netSalary: p.netSalary || 0,
-            status: p.status || 'draft'
-          }))
-          
-          setPayslips(formattedPayslips)
-          
-          // Extraire les périodes uniques pour le filtre
-          const uniquePeriods = [...new Set(formattedPayslips.map(p => p.period))]
-          setAvailablePeriods(uniquePeriods)
+        setIsLoading(true);
+        const response = await fetch('/api/get-payslips');
+        if (response.ok) {
+          const data = await response.json();
+          setPayslips(data.payslips);
+          setFilteredPayslips(data.payslips);
+        } else {
+          toast.error('Erreur lors du chargement des fiches de paie');
         }
       } catch (error) {
-        console.error('Erreur lors du chargement des fiches de paie:', error)
-        toast.error('Erreur lors du chargement des fiches de paie')
+        console.error('Erreur:', error);
+        toast.error('Une erreur est survenue');
       } finally {
-        setLoading(false)
+        setIsLoading(false);
       }
+    };
+
+    if (status === 'authenticated') {
+      fetchPayslips();
     }
-    
-    fetchPayslips()
-  }, [router])
-  
-  // Filtrer et trier les fiches de paie
-  const filteredPayslips = payslips
-    .filter(p => {
-      const matchesSearch = p.employeeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           p.period.toLowerCase().includes(searchTerm.toLowerCase())
-      const matchesStatus = statusFilter === 'all' || p.status === statusFilter
-      const matchesPeriod = period === 'all' || p.period === period
-      
-      return matchesSearch && matchesStatus && matchesPeriod
-    })
-    .sort((a, b) => {
-      const aValue = a[sortField]
-      const bValue = b[sortField]
-      
-      if (typeof aValue === 'string' && typeof bValue === 'string') {
-        return sortDirection === 'asc' 
-          ? aValue.localeCompare(bValue)
-          : bValue.localeCompare(aValue)
-      }
-      
-      if (typeof aValue === 'number' && typeof bValue === 'number') {
-        return sortDirection === 'asc' ? aValue - bValue : bValue - aValue
-      }
-      
-      return 0
-    })
-  
-  const handleSort = (field: keyof Payslip) => {
-    if (sortField === field) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+  }, [status]);
+
+  // Filtrer les fiches de paie
+  useEffect(() => {
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      const filtered = payslips.filter(
+        (payslip) =>
+          payslip.employeeFirstName.toLowerCase().includes(term) ||
+          payslip.employeeLastName.toLowerCase().includes(term) ||
+          payslip.period.toLowerCase().includes(term) ||
+          payslip.employerName.toLowerCase().includes(term)
+      );
+      setFilteredPayslips(filtered);
     } else {
-      setSortField(field)
-      setSortDirection('asc')
+      setFilteredPayslips(payslips);
     }
-  }
-  
-  const statusBadge = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-            <CheckCircle2 className="w-3 h-3 mr-1" />
-            Terminé
-          </span>
-        )
-      case 'pending':
-        return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-            <Clock className="w-3 h-3 mr-1" />
-            En attente
-          </span>
-        )
-      default:
-        return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-            <FileText className="w-3 h-3 mr-1" />
-            Brouillon
-          </span>
-        )
-    }
-  }
-  
-  const handleDeletePayslip = async (id: string) => {
-    if (!confirm('Êtes-vous sûr de vouloir supprimer cette fiche de paie ?')) {
-      return
-    }
+  }, [searchTerm, payslips]);
+
+  // Télécharger une fiche de paie
+  const handleDownload = (id: string) => {
+    window.open(`/api/download-payslip/${id}`, '_blank');
+  };
+
+  // Supprimer une fiche de paie
+  const confirmDelete = (id: string) => {
+    setPayslipToDelete(id);
+    setShowDeleteDialog(true);
+  };
+
+  const handleDelete = async () => {
+    if (!payslipToDelete) return;
     
     try {
-      const { error } = await supabase
-        .from('payslips')
-        .delete()
-        .eq('id', id)
+      const response = await fetch(`/api/delete-payslip/${payslipToDelete}`, {
+        method: 'DELETE',
+      });
       
-      if (error) {
-        throw error
+      if (response.ok) {
+        // Mettre à jour l'état local
+        const updatedPayslips = payslips.filter(payslip => payslip.id !== payslipToDelete);
+        setPayslips(updatedPayslips);
+        setFilteredPayslips(updatedPayslips);
+        toast.success('Fiche de paie supprimée avec succès');
+      } else {
+        toast.error('Erreur lors de la suppression');
       }
-      
-      setPayslips(payslips.filter(p => p.id !== id))
-      toast.success('Fiche de paie supprimée avec succès')
     } catch (error) {
-      console.error('Erreur lors de la suppression:', error)
-      toast.error('Erreur lors de la suppression de la fiche de paie')
+      console.error('Erreur:', error);
+      toast.error('Une erreur est survenue');
+    } finally {
+      setPayslipToDelete(null);
+      setShowDeleteDialog(false);
     }
-  }
-  
+  };
+
+  // Formater la date
+  const formatDate = (dateString: string) => {
+    try {
+      const date = new Date(dateString);
+      return format(date, 'dd MMMM yyyy', { locale: fr });
+    } catch (e) {
+      return dateString;
+    }
+  };
+
   return (
-    <div className="px-4 py-6 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-      {/* En-tête de la page */}
-      <div className="mb-8">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Fiches de paie</h1>
-            <p className="mt-1 text-sm text-gray-500">
-              Gérez et consultez toutes vos fiches de paie
-            </p>
-          </div>
-          <div className="mt-4 sm:mt-0">
-            <button 
-              onClick={() => router.push('/dashboard/payslips/new')}
-              className="inline-flex items-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2"
-            >
-              <PlusCircle className="mr-1.5 h-4 w-4" />
+    <div className="container mx-auto py-10">
+      <Card>
+        <CardHeader>
+          <div className="flex justify-between items-center">
+            <div>
+              <CardTitle className="text-2xl">Mes fiches de paie</CardTitle>
+              <CardDescription>
+                Consultez et gérez vos fiches de paie archivées.
+              </CardDescription>
+            </div>
+            <Button onClick={() => redirect('/payslips')}>
+              <FileDown className="mr-2 h-4 w-4" />
               Nouvelle fiche de paie
-            </button>
+            </Button>
           </div>
-        </div>
-      </div>
-      
-      {/* Filtres et recherche */}
-      <div className="mb-6 bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-        <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
-          <div className="relative w-full md:w-72">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Search className="h-4 w-4 text-gray-400" />
+        </CardHeader>
+        <CardContent>
+          <div className="mb-6">
+            <div className="relative w-full max-w-md">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Rechercher par nom, période..."
+                className="pl-10"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
             </div>
-            <input
-              type="text"
-              placeholder="Rechercher par nom ou période..."
-              className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
           </div>
-          
-          <div className="flex flex-wrap gap-3 w-full md:w-auto">
-            {/* Filtre de statut */}
-            <div className="relative inline-block w-full sm:w-auto">
-              <button 
-                className="w-full sm:w-auto inline-flex items-center justify-between px-3 py-2 border border-gray-300 rounded-md bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                onClick={() => document.getElementById('status-dropdown')?.classList.toggle('hidden')}
-              >
-                <Filter className="mr-2 h-4 w-4 text-gray-500" />
-                <span>Statut: {statusFilter === 'all' ? 'Tous' : 
-                  statusFilter === 'completed' ? 'Terminé' : 
-                  statusFilter === 'pending' ? 'En attente' : 'Brouillon'}</span>
-                <ChevronDown className="ml-2 h-4 w-4 text-gray-500" />
-              </button>
-              
-              <div id="status-dropdown" className="hidden absolute z-10 mt-1 w-full bg-white shadow-lg rounded-md border border-gray-200 py-1">
-                {['all', 'completed', 'pending', 'draft'].map(status => (
-                  <button
-                    key={status}
-                    className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 flex items-center"
-                    onClick={() => {
-                      setStatusFilter(status)
-                      document.getElementById('status-dropdown')?.classList.add('hidden')
-                    }}
-                  >
-                    {statusFilter === status && <Check className="mr-2 h-4 w-4 text-blue-500" />}
-                    <span className={statusFilter === status ? 'ml-6' : 'ml-0'}>
-                      {status === 'all' ? 'Tous' : 
-                       status === 'completed' ? 'Terminé' : 
-                       status === 'pending' ? 'En attente' : 'Brouillon'}
-                    </span>
-                  </button>
-                ))}
-              </div>
+
+          {isLoading ? (
+            <div className="flex justify-center items-center py-10">
+              <div className="animate-spin h-8 w-8 border-t-2 border-b-2 border-primary rounded-full"></div>
             </div>
-            
-            {/* Filtre de période */}
-            <div className="relative inline-block w-full sm:w-auto">
-              <button 
-                className="w-full sm:w-auto inline-flex items-center justify-between px-3 py-2 border border-gray-300 rounded-md bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                onClick={() => document.getElementById('period-dropdown')?.classList.toggle('hidden')}
-              >
-                <Calendar className="mr-2 h-4 w-4 text-gray-500" />
-                <span>Période: {period === 'all' ? 'Toutes' : period}</span>
-                <ChevronDown className="ml-2 h-4 w-4 text-gray-500" />
-              </button>
-              
-              <div id="period-dropdown" className="hidden absolute z-10 mt-1 w-full bg-white shadow-lg rounded-md border border-gray-200 py-1 max-h-60 overflow-y-auto">
-                <button
-                  className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 flex items-center"
-                  onClick={() => {
-                    setPeriod('all')
-                    document.getElementById('period-dropdown')?.classList.add('hidden')
-                  }}
+          ) : filteredPayslips.length > 0 ? (
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Salarié</TableHead>
+                    <TableHead>Période</TableHead>
+                    <TableHead>Montant net</TableHead>
+                    <TableHead>Date de création</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredPayslips.map((payslip) => (
+                    <TableRow key={payslip.id}>
+                      <TableCell className="font-medium">
+                        <div className="flex items-center">
+                          <FileText className="mr-2 h-4 w-4 text-blue-500" />
+                          <div>
+                            <div>{payslip.employeeFirstName} {payslip.employeeLastName}</div>
+                            <div className="text-xs text-muted-foreground">{payslip.employeePosition}</div>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>{payslip.period}</TableCell>
+                      <TableCell>{new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(payslip.netToPay)}</TableCell>
+                      <TableCell>{formatDate(payslip.createdAt)}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDownload(payslip.id)}
+                          >
+                            <Download className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-red-600 hover:bg-red-100"
+                            onClick={() => confirmDelete(payslip.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-10 text-center">
+              <AlertCircle className="h-10 w-10 text-muted-foreground mb-3" />
+              <h3 className="text-lg font-semibold">Aucune fiche de paie trouvée</h3>
+              <p className="text-muted-foreground">
+                {searchTerm 
+                  ? "Aucun résultat pour votre recherche." 
+                  : "Vous n'avez pas encore généré de fiches de paie."}
+              </p>
+              {!searchTerm && (
+                <Button 
+                  className="mt-4"
+                  onClick={() => redirect('/payslips')}
                 >
-                  {period === 'all' && <Check className="mr-2 h-4 w-4 text-blue-500" />}
-                  <span className={period === 'all' ? 'ml-6' : 'ml-0'}>Toutes les périodes</span>
-                </button>
-                
-                {availablePeriods.map(p => (
-                  <button
-                    key={p}
-                    className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 flex items-center"
-                    onClick={() => {
-                      setPeriod(p)
-                      document.getElementById('period-dropdown')?.classList.add('hidden')
-                    }}
-                  >
-                    {period === p && <Check className="mr-2 h-4 w-4 text-blue-500" />}
-                    <span className={period === p ? 'ml-6' : 'ml-0'}>{p}</span>
-                  </button>
-                ))}
-              </div>
+                  Générer votre première fiche de paie
+                </Button>
+              )}
             </div>
-          </div>
-        </div>
-      </div>
-      
-      {/* Tableau des fiches de paie */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-        {loading ? (
-          <div className="flex justify-center items-center p-12">
-            <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-600 border-t-transparent"></div>
-          </div>
-        ) : filteredPayslips.length === 0 ? (
-          <div className="p-8 text-center">
-            <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900">Aucune fiche de paie</h3>
-            <p className="mt-1 text-sm text-gray-500">
-              {searchTerm || statusFilter !== 'all' || period !== 'all' ? 
-                'Aucune fiche de paie ne correspond à vos critères de recherche.' : 
-                'Vous n\'avez pas encore créé de fiche de paie.'}
-            </p>
-            {!searchTerm && statusFilter === 'all' && period === 'all' && (
-              <button 
-                onClick={() => router.push('/dashboard/payslips/new')}
-                className="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700"
-              >
-                <PlusCircle className="mr-2 h-4 w-4" />
-                Créer ma première fiche
-              </button>
-            )}
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th 
-                    scope="col" 
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                    onClick={() => handleSort('employeeName')}
-                  >
-                    <div className="flex items-center">
-                      Employé
-                      {sortField === 'employeeName' && (
-                        <ArrowUpDown className={`ml-1 h-4 w-4 ${sortDirection === 'asc' ? 'transform rotate-180' : ''}`} />
-                      )}
-                    </div>
-                  </th>
-                  <th 
-                    scope="col" 
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                    onClick={() => handleSort('period')}
-                  >
-                    <div className="flex items-center">
-                      Période
-                      {sortField === 'period' && (
-                        <ArrowUpDown className={`ml-1 h-4 w-4 ${sortDirection === 'asc' ? 'transform rotate-180' : ''}`} />
-                      )}
-                    </div>
-                  </th>
-                  <th 
-                    scope="col" 
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                    onClick={() => handleSort('grossSalary')}
-                  >
-                    <div className="flex items-center">
-                      Salaire brut
-                      {sortField === 'grossSalary' && (
-                        <ArrowUpDown className={`ml-1 h-4 w-4 ${sortDirection === 'asc' ? 'transform rotate-180' : ''}`} />
-                      )}
-                    </div>
-                  </th>
-                  <th 
-                    scope="col" 
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                    onClick={() => handleSort('netSalary')}
-                  >
-                    <div className="flex items-center">
-                      Salaire net
-                      {sortField === 'netSalary' && (
-                        <ArrowUpDown className={`ml-1 h-4 w-4 ${sortDirection === 'asc' ? 'transform rotate-180' : ''}`} />
-                      )}
-                    </div>
-                  </th>
-                  <th 
-                    scope="col" 
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                    onClick={() => handleSort('status')}
-                  >
-                    <div className="flex items-center">
-                      Statut
-                      {sortField === 'status' && (
-                        <ArrowUpDown className={`ml-1 h-4 w-4 ${sortDirection === 'asc' ? 'transform rotate-180' : ''}`} />
-                      )}
-                    </div>
-                  </th>
-                  <th 
-                    scope="col" 
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                    onClick={() => handleSort('created_at')}
-                  >
-                    <div className="flex items-center">
-                      Date de création
-                      {sortField === 'created_at' && (
-                        <ArrowUpDown className={`ml-1 h-4 w-4 ${sortDirection === 'asc' ? 'transform rotate-180' : ''}`} />
-                      )}
-                    </div>
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredPayslips.map((payslip) => (
-                  <tr key={payslip.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">{payslip.employeeName}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-500">{payslip.period}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{payslip.grossSalary.toLocaleString('fr-FR')} €</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{payslip.netSalary.toLocaleString('fr-FR')} €</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {statusBadge(payslip.status)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {new Date(payslip.created_at).toLocaleDateString('fr-FR')}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex justify-end items-center space-x-2">
-                        <button 
-                          className="text-blue-600 hover:text-blue-900"
-                          onClick={() => router.push(`/dashboard/payslips/${payslip.id}`)}
-                        >
-                          <Eye className="h-4 w-4" />
-                        </button>
-                        <button 
-                          className="text-gray-600 hover:text-gray-900"
-                          onClick={() => router.push(`/dashboard/payslips/${payslip.id}/edit`)}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </button>
-                        <button 
-                          className="text-red-600 hover:text-red-900"
-                          onClick={() => handleDeletePayslip(payslip.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                        <Link 
-                          href={`/dashboard/payslips/${payslip.id}/download`}
-                          className="text-green-600 hover:text-green-900"
-                        >
-                          <Download className="h-4 w-4" />
-                        </Link>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Dialogue de confirmation de suppression */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmer la suppression</AlertDialogTitle>
+            <AlertDialogDescription>
+              Êtes-vous sûr de vouloir supprimer cette fiche de paie ? Cette action est irréversible.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
+              Supprimer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
-  )
+  );
 } 

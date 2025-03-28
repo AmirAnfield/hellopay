@@ -1,146 +1,227 @@
 'use client';
 
 import { useState } from 'react';
-import { signIn } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { signIn } from 'next-auth/react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { ArrowRight, AlertCircle, Mail, Lock, Github, Loader2 } from 'lucide-react';
+
+interface LoginFormData {
+  email: string;
+  password: string;
+  rememberMe: boolean;
+}
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-
+  const [formData, setFormData] = useState<LoginFormData>({
+    email: '',
+    password: '',
+    rememberMe: false
+  });
+  
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+  
+  const handleCheckboxChange = (checked: boolean) => {
+    setFormData(prev => ({
+      ...prev,
+      rememberMe: checked
+    }));
+  };
+  
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-    setLoading(true);
-
+    setIsLoading(true);
+    setError(null);
+    
     try {
       const result = await signIn('credentials', {
-        email,
-        password,
-        redirect: false
+        redirect: false,
+        email: formData.email,
+        password: formData.password,
+        callbackUrl: '/dashboard'
       });
-
+      
       if (result?.error) {
-        setError(result.error);
-      } else {
-        router.push('/dashboard');
-        router.refresh();
+        setError('Identifiants incorrects. Veuillez réessayer.');
+      } else if (result?.url) {
+        router.push(result.url);
       }
-    } catch (err) {
-      setError('Une erreur est survenue lors de la connexion');
-      console.error(err);
+    } catch {
+      setError('Une erreur est survenue. Veuillez réessayer plus tard.');
     } finally {
-      setLoading(false);
+      setIsLoading(false);
+    }
+  };
+  
+  const handleGithubSignIn = async () => {
+    setIsLoading(true);
+    try {
+      await signIn('github', { callbackUrl: '/dashboard' });
+    } catch {
+      setError('Erreur lors de la connexion avec GitHub. Veuillez réessayer.');
+      setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Connexion à votre compte
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            Ou{' '}
-            <Link href="/auth/register" className="font-medium text-indigo-600 hover:text-indigo-500">
-              créer un nouveau compte
-            </Link>
+    <div className="container flex h-screen flex-col items-center justify-center">
+      <div className="mx-auto flex w-full flex-col justify-center space-y-6 sm:w-[350px] md:w-[450px]">
+        <div className="flex flex-col space-y-2 text-center">
+          <h1 className="text-2xl font-semibold tracking-tight">Connexion à HelloPay</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            Accédez à votre espace personnel pour gérer vos fiches de paie
           </p>
         </div>
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          <div className="rounded-md shadow-sm space-y-4">
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                Adresse e-mail
-              </label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                autoComplete="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="mt-1 appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-              />
-            </div>
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                Mot de passe
-              </label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                autoComplete="current-password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="mt-1 appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-              />
-            </div>
-          </div>
-
-          {error && (
-            <div className="bg-red-50 border-l-4 border-red-400 p-4">
-              <div className="flex">
-                <div className="flex-shrink-0">
-                  <svg
-                    className="h-5 w-5 text-red-400"
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                    aria-hidden="true"
+        
+        <Card>
+          <CardHeader className="space-y-1">
+            <CardTitle className="text-xl">Connexion</CardTitle>
+            <CardDescription>
+              Utilisez votre adresse email et mot de passe pour vous connecter
+            </CardDescription>
+          </CardHeader>
+          
+          <CardContent>
+            <Tabs defaultValue="email" className="w-full">
+              <TabsList className="grid w-full grid-cols-2 mb-4">
+                <TabsTrigger value="email">Email</TabsTrigger>
+                <TabsTrigger value="github">GitHub</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="email">
+                {error && (
+                  <div className="flex items-center p-3 mb-4 bg-red-50 border border-red-200 text-red-700 rounded-md">
+                    <AlertCircle className="h-4 w-4 mr-2" />
+                    <span className="text-sm">{error}</span>
+                  </div>
+                )}
+                
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email</Label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                      <Input 
+                        id="email"
+                        name="email"
+                        type="email"
+                        placeholder="nom@exemple.fr"
+                        autoComplete="email"
+                        required
+                        className="pl-10"
+                        value={formData.email}
+                        onChange={handleInputChange}
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="password">Mot de passe</Label>
+                      <Link href="/auth/reset-password" className="text-xs text-primary hover:underline">
+                        Mot de passe oublié ?
+                      </Link>
+                    </div>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                      <Input 
+                        id="password"
+                        name="password"
+                        type="password"
+                        placeholder="••••••••"
+                        autoComplete="current-password"
+                        required
+                        className="pl-10"
+                        value={formData.password}
+                        onChange={handleInputChange}
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox 
+                        id="remember"
+                        checked={formData.rememberMe} 
+                        onCheckedChange={handleCheckboxChange}
+                      />
+                      <Label htmlFor="remember" className="text-sm">Se souvenir de moi</Label>
+                    </div>
+                  </div>
+                  
+                  <Button type="submit" className="w-full" disabled={isLoading}>
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Connexion en cours...
+                      </>
+                    ) : (
+                      <>
+                        Se connecter
+                        <ArrowRight className="ml-1 h-4 w-4" />
+                      </>
+                    )}
+                  </Button>
+                </form>
+              </TabsContent>
+              
+              <TabsContent value="github">
+                <div className="flex flex-col space-y-4">
+                  <p className="text-sm text-gray-500 text-center mx-auto max-w-xs">
+                    Connectez-vous avec votre compte GitHub pour un accès rapide
+                  </p>
+                  <Button
+                    variant="outline"
+                    onClick={handleGithubSignIn}
+                    disabled={isLoading}
+                    className="w-full"
                   >
-                    <path
-                      fillRule="evenodd"
-                      d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
+                    {isLoading ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Github className="mr-2 h-4 w-4" />
+                    )}
+                    Continuer avec GitHub
+                  </Button>
                 </div>
-                <div className="ml-3">
-                  <p className="text-sm text-red-700">{error}</p>
-                </div>
-              </div>
+              </TabsContent>
+            </Tabs>
+          </CardContent>
+          
+          <CardFooter className="flex flex-col space-y-4">
+            <div className="flex items-center justify-center text-sm">
+              <p className="text-center text-sm text-gray-500">
+                Pas encore inscrit ?{' '}
+                <Link href="/auth/register" className="text-primary hover:underline">
+                  Créer un compte
+                </Link>
+              </p>
             </div>
-          )}
-
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <input
-                id="remember_me"
-                name="remember_me"
-                type="checkbox"
-                className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-              />
-              <label htmlFor="remember_me" className="ml-2 block text-sm text-gray-900">
-                Se souvenir de moi
-              </label>
+            
+            <div className="text-center text-xs text-gray-500">
+              En vous connectant, vous acceptez nos{' '}
+              <Link href="/mentions-legales" className="text-primary hover:underline">Conditions d&apos;utilisation</Link>{' '}
+              et notre{' '}
+              <Link href="/confidentialite" className="text-primary hover:underline">Politique de confidentialité</Link>.
             </div>
-
-            <div className="text-sm">
-              <Link href="/auth/forgot-password" className="font-medium text-indigo-600 hover:text-indigo-500">
-                Mot de passe oublié ?
-              </Link>
-            </div>
-          </div>
-
-          <div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
-            >
-              {loading ? 'Connexion en cours...' : 'Se connecter'}
-            </button>
-          </div>
-        </form>
+          </CardFooter>
+        </Card>
       </div>
     </div>
   );

@@ -6,10 +6,10 @@ import type { PayslipData } from './PayslipCalculator';
 import { getValidationMessage } from '../../utils/validation';
 
 interface PayslipGeneratorProps {
-  onGenerate: (payslip: PayslipData) => void;
+  onPayslipGenerated: (payslip: PayslipData) => void;
 }
 
-export default function PayslipGenerator({ onGenerate }: PayslipGeneratorProps) {
+export function PayslipGenerator({ onPayslipGenerated }: PayslipGeneratorProps) {
   const [formData, setFormData] = useState({
     employerName: '',
     employerAddress: '',
@@ -58,7 +58,7 @@ export default function PayslipGenerator({ onGenerate }: PayslipGeneratorProps) 
     });
 
     const payslip = calculator.calculate();
-    onGenerate(payslip);
+    onPayslipGenerated(payslip);
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {

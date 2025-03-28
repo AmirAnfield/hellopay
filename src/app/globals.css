@@ -1,0 +1,155 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --foreground-rgb: 0, 0, 0;
+  --background-start-rgb: 245, 247, 250;
+  --background-end-rgb: 255, 255, 255;
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background: rgb(var(--background-start-rgb));
+}
+
+/* Styles pour les formulaires */
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  ring-color: #3b82f6;
+  ring-width: 2px;
+}
+
+/* Transition douce pour les boutons et éléments interactifs */
+button, a, input, select, textarea, .hover-effect {
+  transition: all 0.2s ease-in-out;
+}
+
+/* Styles généraux pour les tableaux */
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th {
+  text-align: left;
+  font-weight: 500;
+}
+
+tbody tr:hover {
+  background-color: rgba(243, 244, 246, 0.5);
+}
+
+/* Personnalisation du scroll */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgb(243, 244, 246);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgb(209, 213, 219);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgb(156, 163, 175);
+}
+
+/* Animation de chargement */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.loading-spinner {
+  animation: spin 1s linear infinite;
+}
+
+@layer components {
+  .payslip-section {
+    @apply mb-4 p-4 border rounded-md;
+  }
+
+  .payslip-header {
+    @apply flex justify-between items-start mb-6;
+  }
+
+  .payslip-table {
+    @apply w-full border-collapse;
+  }
+
+  .payslip-table th {
+    @apply text-left p-2 bg-gray-50 font-medium text-sm border;
+  }
+
+  .payslip-table td {
+    @apply p-2 border text-sm;
+  }
+
+  .contribution-item {
+    @apply grid grid-cols-4 py-1 text-sm border-b border-gray-100;
+  }
+
+  .contribution-header {
+    @apply font-medium;
+  }
+
+  .contribution-base {
+    @apply text-right;
+  }
+
+  .contribution-rate {
+    @apply text-right;
+  }
+
+  .contribution-amount {
+    @apply text-right font-medium;
+  }
+
+  .contribution-totals {
+    @apply grid grid-cols-4 py-2 font-bold text-sm border-t border-gray-400 mt-2;
+  }
+
+  .payslip-summary {
+    @apply mt-6 grid grid-cols-3 gap-4;
+  }
+
+  .summary-box {
+    @apply border rounded-md p-3 text-center;
+  }
+
+  .summary-title {
+    @apply text-sm text-gray-500 mb-1;
+  }
+
+  .summary-value {
+    @apply text-xl font-bold;
+  }
+
+  .print-only {
+    @apply hidden;
+  }
+}
+
+@media print {
+  .no-print {
+    @apply hidden;
+  }
+  
+  .print-only {
+    @apply block;
+  }
+  
+  .payslip-container {
+    @apply p-0 m-0 max-w-full;
+  }
+} 

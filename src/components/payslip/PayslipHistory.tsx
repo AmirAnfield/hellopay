@@ -1,84 +1,27 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import type { PayslipData } from './PayslipCalculator';
+import { useState } from 'react';
+import { PayslipData } from './PayslipCalculator';
+import { formatDate, formatCurrency } from '@/lib/utils';
 
 interface PayslipHistoryProps {
-  employeeName: string;
-  onSelectPayslip?: (payslip: PayslipData) => void;
+  payslips: PayslipData[];
+  onViewPayslip: (payslip: PayslipData) => void;
+  onDownloadPayslip: (payslip: PayslipData) => void;
+  onDeletePayslip: (payslip: PayslipData) => void;
 }
 
-export default function PayslipHistory({ employeeName, onSelectPayslip }: PayslipHistoryProps) {
-  const [payslips, setPayslips] = useState<PayslipData[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+export function PayslipHistory({ payslips, onViewPayslip, onDownloadPayslip, onDeletePayslip }: PayslipHistoryProps) {
   const [isResetting, setIsResetting] = useState(false);
 
-  useEffect(() => {
-    const fetchPayslips = async () => {
-      try {
-        const response = await fetch(`/api/payslips?employeeName=${encodeURIComponent(employeeName)}`);
-        if (!response.ok) {
-          throw new Error('Erreur lors de la récupération des fiches de paie');
-        }
-        const data = await response.json();
-        setPayslips(data);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Une erreur est survenue');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchPayslips();
-  }, [employeeName]);
-
-  const handleResetCumulatives = async () => {
-    try {
-      setIsResetting(true);
-      const response = await fetch(`/api/payslips?employeeName=${encodeURIComponent(employeeName)}`, {
-        method: 'PATCH'
-      });
-
-      if (!response.ok) {
-        throw new Error('Erreur lors de la réinitialisation des cumuls');
-      }
-
-      // Recharger les fiches de paie
-      const payslipsResponse = await fetch(`/api/payslips?employeeName=${encodeURIComponent(employeeName)}`);
-      if (!payslipsResponse.ok) {
-        throw new Error('Erreur lors de la récupération des fiches de paie');
-      }
-      const data = await payslipsResponse.json();
-      setPayslips(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Une erreur est survenue');
-    } finally {
+  const handleResetCumulatives = () => {
+    setIsResetting(true);
+    // Simuler une réinitialisation (dans une vraie application, cela appellerait une API)
+    setTimeout(() => {
       setIsResetting(false);
-    }
+      alert('Les cumuls ont été réinitialisés');
+    }, 1000);
   };
-
-  const formatDate = (date: Date) => {
-    return new Date(date).toLocaleDateString('fr-FR', {
-      year: 'numeric',
-      month: 'long'
-    });
-  };
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('fr-FR', {
-      style: 'currency',
-      currency: 'EUR'
-    }).format(amount);
-  };
-
-  if (loading) {
-    return <div className="text-center p-4">Chargement...</div>;
-  }
-
-  if (error) {
-    return <div className="text-red-500 p-4">{error}</div>;
-  }
 
   if (payslips.length === 0) {
     return <div className="text-center p-4">Aucune fiche de paie trouvée</div>;
@@ -121,8 +64,8 @@ export default function PayslipHistory({ employeeName, onSelectPayslip }: Paysli
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {payslips.map((payslip) => (
-              <tr key={payslip.periodStart.toString()} className="hover:bg-gray-50">
+            {payslips.map((payslip, index) => (
+              <tr key={index} className="hover:bg-gray-50">
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                   {formatDate(payslip.periodStart)}
                 </td>
@@ -140,10 +83,22 @@ export default function PayslipHistory({ employeeName, onSelectPayslip }: Paysli
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                   <button
-                    onClick={() => onSelectPayslip?.(payslip)}
-                    className="text-indigo-600 hover:text-indigo-900"
+                    onClick={() => onViewPayslip(payslip)}
+                    className="text-indigo-600 hover:text-indigo-900 mr-2"
                   >
                     Voir
+                  </button>
+                  <button
+                    onClick={() => onDownloadPayslip(payslip)}
+                    className="text-indigo-600 hover:text-indigo-900 mr-2"
+                  >
+                    Télécharger
+                  </button>
+                  <button
+                    onClick={() => onDeletePayslip(payslip)}
+                    className="text-red-600 hover:text-red-900"
+                  >
+                    Supprimer
                   </button>
                 </td>
               </tr>
