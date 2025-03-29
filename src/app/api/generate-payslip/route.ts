@@ -6,8 +6,9 @@ import { authOptions } from '@/lib/auth';
 import { PayslipProps } from '@/src/components/payslip/PayslipTemplate';
 import { Contribution } from '@/src/components/payslip/FrenchContributions';
 import { PrismaClient } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
 
-const prisma = new PrismaClient();
+const prismaClient = new PrismaClient();
 
 // Fonction pour formater les montants en devise EUR
 const formatCurrency = (amount: number) => {
@@ -316,6 +317,20 @@ const generateContributionsTable = (contributions: Contribution[] | undefined, g
   return tableHtml;
 };
 
+// Calcul des congés payés
+const calculateLeaveData = () => {
+  // Utiliser const au lieu de let pour les valeurs qui ne sont pas réassignées
+  const paidLeaveAcquired = 2.5; // 2.5 jours par mois travaillé
+  const paidLeaveTaken = 0; // À ajuster selon les congés pris
+  const paidLeaveRemaining = paidLeaveBalance + paidLeaveAcquired - paidLeaveTaken;
+  
+  return {
+    paidLeaveAcquired,
+    paidLeaveTaken,
+    paidLeaveRemaining
+  };
+};
+
 // POST /api/generate-payslip
 export async function POST(request: NextRequest) {
   try {
@@ -337,7 +352,7 @@ export async function POST(request: NextRequest) {
     
     if (payslipData.employeeId) {
       // Récupérer les informations de l'employé depuis la base de données
-      employee = await prisma.employee.findUnique({
+      employee = await prismaClient.employee.findUnique({
         where: { 
           id: payslipData.employeeId 
         },
@@ -375,7 +390,7 @@ export async function POST(request: NextRequest) {
       }
     } else if (payslipData.companyId) {
       // Si seule l'entreprise est spécifiée, récupérer ses informations
-      company = await prisma.company.findUnique({
+      company = await prismaClient.company.findUnique({
         where: { 
           id: payslipData.companyId 
         }
@@ -505,7 +520,7 @@ export async function POST(request: NextRequest) {
     }
     
     // Créer le bulletin de paie dans la base de données
-    const payslip = await prisma.payslip.create({
+    const payslip = await prismaClient.payslip.create({
       data: payslipToCreate
     });
     
@@ -513,7 +528,7 @@ export async function POST(request: NextRequest) {
     if (employee) {
       const newPaidLeaveBalance = employee.paidLeaveBalance + paidLeaveAcquired - paidLeaveTaken;
       
-      await prisma.employee.update({
+      await prismaClient.employee.update({
         where: { id: employee.id },
         data: { paidLeaveBalance: newPaidLeaveBalance }
       });

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,8 @@ import {
   X,
   ChevronDown,
   LayoutDashboard,
+  AlertTriangle,
+  Mail,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -33,22 +35,36 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useTheme } from "next-themes";
 import { signOut, useSession } from "next-auth/react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { Badge } from "@/components/ui/badge";
 
 export default function NavBar() {
   const router = useRouter();
   const pathname = usePathname();
   const { theme, setTheme } = useTheme();
   const { data: session, status } = useSession();
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const isAuthenticated = status === "authenticated";
   const user = session?.user;
+  // Vérifier si l'email est vérifié
+  const emailVerified = !!session?.user && 'emailVerified' in session.user && !!session.user.emailVerified;
 
   const handleLogout = async () => {
     await signOut({ redirect: false });
-    setIsMenuOpen(false);
+    setMobileMenuOpen(false);
     router.push("/");
   };
+
+  // Fermer le menu mobile lors du changement de route
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [pathname]);
 
   return (
     <header className="border-b sticky top-0 z-50 bg-background/95 backdrop-blur">
@@ -107,6 +123,14 @@ export default function NavBar() {
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
+                <Link
+                  href="/dashboard/documents"
+                  className={`text-sm font-medium transition-colors hover:text-primary ${
+                    pathname?.startsWith("/dashboard/documents") ? "text-primary" : "text-muted-foreground"
+                  }`}
+                >
+                  Documents
+                </Link>
               </>
             ) : (
               // Liens pour visiteurs
@@ -155,51 +179,92 @@ export default function NavBar() {
           </Button>
 
           {isAuthenticated ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="flex items-center gap-2 px-3 py-2"
-                >
-                  <User className="h-4 w-4" />
-                  <span>{user?.name || "Mon compte"}</span>
-                  <ChevronDown className="h-4 w-4 ml-1" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuLabel>Mon compte</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => router.push("/profile")}>
-                  <User className="h-4 w-4 mr-2" />
-                  Profil
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => router.push("/profile/settings")}>
-                  <Settings className="h-4 w-4 mr-2" />
-                  Paramètres
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => router.push("/profile/billing")}>
-                  <CreditCard className="h-4 w-4 mr-2" />
-                  Facturation
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuGroup>
-                  <DropdownMenuLabel className="text-xs">Gestion</DropdownMenuLabel>
-                  <DropdownMenuItem onClick={() => router.push("/dashboard/companies")}>
-                    <Building2 className="h-4 w-4 mr-2" />
-                    Mes entreprises
+            <>
+              {/* Indicateur d'email non vérifié */}
+              {!emailVerified && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Link href="/auth/verify/pending">
+                        <Button variant="outline" size="sm" className="gap-2 text-amber-600 border-amber-400 hover:bg-amber-50">
+                          <AlertTriangle className="h-4 w-4" />
+                          <span className="hidden sm:inline">Vérifiez votre email</span>
+                        </Button>
+                      </Link>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Votre email n&apos;est pas vérifié. Cliquez pour envoyer une vérification.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="flex items-center gap-2 px-3 py-2"
+                  >
+                    <User className="h-4 w-4" />
+                    <span className="max-w-[120px] truncate">{user?.name || "Mon compte"}</span>
+                    {!emailVerified && (
+                      <Badge variant="outline" className="h-2 w-2 rounded-full bg-amber-500 p-0" />
+                    )}
+                    <ChevronDown className="h-4 w-4 ml-1" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel className="flex justify-between items-center">
+                    <span>Mon compte</span>
+                    {!emailVerified && (
+                      <Badge variant="outline" className="text-xs bg-amber-100 text-amber-800 hover:bg-amber-200">
+                        Non vérifié
+                      </Badge>
+                    )}
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {!emailVerified && (
+                    <DropdownMenuItem onClick={() => router.push("/auth/verify/pending")}>
+                      <Mail className="h-4 w-4 mr-2 text-amber-500" />
+                      Vérifier email
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuItem onClick={() => router.push("/profile")}>
+                    <User className="h-4 w-4 mr-2" />
+                    Profil
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => router.push("/dashboard/employees")}>
-                    <Users className="h-4 w-4 mr-2" />
-                    Mes employés
+                  <DropdownMenuItem onClick={() => router.push("/profile/settings")}>
+                    <Settings className="h-4 w-4 mr-2" />
+                    Paramètres
                   </DropdownMenuItem>
-                </DropdownMenuGroup>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleLogout}>
-                  <LogOut className="h-4 w-4 mr-2" />
-                  Déconnexion
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+                  <DropdownMenuItem onClick={() => router.push("/profile/billing")}>
+                    <CreditCard className="h-4 w-4 mr-2" />
+                    Facturation
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuGroup>
+                    <DropdownMenuLabel className="text-xs">Gestion</DropdownMenuLabel>
+                    <DropdownMenuItem onClick={() => router.push("/dashboard/companies")}>
+                      <Building2 className="h-4 w-4 mr-2" />
+                      Mes entreprises
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => router.push("/dashboard/employees")}>
+                      <Users className="h-4 w-4 mr-2" />
+                      Mes employés
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => router.push("/dashboard/documents")}>
+                      <FileText className="h-4 w-4 mr-2" />
+                      Documents
+                    </DropdownMenuItem>
+                  </DropdownMenuGroup>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleLogout}>
+                    <LogOut className="h-4 w-4 mr-2" />
+                    Déconnexion
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </>
           ) : (
             <>
               <Button
@@ -222,8 +287,8 @@ export default function NavBar() {
           )}
         </div>
 
-        {/* Menu mobile */}
-        <div className="md:hidden flex items-center gap-4">
+        {/* Bouton menu mobile */}
+        <div className="md:hidden flex items-center gap-2">
           <Button
             variant="ghost"
             size="icon"
@@ -235,14 +300,24 @@ export default function NavBar() {
             <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
             <span className="sr-only">Changer de thème</span>
           </Button>
+
+          {/* Indicateur d'email non vérifié (version mobile) */}
+          {isAuthenticated && !emailVerified && (
+            <Link href="/auth/verify/pending">
+              <Button variant="outline" size="icon" className="rounded-full text-amber-600 border-amber-400">
+                <AlertTriangle className="h-5 w-5" />
+              </Button>
+            </Link>
+          )}
+
           <Button
             variant="ghost"
             size="icon"
             aria-label="Toggle menu"
             className="rounded-full"
-            onClick={() => setIsMenuOpen(!isMenuOpen)}
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
           >
-            {isMenuOpen ? (
+            {mobileMenuOpen ? (
               <X className="h-5 w-5" />
             ) : (
               <Menu className="h-5 w-5" />
@@ -251,113 +326,90 @@ export default function NavBar() {
         </div>
       </div>
 
-      {/* Menu mobile ouvert */}
-      {isMenuOpen && (
-        <div className="md:hidden border-t">
-          <div className="container py-4 space-y-4 px-4">
-            <nav className="flex flex-col gap-3">
-              <Link
-                href="/"
-                className="flex items-center gap-2 py-2 hover:text-primary"
-                onClick={() => setIsMenuOpen(false)}
-              >
-                <Home className="h-4 w-4" />
-                Accueil
-              </Link>
+      {/* Menu mobile */}
+      {mobileMenuOpen && (
+        <div className="md:hidden px-4 py-6 border-t bg-background">
+          <nav className="flex flex-col space-y-4">
+            <Link
+              href="/"
+              className={`px-3 py-2 rounded-md ${
+                pathname === "/" ? "bg-primary-50 text-primary" : "text-foreground"
+              }`}
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              <Home className="h-4 w-4 mr-2 inline-block" />
+              Accueil
+            </Link>
 
-              {isAuthenticated ? (
-                <>
-                  <Link
-                    href="/dashboard"
-                    className="flex items-center gap-2 py-2 hover:text-primary"
-                    onClick={() => setIsMenuOpen(false)}
-                  >
-                    <LayoutDashboard className="h-4 w-4" />
-                    Tableau de bord
-                  </Link>
-                  
-                  <Link
-                    href="/dashboard/companies"
-                    className="flex items-center gap-2 py-2 hover:text-primary"
-                    onClick={() => setIsMenuOpen(false)}
-                  >
-                    <Building2 className="h-4 w-4" />
-                    Entreprises
-                  </Link>
-                  
-                  <Link
-                    href="/dashboard/employees"
-                    className="flex items-center gap-2 py-2 hover:text-primary"
-                    onClick={() => setIsMenuOpen(false)}
-                  >
-                    <Users className="h-4 w-4" />
-                    Employés
-                  </Link>
-                  
-                  <Link
-                    href="/payslip/new"
-                    className="flex items-center gap-2 py-2 hover:text-primary"
-                    onClick={() => setIsMenuOpen(false)}
-                  >
-                    <FileText className="h-4 w-4" />
-                    Nouveau bulletin
-                  </Link>
-                </>
-              ) : (
-                <>
-                  <Link
-                    href="/pricing"
-                    className="flex items-center gap-2 py-2 hover:text-primary"
-                    onClick={() => setIsMenuOpen(false)}
-                  >
-                    <CreditCard className="h-4 w-4" />
-                    Tarifs
-                  </Link>
-                  <Link
-                    href="/demo"
-                    className="flex items-center gap-2 py-2 hover:text-primary"
-                    onClick={() => setIsMenuOpen(false)}
-                  >
-                    <FileText className="h-4 w-4" />
-                    Démo
-                  </Link>
-                  <Link
-                    href="/faq"
-                    className="flex items-center gap-2 py-2 hover:text-primary"
-                    onClick={() => setIsMenuOpen(false)}
-                  >
-                    <FileText className="h-4 w-4" />
-                    FAQ
-                  </Link>
-                </>
-              )}
-            </nav>
+            {isAuthenticated ? (
+              // Liens pour utilisateurs authentifiés
+              <>
+                <Link
+                  href="/dashboard"
+                  className={`px-3 py-2 rounded-md ${
+                    pathname?.startsWith("/dashboard") ? "bg-primary-50 text-primary" : "text-foreground"
+                  }`}
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  <LayoutDashboard className="h-4 w-4 mr-2 inline-block" />
+                  Tableau de bord
+                </Link>
 
-            {!isAuthenticated && (
-              <div className="flex flex-col gap-3 pt-3 border-t">
-                <Link href="/auth/login" onClick={() => setIsMenuOpen(false)}>
-                  <Button variant="outline" className="w-full justify-start">
-                    <LogIn className="h-4 w-4 mr-2" />
-                    Connexion
-                  </Button>
+                <Link
+                  href="/dashboard/companies"
+                  className={`px-3 py-2 rounded-md ${
+                    pathname?.includes("/companies") ? "bg-primary-50 text-primary" : "text-foreground"
+                  }`}
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  <Building2 className="h-4 w-4 mr-2 inline-block" />
+                  Entreprises
                 </Link>
-                <Link href="/auth/register" onClick={() => setIsMenuOpen(false)}>
-                  <Button className="w-full justify-start">
-                    <User className="h-4 w-4 mr-2" />
-                    S&apos;inscrire
-                  </Button>
-                </Link>
-              </div>
-            )}
 
-            {isAuthenticated && (
-              <div className="flex flex-col gap-3 pt-3 border-t">
-                <Link href="/profile" onClick={() => setIsMenuOpen(false)}>
-                  <Button variant="outline" className="w-full justify-start">
-                    <User className="h-4 w-4 mr-2" />
-                    Mon profil
-                  </Button>
+                <Link
+                  href="/dashboard/employees"
+                  className={`px-3 py-2 rounded-md ${
+                    pathname?.includes("/employees") ? "bg-primary-50 text-primary" : "text-foreground"
+                  }`}
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  <Users className="h-4 w-4 mr-2 inline-block" />
+                  Employés
                 </Link>
+
+                <Link
+                  href="/dashboard/documents"
+                  className={`px-3 py-2 rounded-md ${
+                    pathname?.includes("/documents") ? "bg-primary-50 text-primary" : "text-foreground"
+                  }`}
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  <FileText className="h-4 w-4 mr-2 inline-block" />
+                  Documents
+                </Link>
+
+                <Link
+                  href="/profile"
+                  className={`px-3 py-2 rounded-md ${
+                    pathname?.includes("/profile") ? "bg-primary-50 text-primary" : "text-foreground"
+                  }`}
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  <User className="h-4 w-4 mr-2 inline-block" />
+                  Mon compte
+                </Link>
+
+                {!emailVerified && (
+                  <Link
+                    href="/auth/verify/pending"
+                    className="px-3 py-2 rounded-md bg-amber-50 text-amber-600"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    <AlertTriangle className="h-4 w-4 mr-2 inline-block" />
+                    Vérifier mon email
+                  </Link>
+                )}
+
                 <Button
                   variant="outline"
                   className="w-full justify-start"
@@ -366,9 +418,67 @@ export default function NavBar() {
                   <LogOut className="h-4 w-4 mr-2" />
                   Déconnexion
                 </Button>
-              </div>
+              </>
+            ) : (
+              // Liens pour visiteurs
+              <>
+                <Link
+                  href="/pricing"
+                  className={`px-3 py-2 rounded-md ${
+                    pathname === "/pricing" ? "bg-primary-50 text-primary" : "text-foreground"
+                  }`}
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  <CreditCard className="h-4 w-4 mr-2 inline-block" />
+                  Tarifs
+                </Link>
+                <Link
+                  href="/demo"
+                  className={`px-3 py-2 rounded-md ${
+                    pathname === "/demo" ? "bg-primary-50 text-primary" : "text-foreground"
+                  }`}
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  <FileText className="h-4 w-4 mr-2 inline-block" />
+                  Démo
+                </Link>
+                <Link
+                  href="/faq"
+                  className={`px-3 py-2 rounded-md ${
+                    pathname === "/faq" ? "bg-primary-50 text-primary" : "text-foreground"
+                  }`}
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  <FileText className="h-4 w-4 mr-2 inline-block" />
+                  FAQ
+                </Link>
+
+                <div className="flex flex-col gap-2 pt-4">
+                  <Button
+                    variant="outline"
+                    className="w-full justify-center"
+                    onClick={() => {
+                      router.push("/auth/login");
+                      setMobileMenuOpen(false);
+                    }}
+                  >
+                    <LogIn className="h-4 w-4 mr-2" />
+                    Connexion
+                  </Button>
+                  <Button
+                    variant="default"
+                    className="w-full justify-center"
+                    onClick={() => {
+                      router.push("/auth/register");
+                      setMobileMenuOpen(false);
+                    }}
+                  >
+                    S&apos;inscrire
+                  </Button>
+                </div>
+              </>
             )}
-          </div>
+          </nav>
         </div>
       )}
     </header>

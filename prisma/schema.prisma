@@ -223,6 +223,11 @@ model Payslip {
   cumulativePeriodStart      DateTime  // Début de période des cumuls (normalement 1er janvier)
   cumulativePeriodEnd        DateTime  // Fin de période des cumuls (normalement 31 décembre)
 
+  // État du bulletin
+  status                     String    @default("draft") // "draft", "validated"
+  locked                     Boolean   @default(false)
+  validatedAt                DateTime?
+
   pdfUrl                      String?  // URL du PDF stocké dans Supabase
 
   @@index([employeeName])
@@ -232,6 +237,7 @@ model Payslip {
   @@index([companyId])
   @@index([employeeId])
   @@index([fiscalYear])
+  @@index([status])
 }
 
 // Modèle pour les contrats de travail (mis à jour)
@@ -310,4 +316,20 @@ model Certificate {
   @@index([companyId])
   @@index([employeeName])
   @@index([certificateType])
+}
+
+// Nouveau modèle pour les versions de taux de cotisations
+model RateVersion {
+  id              String   @id @default(cuid())
+  year            Int      // Année fiscale
+  description     String
+  effectiveFrom   DateTime
+  effectiveTo     DateTime?
+  isActive        Boolean  @default(true)
+  ratesJson       String   // JSON stringifié des taux
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@index([year])
+  @@index([isActive])
 }

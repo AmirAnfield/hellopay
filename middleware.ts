@@ -15,6 +15,7 @@ export async function middleware(request: NextRequest) {
     '/auth/reset-password',
     '/auth/verify',
     '/auth/verify/success',
+    '/auth/verify/pending',
     '/api/auth/register'
   ];
   
@@ -26,6 +27,14 @@ export async function middleware(request: NextRequest) {
   // Définir les chemins protégés (nécessitant authentification)
   const protectedPaths = ['/dashboard', '/payslip', '/profile', '/payslips'];
 
+  // Chemins accessibles avec connexion mais sans vérification d'email
+  const emailVerificationExemptPaths = [
+    '/auth/verify/pending',
+    '/auth/verify/send',
+    '/profile/settings',
+    '/api/auth/verify/send',
+  ];
+
   // Récupérer le token de la session
   const token = await getToken({
     req: request,
@@ -34,8 +43,21 @@ export async function middleware(request: NextRequest) {
 
   // Si le chemin demandé est protégé et qu'aucun token n'existe, rediriger vers login
   const isProtectedPath = protectedPaths.some(protectedPath => path.startsWith(protectedPath));
+  
   if (isProtectedPath && !token) {
     return NextResponse.redirect(new URL('/auth/login', request.url));
+  }
+
+  // Vérifier si l'utilisateur a vérifié son email
+  if (token && !token.emailVerified && isProtectedPath) {
+    // Vérifier si le chemin est exempté de la vérification d'email
+    const isExempt = emailVerificationExemptPaths.some(exemptPath => 
+      path.startsWith(exemptPath)
+    );
+    
+    if (!isExempt) {
+      return NextResponse.redirect(new URL('/auth/verify/pending', request.url));
+    }
   }
 
   // Si l'utilisateur est connecté et tente d'accéder à une page auth, rediriger vers dashboard

@@ -21,6 +21,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import Link from 'next/link';
 
 // Type pour les fiches de paie
 type Payslip = {
@@ -39,7 +40,7 @@ type Payslip = {
 };
 
 export default function PayslipsDashboard() {
-  const { data: session, status } = useSession();
+  const { status } = useSession();
   const [payslips, setPayslips] = useState<Payslip[]>([]);
   const [filteredPayslips, setFilteredPayslips] = useState<Payslip[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -137,7 +138,7 @@ export default function PayslipsDashboard() {
     try {
       const date = new Date(dateString);
       return format(date, 'dd MMMM yyyy', { locale: fr });
-    } catch (e) {
+    } catch {
       return dateString;
     }
   };
@@ -153,10 +154,18 @@ export default function PayslipsDashboard() {
                 Consultez et gérez vos fiches de paie archivées.
               </CardDescription>
             </div>
-            <Button onClick={() => redirect('/payslips')}>
-              <FileDown className="mr-2 h-4 w-4" />
-              Nouvelle fiche de paie
-            </Button>
+            <div className="flex space-x-2">
+              <Button asChild>
+                <Link href="/dashboard/payslips/generate">
+                  <FileDown className="mr-2 h-4 w-4" />
+                  Générer des bulletins
+                </Link>
+              </Button>
+              <Button onClick={() => redirect('/payslips')}>
+                <FileDown className="mr-2 h-4 w-4" />
+                Nouvelle fiche de paie
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>

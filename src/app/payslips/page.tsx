@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import Link from 'next/link';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { useRouter } from 'next/navigation';
 
 // Type pour une fiche de paie
 type Payslip = {
@@ -50,7 +49,6 @@ const mockPayslips: Payslip[] = [
 ];
 
 export default function PayslipsPage() {
-  const router = useRouter();
   const [payslips, setPayslips] = useState<Payslip[]>(mockPayslips);
   const [isLoading, setIsLoading] = useState(false);
   
@@ -84,7 +82,9 @@ export default function PayslipsPage() {
     try {
       // Simuler un appel API
       await new Promise(resolve => setTimeout(resolve, 1000));
-      console.log(`Téléchargement de la fiche de paie ID: ${id}`);
+      // Supprimer le console.log
+      // Remplacer par une action plus appropriée si nécessaire
+      window.open(`/api/download-payslip/${id}`, '_blank');
     } catch (error) {
       console.error('Erreur lors du téléchargement', error);
     } finally {
