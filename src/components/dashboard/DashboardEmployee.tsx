@@ -15,11 +15,8 @@ import {
   Phone, 
   Mail, 
   Tag, 
-  Check, 
-  X, 
   Building2, 
   ArrowLeft,
-  Loader2,
   AlertCircle,
   Euro
 } from "lucide-react";
@@ -29,6 +26,19 @@ import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
+import { 
+  EmptyState, 
+  HeaderActions 
+} from "@/components/shared/PageContainer";
+import { DeleteConfirmationDialog } from "@/components/shared/ConfirmationDialog";
+import { TableLoader } from "@/components/shared/SkeletonLoader";
+
+// Type pour représenter un bulletin de paie
+interface Payslip {
+  id: string;
+  period: string;
+  createdAt: string;
+}
 
 // Type pour représenter un employé
 interface Employee {
@@ -60,7 +70,7 @@ interface Employee {
     id: string;
     name: string;
   };
-  payslips?: any[]; // Optionnel, si les bulletins sont inclus
+  payslips?: Payslip[]; // Bulletins de paie de l'employé
 }
 
 interface DashboardEmployeeProps {
@@ -137,10 +147,6 @@ export default function DashboardEmployee({ companyId }: DashboardEmployeeProps)
 
   // Fonction pour supprimer un employé
   async function deleteEmployee(id: string) {
-    if (!confirm("Êtes-vous sûr de vouloir supprimer cet employé ? Cette action est irréversible.")) {
-      return;
-    }
-
     try {
       const response = await fetch(`/api/employees/${id}`, {
         method: "DELETE",
@@ -186,11 +192,6 @@ export default function DashboardEmployee({ companyId }: DashboardEmployeeProps)
     router.push(url);
   }
 
-  // Fonction pour voir les bulletins de paie d'un employé
-  function viewPayslips(id: string) {
-    router.push(`/dashboard/employees/${id}/payslips`);
-  }
-
   // Fonction pour créer un bulletin de paie pour cet employé
   function createPayslip(id: string) {
     router.push(`/payslip/new?employeeId=${id}`);
@@ -213,28 +214,24 @@ export default function DashboardEmployee({ companyId }: DashboardEmployeeProps)
 
   // Affichage du chargement
   if (isLoading) {
-    return (
-      <div className="flex justify-center items-center min-h-[400px]">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
+    return <TableLoader rows={3} columns={3} />;
   }
 
   // Affichage d'erreur
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[400px] text-center">
-        <AlertCircle className="h-12 w-12 text-destructive mb-4" />
-        <h3 className="text-xl font-semibold mb-2">Erreur de chargement</h3>
-        <p className="text-muted-foreground mb-4">{error}</p>
-        <Button onClick={fetchEmployees}>Réessayer</Button>
-      </div>
+      <EmptyState
+        title="Erreur de chargement"
+        description={error}
+        icon={AlertCircle}
+        action={<Button onClick={fetchEmployees}>Réessayer</Button>}
+      />
     );
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           {currentCompanyId && company ? (
             <div className="flex flex-col">
@@ -261,36 +258,40 @@ export default function DashboardEmployee({ companyId }: DashboardEmployeeProps)
             </div>
           )}
         </div>
-        <Button onClick={createEmployee} className="flex items-center gap-2">
-          <Plus className="h-4 w-4" />
-          Ajouter un employé
-        </Button>
+        <HeaderActions>
+          <Button onClick={createEmployee} className="flex items-center gap-2">
+            <Plus className="h-4 w-4" />
+            Ajouter un employé
+          </Button>
+        </HeaderActions>
       </div>
 
       {employees.length === 0 ? (
-        <Card className="border-dashed border-2 bg-muted/50">
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <Users className="h-12 w-12 text-muted-foreground opacity-30 mb-4" />
-            <h3 className="text-lg font-medium mb-2">Aucun employé</h3>
-            <p className="text-muted-foreground text-center max-w-md mb-6">
-              {currentCompanyId 
-                ? "Vous n'avez pas encore ajouté d'employé à cette entreprise."
-                : "Vous n'avez pas encore ajouté d'employé à vos entreprises."}
-              Créez votre premier employé pour commencer à générer des bulletins de paie.
-            </p>
+        <EmptyState
+          title="Aucun employé"
+          description={
+            currentCompanyId 
+              ? "Vous n'avez pas encore ajouté d'employé à cette entreprise. Créez votre premier employé pour commencer à générer des bulletins de paie."
+              : "Vous n'avez pas encore ajouté d'employé à vos entreprises. Créez votre premier employé pour commencer à générer des bulletins de paie."
+          }
+          icon={Users}
+          action={
             <Button onClick={createEmployee} className="flex items-center gap-2">
               <Plus className="h-4 w-4" />
               Ajouter mon premier employé
             </Button>
-          </CardContent>
-        </Card>
+          }
+        />
       ) : (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {employees.map((employee) => (
             <Card key={employee.id} className="overflow-hidden hover:shadow-md transition-shadow">
               <CardHeader className="pb-3">
                 <div className="flex justify-between items-start">
-                  <CardTitle className="text-xl font-bold line-clamp-1">
+                  <CardTitle 
+                    className="text-xl font-bold line-clamp-1 cursor-pointer hover:text-primary hover:underline transition-colors"
+                    onClick={() => viewEmployeeDetails(employee.id)}
+                  >
                     {employee.firstName} {employee.lastName}
                   </CardTitle>
                   <Badge variant={employee.isExecutive ? "default" : "secondary"} className="font-normal">
@@ -376,14 +377,16 @@ export default function DashboardEmployee({ companyId }: DashboardEmployeeProps)
                     <FileText className="h-4 w-4 mr-1" />
                     Bulletin
                   </Button>
-                  <Button 
-                    size="sm" 
-                    variant="destructive"
-                    onClick={() => deleteEmployee(employee.id)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    <span className="sr-only">Supprimer</span>
-                  </Button>
+                  <DeleteConfirmationDialog
+                    itemName={`l'employé ${employee.firstName} ${employee.lastName}`}
+                    onConfirm={() => deleteEmployee(employee.id)}
+                    trigger={
+                      <Button size="sm" variant="destructive">
+                        <Trash2 className="h-4 w-4" />
+                        <span className="sr-only">Supprimer</span>
+                      </Button>
+                    }
+                  />
                 </div>
               </CardFooter>
             </Card>

@@ -47,6 +47,8 @@ export default function RegisterPage() {
     register,
     handleSubmit,
     formState: { errors },
+    watch,
+    setValue,
   } = useForm<RegisterValues>({
     resolver: zodResolver(registerSchema),
     defaultValues: {
@@ -179,7 +181,13 @@ export default function RegisterPage() {
               )}
             </div>
             <div className="flex items-start space-x-2">
-              <Checkbox id="termsAccepted" {...register("termsAccepted")} />
+              <Checkbox 
+                id="termsAccepted" 
+                checked={!!watch("termsAccepted")}
+                onCheckedChange={(checked) => {
+                  setValue("termsAccepted", checked === true);
+                }}
+              />
               <div className="space-y-1 leading-none">
                 <Label
                   htmlFor="termsAccepted"
@@ -206,7 +214,7 @@ export default function RegisterPage() {
                   Inscription en cours...
                 </>
               ) : (
-                "S&apos;inscrire"
+                "S'inscrire"
               )}
             </Button>
           </form>

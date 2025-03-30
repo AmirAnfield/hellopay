@@ -1,79 +1,92 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
+import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
+import { getEmployees } from '@/lib/db/queries';
+import { listEmployeesQuerySchema } from '@/lib/validators/pagination';
+import { logAPIEvent, LogLevel, SecurityEvent } from '@/lib/security/logger';
+import { validateRouteBody } from '@/lib/validators/adapters';
+import { employeeSchema } from '@/lib/validators/employees';
 
-// GET /api/employees - Récupère les salariés
+// GET /api/employees - Récupère les salariés avec pagination
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
 
     if (!session?.user?.id) {
       return NextResponse.json(
-        { error: 'Non autorisé. Veuillez vous connecter.' },
+        { success: false, message: 'Non autorisé. Veuillez vous connecter.' },
         { status: 401 }
       );
     }
 
+    // Récupérer les paramètres de requête
     const { searchParams } = new URL(request.url);
-    const companyId = searchParams.get('companyId');
-
-    let employees;
-
-    // Si un ID d'entreprise est fourni, récupère les salariés de cette entreprise
-    if (companyId) {
-      // Vérifier que l'entreprise appartient à l'utilisateur
+    const queryParams = Object.fromEntries(searchParams.entries());
+    
+    // Valider les paramètres de requête
+    const validationResult = listEmployeesQuerySchema.safeParse(queryParams);
+    
+    if (!validationResult.success) {
+      return NextResponse.json(
+        { 
+          success: false, 
+          message: "Paramètres de requête invalides",
+          errors: validationResult.error.errors
+        },
+        { status: 400 }
+      );
+    }
+    
+    const params = validationResult.data;
+    
+    // Vérifier les permissions si companyId est spécifié
+    if (params.companyId) {
       const company = await prisma.company.findFirst({
         where: {
-          id: companyId,
+          id: params.companyId,
           userId: session.user.id,
         },
+        select: { id: true }
       });
 
       if (!company) {
         return NextResponse.json(
-          { error: 'Entreprise non trouvée ou non autorisée.' },
+          { success: false, message: 'Entreprise non trouvée ou non autorisée.' },
           { status: 404 }
         );
       }
-
-      employees = await prisma.employee.findMany({
-        where: {
-          companyId,
-        },
-        orderBy: [
-          { lastName: 'asc' },
-          { firstName: 'asc' },
-        ],
-      });
-    } else {
-      // Sinon, récupère tous les salariés des entreprises de l'utilisateur
-      employees = await prisma.employee.findMany({
-        where: {
-          company: {
-            userId: session.user.id,
-          },
-        },
-        include: {
-          company: {
-            select: {
-              id: true,
-              name: true,
-            },
-          },
-        },
-        orderBy: [
-          { lastName: 'asc' },
-          { firstName: 'asc' },
-        ],
-      });
     }
-
-    return NextResponse.json({ employees });
+    
+    // Récupérer les employés avec pagination
+    const result = await getEmployees(params);
+    
+    // Journaliser l'événement
+    logAPIEvent(
+      request,
+      SecurityEvent.INFO,
+      `Liste des employés récupérée (${result.meta.total} résultats)`,
+      LogLevel.INFO,
+      { 
+        userId: session.user.id,
+        companyId: params.companyId,
+        page: params.page,
+        limit: params.limit
+      }
+    );
+    
+    // Retourner la réponse
+    return NextResponse.json(
+      { 
+        success: true, 
+        ...result
+      },
+      { status: 200 }
+    );
   } catch (error) {
     console.error('Erreur lors de la récupération des salariés:', error);
     return NextResponse.json(
-      { error: 'Une erreur est survenue lors de la récupération des salariés.' },
+      { success: false, message: 'Une erreur est survenue lors de la récupération des salariés.' },
       { status: 500 }
     );
   }
@@ -86,20 +99,22 @@ export async function POST(request: NextRequest) {
 
     if (!session?.user?.id) {
       return NextResponse.json(
-        { error: 'Non autorisé. Veuillez vous connecter.' },
+        { success: false, message: 'Non autorisé. Veuillez vous connecter.' },
         { status: 401 }
       );
     }
 
-    const data = await request.json();
-
-    // Validation de base
-    if (!data.firstName || !data.lastName || !data.socialSecurityNumber || !data.companyId) {
+    // Valider les données avec le schéma
+    const validation = await validateRouteBody(employeeSchema)(request.clone());
+    
+    if (!validation.success) {
       return NextResponse.json(
-        { error: 'Veuillez remplir tous les champs obligatoires.' },
+        { success: false, ...validation.error },
         { status: 400 }
       );
     }
+    
+    const data = validation.data;
 
     // Vérifier que l'entreprise appartient à l'utilisateur
     const company = await prisma.company.findFirst({
@@ -107,11 +122,12 @@ export async function POST(request: NextRequest) {
         id: data.companyId,
         userId: session.user.id,
       },
+      select: { id: true }
     });
 
     if (!company) {
       return NextResponse.json(
-        { error: 'Entreprise non trouvée ou non autorisée.' },
+        { success: false, message: 'Entreprise non trouvée ou non autorisée.' },
         { status: 404 }
       );
     }
@@ -122,11 +138,15 @@ export async function POST(request: NextRequest) {
         socialSecurityNumber: data.socialSecurityNumber,
         companyId: data.companyId,
       },
+      select: { id: true }
     });
 
     if (existingEmployee) {
       return NextResponse.json(
-        { error: 'Un salarié avec ce numéro de sécurité sociale existe déjà dans cette entreprise.' },
+        { 
+          success: false, 
+          message: 'Un salarié avec ce numéro de sécurité sociale existe déjà dans cette entreprise.' 
+        },
         { status: 400 }
       );
     }
@@ -134,13 +154,41 @@ export async function POST(request: NextRequest) {
     // Création du salarié
     const employee = await prisma.employee.create({
       data,
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        phoneNumber: true,
+        position: true,
+        contractType: true,
+        startDate: true,
+        endDate: true
+      }
     });
+    
+    // Journaliser l'événement
+    logAPIEvent(
+      request,
+      SecurityEvent.INFO,
+      `Nouvel employé créé: ${employee.firstName} ${employee.lastName}`,
+      LogLevel.INFO,
+      { 
+        userId: session.user.id,
+        companyId: data.companyId,
+        employeeId: employee.id
+      }
+    );
 
-    return NextResponse.json({ employee }, { status: 201 });
+    return NextResponse.json({ 
+      success: true, 
+      message: 'Employé créé avec succès',
+      data: employee 
+    }, { status: 201 });
   } catch (error) {
     console.error('Erreur lors de la création du salarié:', error);
     return NextResponse.json(
-      { error: 'Une erreur est survenue lors de la création du salarié.' },
+      { success: false, message: 'Une erreur est survenue lors de la création du salarié.' },
       { status: 500 }
     );
   }

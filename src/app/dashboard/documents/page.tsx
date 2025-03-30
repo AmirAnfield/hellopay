@@ -15,9 +15,17 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
-import { FileText, Download, Briefcase, Users, Plus, Calendar, Loader2 } from "lucide-react";
+import { FileText, Download, Briefcase, Users, Plus, Calendar, AlertCircle } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
+import { 
+  PageContainer, 
+  PageHeader, 
+  EmptyState, 
+  LoadingState,
+  NoDataMessage
+} from "@/components/shared/PageContainer";
+import { LoadingButton } from "@/components/shared/LoadingButton";
 
 interface Company {
   id: string;
@@ -52,6 +60,7 @@ export default function DocumentsPage() {
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>("");
   const [monthlyPayslips, setMonthlyPayslips] = useState<MonthlyPayslip[]>([]);
   const [isGenerating, setIsGenerating] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   // Charger les entreprises et employés
   useEffect(() => {
@@ -62,10 +71,12 @@ export default function DocumentsPage() {
       .then(([companiesData, employeesData]) => {
         setCompanies(companiesData.companies || []);
         setEmployees(employeesData.employees || []);
+        setError(null);
         setIsLoading(false);
       })
       .catch(error => {
         console.error("Erreur lors du chargement des données:", error);
+        setError("Impossible de charger les données. Veuillez réessayer.");
         toast({
           variant: "destructive",
           title: "Erreur",
@@ -168,32 +179,52 @@ export default function DocumentsPage() {
     }
   };
 
+  // Si une erreur est survenue lors du chargement
+  if (error) {
+    return (
+      <PageContainer>
+        <PageHeader
+          title="Documents"
+          description="Gérez et générez vos bulletins de paie"
+        />
+        <EmptyState
+          title="Erreur de chargement"
+          description={error}
+          icon={AlertCircle}
+          action={
+            <Button onClick={() => window.location.reload()}>
+              Réessayer
+            </Button>
+          }
+        />
+      </PageContainer>
+    );
+  }
+
   return (
-    <div className="container max-w-7xl mx-auto px-4 py-8">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
-        <div>
-          <h1 className="text-3xl font-bold">Documents</h1>
-          <p className="text-muted-foreground">Gérez et générez vos bulletins de paie</p>
-        </div>
-        <div className="mt-4 md:mt-0">
-          <Tabs defaultValue="payslips" className="w-[400px]">
+    <PageContainer>
+      <PageHeader
+        title="Documents"
+        description="Gérez et générez vos bulletins de paie"
+        actions={
+          <Tabs defaultValue="payslips" className="w-full max-w-[400px]">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="payslips">Bulletins de paie</TabsTrigger>
               <TabsTrigger value="other" disabled>Autres documents</TabsTrigger>
             </TabsList>
           </Tabs>
-        </div>
-      </div>
+        }
+      />
 
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-6">
         {/* Sidebar avec les filtres */}
         <div className="md:col-span-4 lg:col-span-3">
-          <Card>
-            <CardHeader>
+          <Card className="h-full">
+            <CardHeader className="px-4 sm:px-6">
               <CardTitle>Filtres</CardTitle>
               <CardDescription>Sélectionnez une entreprise et un employé</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4 px-4 sm:px-6">
               <div className="space-y-2">
                 <Label htmlFor="company">Entreprise</Label>
                 <Select
@@ -254,7 +285,7 @@ export default function DocumentsPage() {
                   onClick={() => router.push('/dashboard/companies/new')}
                 >
                   <Plus className="h-4 w-4 mr-2" />
-                  Ajouter une entreprise
+                  <span className="truncate">Ajouter une entreprise</span>
                 </Button>
                 <Button 
                   variant="outline" 
@@ -263,7 +294,7 @@ export default function DocumentsPage() {
                   onClick={() => router.push('/dashboard/employees/new')}
                 >
                   <Plus className="h-4 w-4 mr-2" />
-                  Ajouter un employé
+                  <span className="truncate">Ajouter un employé</span>
                 </Button>
               </div>
             </CardContent>
@@ -272,8 +303,8 @@ export default function DocumentsPage() {
 
         {/* Contenu principal */}
         <div className="md:col-span-8 lg:col-span-9">
-          <Card>
-            <CardHeader>
+          <Card className="h-full">
+            <CardHeader className="px-4 sm:px-6">
               <CardTitle>Bulletins de paie</CardTitle>
               <CardDescription>
                 {selectedEmployeeId ? (
@@ -285,14 +316,9 @@ export default function DocumentsPage() {
                 )}
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="px-4 sm:px-6">
               {isLoading ? (
-                <div className="py-8 flex justify-center">
-                  <div className="flex flex-col items-center">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                    <p className="mt-2 text-sm text-muted-foreground">Chargement des données...</p>
-                  </div>
-                </div>
+                <LoadingState message="Chargement des données..." />
               ) : selectedEmployeeId ? (
                 monthlyPayslips.length > 0 ? (
                   <div className="space-y-4">
@@ -300,10 +326,10 @@ export default function DocumentsPage() {
                       {monthlyPayslips.map((payslip) => (
                         <div 
                           key={payslip.month.toISOString()} 
-                          className="flex items-center justify-between p-4 rounded-lg border bg-card hover:bg-accent/5 transition-colors"
+                          className="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 rounded-lg border bg-card hover:bg-accent/5 transition-colors gap-3 sm:gap-4"
                         >
-                          <div className="flex items-center gap-4">
-                            <div className="p-2 rounded-full bg-primary/10">
+                          <div className="flex items-center gap-3 sm:gap-4">
+                            <div className="p-2 rounded-full bg-primary/10 flex-shrink-0">
                               <Calendar className="h-5 w-5 text-primary" />
                             </div>
                             <div>
@@ -313,33 +339,26 @@ export default function DocumentsPage() {
                               </p>
                             </div>
                           </div>
-                          <div>
+                          <div className="ml-auto">
                             {payslip.isGenerated ? (
-                              <Button variant="outline" size="sm" asChild>
+                              <Button variant="outline" size="sm" asChild className="w-full sm:w-auto">
                                 <a href={payslip.pdfUrl} target="_blank" rel="noopener noreferrer">
                                   <Download className="h-4 w-4 mr-2" />
                                   Télécharger
                                 </a>
                               </Button>
                             ) : (
-                              <Button 
+                              <LoadingButton 
                                 variant="default" 
                                 size="sm"
                                 onClick={() => handleGeneratePayslip(payslip)}
-                                disabled={isGenerating === payslip.month.toISOString()}
+                                isLoading={isGenerating === payslip.month.toISOString()}
+                                loadingText="Génération..."
+                                className="w-full sm:w-auto"
                               >
-                                {isGenerating === payslip.month.toISOString() ? (
-                                  <>
-                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                    Génération...
-                                  </>
-                                ) : (
-                                  <>
-                                    <FileText className="h-4 w-4 mr-2" />
-                                    Générer
-                                  </>
-                                )}
-                              </Button>
+                                <FileText className="h-4 w-4 mr-2" />
+                                Générer
+                              </LoadingButton>
                             )}
                           </div>
                         </div>
@@ -347,43 +366,39 @@ export default function DocumentsPage() {
                     </div>
                   </div>
                 ) : (
-                  <div className="py-8 text-center">
-                    <p className="text-muted-foreground">Aucune période disponible pour cet employé</p>
-                  </div>
+                  <NoDataMessage message="Aucune période disponible pour cet employé" />
                 )
               ) : (
-                <div className="py-12 flex flex-col items-center justify-center text-center">
-                  <div className="bg-primary/10 p-4 rounded-full mb-4">
-                    <FileText className="h-10 w-10 text-primary" />
-                  </div>
-                  <h3 className="text-lg font-medium mb-2">Aucun employé sélectionné</h3>
-                  <p className="text-muted-foreground mb-6 max-w-md">
-                    Veuillez sélectionner une entreprise et un employé pour générer ou consulter des bulletins de paie.
-                  </p>
-                  <div className="flex gap-4">
-                    <Button 
-                      variant="outline" 
-                      onClick={() => router.push('/dashboard/companies/new')}
-                      className="flex items-center"
-                    >
-                      <Briefcase className="h-4 w-4 mr-2" />
-                      Ajouter une entreprise
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      onClick={() => router.push('/dashboard/employees/new')}
-                      className="flex items-center"
-                    >
-                      <Users className="h-4 w-4 mr-2" />
-                      Ajouter un employé
-                    </Button>
-                  </div>
-                </div>
+                <EmptyState
+                  title="Aucun employé sélectionné"
+                  description="Veuillez sélectionner une entreprise et un employé pour générer ou consulter des bulletins de paie."
+                  icon={FileText}
+                  action={
+                    <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+                      <Button 
+                        variant="outline" 
+                        onClick={() => router.push('/dashboard/companies/new')}
+                        className="flex items-center"
+                      >
+                        <Briefcase className="h-4 w-4 mr-2" />
+                        Ajouter une entreprise
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        onClick={() => router.push('/dashboard/employees/new')}
+                        className="flex items-center"
+                      >
+                        <Users className="h-4 w-4 mr-2" />
+                        Ajouter un employé
+                      </Button>
+                    </div>
+                  }
+                />
               )}
             </CardContent>
           </Card>
         </div>
       </div>
-    </div>
+    </PageContainer>
   );
 } 

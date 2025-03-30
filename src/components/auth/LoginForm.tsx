@@ -8,6 +8,9 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { EyeIcon, EyeOffIcon, Loader2 } from 'lucide-react';
+import { toast } from '@/components/ui/use-toast';
+import { useRouter } from 'next/navigation';
+import { signIn } from 'next-auth/react';
 
 const loginSchema = z.object({
   email: z.string().email('Email invalide').min(1, 'L\'email est requis'),
@@ -26,6 +29,7 @@ export default function LoginForm({ onSuccess, onRegisterClick }: LoginFormProps
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
 
   const {
     register,
@@ -42,21 +46,34 @@ export default function LoginForm({ onSuccess, onRegisterClick }: LoginFormProps
 
   const onSubmit = async (data: LoginFormValues) => {
     setIsLoading(true);
-    setError(null);
-    
+
     try {
-      // Simulation d'une connexion (à remplacer par le vrai code de connexion)
-      console.log('Tentative de connexion avec:', data);
-      
-      // Attendre un peu pour simuler l'appel API
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // Simulation de succès (à remplacer par le vrai code)
-      localStorage.setItem('isAuthenticated', 'true');
-      onSuccess();
-    } catch (err) {
-      setError('Identifiants incorrects. Veuillez réessayer.');
-      console.error(err);
+      // Connexion via NextAuth
+      const signInResult = await signIn("credentials", {
+        redirect: false,
+        email: data.email,
+        password: data.password,
+      });
+
+      if (signInResult?.error) {
+        throw new Error(signInResult.error);
+      }
+
+      // Succès : redirection
+      toast({
+        title: "Connexion réussie",
+        description: "Vous êtes maintenant connecté",
+      });
+
+      // Redirection vers le tableau de bord
+      router.push("/dashboard");
+      router.refresh();
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Erreur de connexion",
+        description: error instanceof Error ? error.message : "Une erreur est survenue lors de la connexion",
+      });
     } finally {
       setIsLoading(false);
     }

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { StatCard } from './StatCard';
+import { SupportCard } from './SupportCard';
 import { BuildingIcon, UsersIcon, FileTextIcon, SettingsIcon } from '@/components/ui/icons';
 
 interface DashboardLayoutProps {
@@ -123,6 +124,11 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
       {/* Additional content */}
       {children}
+
+      {/* Support & Help Section */}
+      <div className="mt-8">
+        <SupportCard />
+      </div>
     </div>
   );
 } 

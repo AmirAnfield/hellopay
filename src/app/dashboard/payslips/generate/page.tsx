@@ -1,22 +1,37 @@
-'use client';
+"use client";
 
-import React, { useState, useEffect } from 'react';
-import { useSession } from 'next-auth/react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { MonthSelector } from '@/components/payslip/MonthSelector';
-import { toast } from 'sonner';
-import { AlertCircle, CheckCircle, Download, ArrowLeft } from 'lucide-react';
-import Link from 'next/link';
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { format } from "date-fns";
+import { fr } from "date-fns/locale";
+import { FileText, Calculator, History } from "lucide-react";
+import { useToast } from "@/components/ui/use-toast";
+import { 
+  PageContainer, 
+  PageHeader, 
+  LoadingState 
+} from "@/components/shared/PageContainer";
+import PayslipPreview from "@/components/PayslipPreview";
 
 interface Employee {
   id: string;
   firstName: string;
   lastName: string;
-  startDate: string;
-  grossSalary: number;
+  position?: string;
+  companyId?: string;
 }
 
 interface Company {
@@ -24,498 +39,368 @@ interface Company {
   name: string;
 }
 
-interface PayslipData {
-  id: string;
-  period: string;
+interface PayslipCalculationResult {
   grossSalary: number;
   netSalary: number;
   employerCost: number;
-  employeeContributions?: {
-    total: number;
-    [key: string]: number;
-  };
-  status?: string;
-  locked?: boolean;
+  taxAmount: number;
+  totalEmployeeContributions: number;
+  totalEmployerContributions: number;
+  contributions: Array<{
+    category: string;
+    label: string;
+    baseType: string;
+    baseAmount: number;
+    employerRate: number;
+    employeeRate: number;
+    employerAmount: number;
+    employeeAmount: number;
+  }>;
 }
 
-interface MonthData {
-  key: string;
-  date: Date;
-  label: string;
-  selected: boolean;
-  grossSalary: number;
-  netSalary: number;
-  contributions: number;
-  employerCost: number;
-  locked: boolean;
-  validated: boolean;
-}
-
-export default function PayslipsGeneratePage() {
-  const { data: session, status } = useSession();
-  const [selectedCompany, setSelectedCompany] = useState<string>('');
-  const [selectedEmployee, setSelectedEmployee] = useState<string>('');
-  const [companies, setCompanies] = useState<Company[]>([]);
-  const [employees, setEmployees] = useState<Employee[]>([]);
-  const [currentEmployee, setCurrentEmployee] = useState<Employee | null>(null);
+export default function GeneratePayslipPage() {
+  const router = useRouter();
+  const { toast } = useToast();
+  const [activeTab, setActiveTab] = useState("details");
   const [isLoading, setIsLoading] = useState(false);
-  const [hasPaid, setHasPaid] = useState(true);
-  const [generatedPayslips, setGeneratedPayslips] = useState<PayslipData[]>([]);
-  const [currentTab, setCurrentTab] = useState('selection');
-  const [existingPayslips, setExistingPayslips] = useState<PayslipData[]>([]);
+  const [isCalculating, setIsCalculating] = useState(false);
+  const [selectedEmployee, setSelectedEmployee] = useState("");
+  const [selectedCompany, setSelectedCompany] = useState("");
+  const [selectedPeriod, setSelectedPeriod] = useState<string>(
+    format(new Date(), "yyyy-MM-dd")
+  );
+  const [autoGenerate, setAutoGenerate] = useState(true);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [calculationResult, setCalculationResult] = useState<PayslipCalculationResult | null>(null);
   
-  // Charger les entreprises
+  // Récupérer la liste des entreprises et employés
   useEffect(() => {
-    const fetchCompanies = async () => {
-      try {
-        setIsLoading(true);
-        const response = await fetch('/api/companies');
-        if (response.ok) {
-          const data = await response.json();
-          setCompanies(data.companies);
-        } else {
-          toast.error('Impossible de charger les entreprises');
-        }
-      } catch (error) {
-        console.error('Erreur lors du chargement des entreprises', error);
-        toast.error('Une erreur est survenue');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
-    if (status === 'authenticated') {
-      fetchCompanies();
-    }
-  }, [status]);
-  
-  // Charger les employés lorsqu'une entreprise est sélectionnée
-  useEffect(() => {
-    const fetchEmployees = async () => {
-      if (!selectedCompany) return;
-      
-      try {
-        setIsLoading(true);
-        const response = await fetch(`/api/companies/${selectedCompany}/employees`);
-        if (response.ok) {
-          const data = await response.json();
-          setEmployees(data.employees);
-        } else {
-          toast.error('Impossible de charger les employés');
-        }
-      } catch (error) {
-        console.error('Erreur lors du chargement des employés', error);
-        toast.error('Une erreur est survenue');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
-    if (selectedCompany) {
-      fetchEmployees();
-      setSelectedEmployee('');
-      setExistingPayslips([]);
-    }
-  }, [selectedCompany]);
-  
-  // Mettre à jour l'employé actuel lorsqu'il est sélectionné
-  useEffect(() => {
-    if (selectedEmployee) {
-      const employee = employees.find(e => e.id === selectedEmployee);
-      setCurrentEmployee(employee || null);
-      
-      // Charger les bulletins existants pour cet employé
-      if (employee) {
-        fetchEmployeePayslips(employee.id);
-      }
-    } else {
-      setCurrentEmployee(null);
-      setExistingPayslips([]);
-    }
-  }, [selectedEmployee, employees]);
-  
-  // Récupérer les bulletins existants pour un employé
-  const fetchEmployeePayslips = async (employeeId: string) => {
-    try {
+    const fetchData = async () => {
       setIsLoading(true);
-      const response = await fetch(`/api/employees/${employeeId}/payslips`);
-      if (response.ok) {
-        const data = await response.json();
-        setExistingPayslips(data.payslips || []);
-      } else {
-        console.error('Erreur lors de la récupération des bulletins');
-        // On ne montre pas d'erreur à l'utilisateur car ce n'est pas bloquant
-      }
-    } catch (error) {
-      console.error('Erreur lors du chargement des bulletins', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-  
-  // Simuler le paiement pour débloquer les bulletins
-  const handlePayment = async () => {
-    // Dans une version réelle, on redirigerait vers une page de paiement
-    toast.loading('Traitement du paiement...');
-    
-    // Simuler un temps de traitement
-    setTimeout(() => {
-      setHasPaid(true);
-      toast.dismiss();
-      toast.success('Paiement réussi ! Bulletins débloqués');
-    }, 2000);
-  };
-  
-  // Gérer la génération des bulletins
-  const handleGeneratePayslips = async (selectedMonths: MonthData[]) => {
-    setIsLoading(true);
-    const generatedResults: PayslipData[] = [];
-    const toastId = toast.loading('Génération des bulletins en cours...');
-    
-    try {
-      for (const month of selectedMonths) {
-        const payslipData = {
-          employeeId: currentEmployee?.id,
-          companyId: selectedCompany,
-          period: month.key,
-          grossSalary: month.grossSalary,
-        };
+      try {
+        // Appels API pour récupérer les données
+        const companiesRes = await fetch('/api/companies');
+        if (companiesRes.ok) {
+          const companiesData = await companiesRes.json();
+          // S'assurer que companies est un tableau
+          setCompanies(Array.isArray(companiesData) ? companiesData : 
+                      (companiesData.companies ? companiesData.companies : []));
+        }
         
-        const response = await fetch('/api/payslips/generate', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(payslipData),
+        if (selectedCompany) {
+          const employeesRes = await fetch(`/api/employees?companyId=${selectedCompany}`);
+          if (employeesRes.ok) {
+            const employeesData = await employeesRes.json();
+            // S'assurer que employees est un tableau
+            setEmployees(Array.isArray(employeesData) ? employeesData : 
+                       (employeesData.employees ? employeesData.employees : []));
+          }
+        } else {
+          setEmployees([]);
+        }
+      } catch (error) {
+        console.error("Erreur lors du chargement des données:", error);
+        toast({
+          variant: "destructive",
+          title: "Erreur",
+          description: "Impossible de charger les données. Veuillez réessayer."
         });
-        
-        if (response.ok) {
-          const result = await response.json();
-          generatedResults.push(result);
-        } else {
-          const error = await response.json();
-          toast.error(`Erreur: ${error.message || 'Impossible de générer le bulletin'}`);
-        }
+      } finally {
+        setIsLoading(false);
       }
-      
-      setGeneratedPayslips(generatedResults);
-      
-      if (generatedResults.length > 0) {
-        toast.success(`${generatedResults.length} bulletin(s) généré(s) avec succès`);
-        setCurrentTab('results');
-        
-        // Rafraîchir les bulletins existants pour montrer les nouveaux statuts
-        if (currentEmployee) {
-          fetchEmployeePayslips(currentEmployee.id);
-        }
-      } else {
-        toast.error('Aucun bulletin n\'a pu être généré');
-      }
-    } catch (error) {
-      console.error('Erreur lors de la génération des bulletins', error);
-      toast.error('Une erreur est survenue lors de la génération des bulletins');
-    } finally {
-      setIsLoading(false);
-      toast.dismiss(toastId);
-    }
-  };
-  
-  // Déverrouiller un bulletin (pour les admins)
-  const handleUnlock = async (payslipId: string) => {
-    try {
-      setIsLoading(true);
-      const response = await fetch(`/api/payslips/${payslipId}/lock`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ locked: false }),
-      });
-      
-      if (response.ok) {
-        // Mettre à jour le statut local
-        setExistingPayslips(prevPayslips => 
-          prevPayslips.map(p => 
-            p.id === payslipId ? { ...p, locked: false } : p
-          )
-        );
-        toast.success('Bulletin déverrouillé avec succès');
-      } else {
-        toast.error('Impossible de déverrouiller le bulletin');
-      }
-    } catch (error) {
-      console.error('Erreur lors du déverrouillage', error);
-      toast.error('Une erreur est survenue');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-  
-  // Télécharger les bulletins sélectionnés
-  const handleDownloadPayslips = async () => {
-    if (generatedPayslips.length === 0) return;
+    };
     
+    fetchData();
+  }, [selectedCompany, toast]);
+  
+  // Calculer le bulletin
+  const handleCalculate = async () => {
+    if (!selectedEmployee || !selectedPeriod) {
+      toast({
+        variant: "destructive", 
+        title: "Données manquantes", 
+        description: "Veuillez sélectionner un employé et une période"
+      });
+      return;
+    }
+    
+    setIsCalculating(true);
     try {
-      setIsLoading(true);
-      const toastId = toast.loading('Préparation du téléchargement...');
-      
-      const payslipIds = generatedPayslips.map(p => p.id);
-      const response = await fetch('/api/payslips/download-bulk', {
+      const res = await fetch('/api/payslips/calculate', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ payslipIds }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          employeeId: selectedEmployee,
+          period: selectedPeriod
+        })
       });
       
-      if (response.ok) {
-        // Télécharger le fichier zip
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `bulletins_${currentEmployee?.lastName}_${currentEmployee?.firstName}.zip`;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-        toast.success('Téléchargement réussi');
-      } else {
-        toast.error('Impossible de télécharger les bulletins');
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || "Erreur lors du calcul");
       }
       
-      toast.dismiss(toastId);
+      const data = await res.json();
+      setCalculationResult(data);
+      setActiveTab("preview");
     } catch (error) {
-      console.error('Erreur lors du téléchargement', error);
-      toast.error('Une erreur est survenue lors du téléchargement');
+      console.error("Erreur lors du calcul:", error);
+      toast({
+        variant: "destructive",
+        title: "Erreur de calcul",
+        description: error instanceof Error ? error.message : "Impossible de calculer le bulletin. Veuillez réessayer."
+      });
     } finally {
-      setIsLoading(false);
+      setIsCalculating(false);
     }
   };
+  
+  // Gérer la sauvegarde du bulletin
+  const handleSaveSuccess = (data: { payslipId?: string; pdfUrl?: string }) => {
+    toast({
+      title: "Bulletin généré",
+      description: "Le bulletin de paie a été généré et sauvegardé avec succès"
+    });
+    
+    // Rediriger vers la page du bulletin
+    if (data.payslipId) {
+      router.push(`/dashboard/payslips/${data.payslipId}`);
+    }
+  };
+  
+  if (isLoading) {
+    return (
+      <PageContainer>
+        <PageHeader
+          title="Générer un bulletin"
+          description="Créez un nouveau bulletin de paie pour un employé"
+        />
+        <LoadingState message="Chargement des données..." />
+      </PageContainer>
+    );
+  }
   
   return (
-    <div className="container mx-auto py-8">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center">
-          <Link href="/dashboard/payslips" className="mr-4">
-            <Button variant="outline" size="icon">
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-          </Link>
-          <h1 className="text-2xl font-bold">Génération de bulletins de paie</h1>
-        </div>
-        
-        {!hasPaid && (
-          <Button 
-            onClick={handlePayment}
-            className="bg-green-600 hover:bg-green-700"
-          >
-            Débloquer les bulletins
-          </Button>
-        )}
-      </div>
+    <PageContainer>
+      <PageHeader
+        title="Générer un bulletin"
+        description="Créez un nouveau bulletin de paie pour un employé"
+      />
       
-      <Tabs value={currentTab} onValueChange={setCurrentTab}>
-        <TabsList className="mb-6">
-          <TabsTrigger value="selection">Sélection</TabsTrigger>
-          <TabsTrigger value="results" disabled={generatedPayslips.length === 0}>
-            Résultats
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full space-y-6">
+        <TabsList className="mb-6 flex w-full flex-wrap overflow-x-auto md:flex-nowrap">
+          <TabsTrigger value="details" className="flex-1 min-w-[130px]">
+            <FileText className="mr-2 h-4 w-4 flex-shrink-0" />
+            <span className="truncate">Informations</span>
+          </TabsTrigger>
+          <TabsTrigger 
+            value="preview" 
+            disabled={!calculationResult}
+            className="flex-1 min-w-[130px]"
+          >
+            <Calculator className="mr-2 h-4 w-4 flex-shrink-0" />
+            <span className="truncate">Aperçu</span>
+          </TabsTrigger>
+          <TabsTrigger 
+            value="history" 
+            className="flex-1 min-w-[130px]"
+          >
+            <History className="mr-2 h-4 w-4 flex-shrink-0" />
+            <span className="truncate">Historique</span>
           </TabsTrigger>
         </TabsList>
         
-        <TabsContent value="selection">
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle>Sélectionner un employé</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-medium mb-1">Entreprise</label>
-                  <Select 
-                    value={selectedCompany} 
-                    onValueChange={setSelectedCompany}
-                    disabled={isLoading}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Sélectionner une entreprise" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {companies.map(company => (
-                        <SelectItem key={company.id} value={company.id}>
-                          {company.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+        <TabsContent value="details">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-6">
+            {/* Formulaire */}
+            <Card className="md:col-span-8">
+              <CardHeader className="px-4 sm:px-6">
+                <CardTitle>Informations du bulletin</CardTitle>
+                <CardDescription>Sélectionnez l'entreprise, l'employé et la période</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6 px-4 sm:px-6">
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="company">Entreprise</Label>
+                    <Select 
+                      value={selectedCompany} 
+                      onValueChange={setSelectedCompany}
+                    >
+                      <SelectTrigger id="company" className="w-full">
+                        <SelectValue placeholder="Sélectionner une entreprise" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Array.isArray(companies) && companies.length > 0 ? 
+                          companies.map(company => (
+                            <SelectItem key={company.id} value={company.id}>
+                              {company.name}
+                            </SelectItem>
+                          )) : 
+                          <SelectItem value="no-companies" disabled>Aucune entreprise disponible</SelectItem>
+                        }
+                      </SelectContent>
+                    </Select>
+                    {(!Array.isArray(companies) || companies.length === 0) && (
+                      <p className="text-sm text-muted-foreground mt-2">
+                        Aucune entreprise disponible. Veuillez d&apos;abord créer une entreprise.
+                      </p>
+                    )}
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="employee">Employé</Label>
+                    <Select 
+                      value={selectedEmployee} 
+                      onValueChange={setSelectedEmployee}
+                      disabled={!selectedCompany || !Array.isArray(employees) || employees.length === 0}
+                    >
+                      <SelectTrigger id="employee" className="w-full">
+                        <SelectValue placeholder="Sélectionner un employé" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Array.isArray(employees) && employees.length > 0 ? 
+                          employees.map(employee => (
+                            <SelectItem key={employee.id} value={employee.id}>
+                              {employee.firstName} {employee.lastName}
+                            </SelectItem>
+                          )) :
+                          <SelectItem value="no-employees" disabled>Aucun employé disponible</SelectItem>
+                        }
+                      </SelectContent>
+                    </Select>
+                    {selectedCompany && (!Array.isArray(employees) || employees.length === 0) && (
+                      <p className="text-sm text-muted-foreground mt-2">
+                        Aucun employé disponible pour cette entreprise. Veuillez d&apos;abord ajouter un employé.
+                      </p>
+                    )}
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="period">Période</Label>
+                    <Select
+                      value={selectedPeriod}
+                      onValueChange={setSelectedPeriod}
+                    >
+                      <SelectTrigger id="period" className="w-full">
+                        <SelectValue placeholder="Sélectionner une période" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Array.from({ length: 12 }, (_, i) => {
+                          const date = new Date();
+                          date.setMonth(date.getMonth() - i);
+                          const value = format(date, "yyyy-MM-dd");
+                          const label = format(date, "MMMM yyyy", { locale: fr });
+                          return (
+                            <SelectItem key={value} value={value}>
+                              {label}
+                            </SelectItem>
+                          );
+                        })}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2 pt-4">
+                    <Switch
+                      id="auto-generate"
+                      checked={autoGenerate}
+                      onCheckedChange={setAutoGenerate}
+                    />
+                    <Label htmlFor="auto-generate">
+                      Générer automatiquement le PDF après calcul
+                    </Label>
+                  </div>
                 </div>
                 
-                <div>
-                  <label className="block text-sm font-medium mb-1">Employé</label>
-                  <Select 
-                    value={selectedEmployee} 
-                    onValueChange={setSelectedEmployee}
-                    disabled={isLoading || !selectedCompany || employees.length === 0}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Sélectionner un employé" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {employees.map(employee => (
-                        <SelectItem key={employee.id} value={employee.id}>
-                          {employee.firstName} {employee.lastName}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                <Separator />
+                
+                <Button 
+                  onClick={handleCalculate} 
+                  disabled={!selectedEmployee || !selectedPeriod || isCalculating}
+                  className="w-full sm:w-auto"
+                >
+                  {isCalculating ? "Calcul en cours..." : "Calculer le bulletin"}
+                </Button>
+              </CardContent>
+            </Card>
+            
+            {/* Aide et informations */}
+            <Card className="md:col-span-4">
+              <CardHeader className="px-4 sm:px-6">
+                <CardTitle>Aide</CardTitle>
+                <CardDescription>Informations sur la génération de bulletins</CardDescription>
+              </CardHeader>
+              <CardContent className="px-4 sm:px-6">
+                <div className="text-sm space-y-4">
+                  <p>
+                    Sélectionnez une entreprise, un employé et une période pour générer
+                    un bulletin de paie.
+                  </p>
+                  <p>
+                    Le système récupérera automatiquement les informations suivantes :
+                  </p>
+                  <ul className="list-disc pl-5 space-y-1">
+                    <li>Salaire brut mensuel</li>
+                    <li>Statut (cadre/non cadre)</li>
+                    <li>Contrat en vigueur</li>
+                    <li>Cotisations applicables</li>
+                    <li>Taux d'imposition</li>
+                  </ul>
+                  <div className="mt-4 pt-4 border-t">
+                    <p className="font-medium">Processus de génération :</p>
+                    <ol className="list-decimal pl-5 space-y-1 mt-2">
+                      <li>Sélection des informations</li>
+                      <li>Calcul du bulletin</li>
+                      <li>Vérification de l'aperçu</li>
+                      <li>Génération au format PDF</li>
+                    </ol>
+                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-          
-          {isLoading && !currentEmployee ? (
-            <div className="flex justify-center py-10">
-              <div className="animate-spin h-8 w-8 border-t-2 border-b-2 border-primary rounded-full"></div>
-            </div>
-          ) : currentEmployee ? (
-            <MonthSelector 
-              employeeStartDate={new Date(currentEmployee.startDate)}
-              defaultGrossSalary={currentEmployee.grossSalary}
-              currentPayslips={existingPayslips}
-              onGeneratePayslips={handleGeneratePayslips}
-              isAdmin={session?.user?.role === 'admin'}
-              hasPaid={hasPaid}
-              onUnlockPayslip={handleUnlock}
-              onRequestPayment={handlePayment}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+        
+        <TabsContent value="preview">
+          {calculationResult ? (
+            <PayslipPreview
+              calculationResult={calculationResult}
+              employeeId={selectedEmployee}
+              period={selectedPeriod}
+              onSave={handleSaveSuccess}
+              autoGenerate={autoGenerate}
             />
           ) : (
-            <Card className="p-8 text-center">
-              <AlertCircle className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-              <h2 className="text-xl font-medium mb-2">Aucun employé sélectionné</h2>
-              <p className="text-gray-500 mb-4">
-                Veuillez sélectionner une entreprise et un employé pour continuer.
-              </p>
+            <Card>
+              <CardContent className="p-6 text-center">
+                <p>Veuillez d'abord calculer le bulletin pour accéder à l'aperçu.</p>
+                <Button 
+                  onClick={() => setActiveTab("details")} 
+                  variant="outline" 
+                  className="mt-4"
+                >
+                  Retour au calcul
+                </Button>
+              </CardContent>
             </Card>
           )}
         </TabsContent>
         
-        <TabsContent value="results">
+        <TabsContent value="history">
           <Card>
-            <CardHeader>
-              <div className="flex justify-between items-center">
-                <CardTitle>Bulletins générés</CardTitle>
-                <Button 
-                  onClick={handleDownloadPayslips}
-                  disabled={generatedPayslips.length === 0 || isLoading}
-                >
-                  <Download className="mr-2 h-4 w-4" />
-                  Télécharger tous
-                </Button>
-              </div>
+            <CardHeader className="px-4 sm:px-6">
+              <CardTitle>Bulletins récents</CardTitle>
+              <CardDescription>Historique des bulletins générés</CardDescription>
             </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <div className="flex justify-center py-10">
-                  <div className="animate-spin h-8 w-8 border-t-2 border-b-2 border-primary rounded-full"></div>
-                </div>
-              ) : generatedPayslips.length > 0 ? (
-                <div className="space-y-4">
-                  {generatedPayslips.map(payslip => (
-                    <div 
-                      key={payslip.id} 
-                      className="flex items-center justify-between p-4 border rounded-md"
-                    >
-                      <div className="flex items-center">
-                        <CheckCircle className="h-5 w-5 text-green-600 mr-2" />
-                        <div>
-                          <div className="font-medium">
-                            {payslip.period || 'Période non spécifiée'}
-                          </div>
-                          <div className="text-sm text-gray-500">
-                            Brut: {new Intl.NumberFormat('fr-FR', { 
-                              style: 'currency', 
-                              currency: 'EUR' 
-                            }).format(payslip.grossSalary)}
-                          </div>
-                        </div>
-                      </div>
-                      <Button 
-                        size="sm" 
-                        variant="outline"
-                        onClick={() => {
-                          // Télécharger un bulletin individuel
-                          window.open(`/api/payslips/${payslip.id}/download`, '_blank');
-                        }}
-                      >
-                        <Download className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
-                  
-                  {/* Bloc récapitulatif des totaux */}
-                  <div className="mt-8 p-4 border rounded-md bg-gray-50">
-                    <h3 className="font-semibold mb-3">Récapitulatif</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div>
-                        <p className="text-sm text-gray-500">Brut total</p>
-                        <p className="font-medium">
-                          {new Intl.NumberFormat('fr-FR', { 
-                            style: 'currency', 
-                            currency: 'EUR' 
-                          }).format(
-                            generatedPayslips.reduce((sum, p) => sum + p.grossSalary, 0)
-                          )}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-gray-500">Net total</p>
-                        <p className="font-medium">
-                          {new Intl.NumberFormat('fr-FR', { 
-                            style: 'currency', 
-                            currency: 'EUR' 
-                          }).format(
-                            generatedPayslips.reduce((sum, p) => sum + p.netSalary, 0)
-                          )}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-gray-500">Coût employeur total</p>
-                        <p className="font-medium">
-                          {new Intl.NumberFormat('fr-FR', { 
-                            style: 'currency', 
-                            currency: 'EUR' 
-                          }).format(
-                            generatedPayslips.reduce((sum, p) => sum + p.employerCost, 0)
-                          )}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <AlertCircle className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-                  <p className="text-gray-500">Aucun bulletin n&apos;a été généré</p>
-                </div>
-              )}
+            <CardContent className="px-4 sm:px-6">
+              <p className="text-center py-8 text-muted-foreground">
+                Fonctionnalité d'historique en cours de développement.
+              </p>
             </CardContent>
           </Card>
-          
-          <div className="flex justify-between mt-6">
-            <Button variant="outline" onClick={() => setCurrentTab('selection')}>
-              Retour à la sélection
-            </Button>
-            
-            <Button 
-              onClick={handleDownloadPayslips}
-              disabled={generatedPayslips.length === 0 || isLoading}
-            >
-              <Download className="mr-2 h-4 w-4" />
-              Télécharger tous les bulletins
-            </Button>
-          </div>
         </TabsContent>
       </Tabs>
-    </div>
+    </PageContainer>
   );
 } 

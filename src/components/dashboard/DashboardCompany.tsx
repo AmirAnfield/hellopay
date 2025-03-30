@@ -10,12 +10,10 @@ import {
   Plus, 
   Edit, 
   Trash2, 
-  Briefcase, 
   Calendar, 
   Phone, 
   Mail, 
   Globe, 
-  Loader2,
   AlertCircle 
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,6 +22,19 @@ import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
+import { 
+  EmptyState, 
+  HeaderActions 
+} from "@/components/shared/PageContainer";
+import { DeleteConfirmationDialog } from "@/components/shared/ConfirmationDialog";
+import { TableLoader } from "@/components/shared/SkeletonLoader";
+
+// Type pour représenter un employé
+interface Employee {
+  id: string;
+  firstName: string;
+  lastName: string;
+}
 
 // Type pour représenter une entreprise
 interface Company {
@@ -42,7 +53,7 @@ interface Company {
   legalRepresentative?: string;
   legalRepresentativeRole?: string;
   createdAt: string;
-  employees?: any[]; // Optionnel, si les employés sont inclus
+  employees?: Employee[]; // Liste des employés de l'entreprise
 }
 
 export default function DashboardCompany() {
@@ -82,10 +93,6 @@ export default function DashboardCompany() {
 
   // Fonction pour supprimer une entreprise
   async function deleteCompany(id: string) {
-    if (!confirm("Êtes-vous sûr de vouloir supprimer cette entreprise ? Cette action est irréversible.")) {
-      return;
-    }
-
     try {
       const response = await fetch(`/api/companies/${id}`, {
         method: "DELETE",
@@ -144,62 +151,62 @@ export default function DashboardCompany() {
 
   // Affichage du chargement
   if (isLoading) {
-    return (
-      <div className="flex justify-center items-center min-h-[400px]">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
+    return <TableLoader rows={3} columns={3} />;
   }
 
   // Affichage d'erreur
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[400px] text-center">
-        <AlertCircle className="h-12 w-12 text-destructive mb-4" />
-        <h3 className="text-xl font-semibold mb-2">Erreur de chargement</h3>
-        <p className="text-muted-foreground mb-4">{error}</p>
-        <Button onClick={fetchCompanies}>Réessayer</Button>
-      </div>
+      <EmptyState
+        title="Erreur de chargement"
+        description={error}
+        icon={AlertCircle}
+        action={<Button onClick={fetchCompanies}>Réessayer</Button>}
+      />
     );
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Mes entreprises</h2>
           <p className="text-muted-foreground">
             Gérez vos entreprises et leurs informations
           </p>
         </div>
-        <Button onClick={createCompany} className="flex items-center gap-2">
-          <Plus className="h-4 w-4" />
-          Ajouter une entreprise
-        </Button>
+        <HeaderActions>
+          <Button onClick={createCompany} className="flex items-center gap-2">
+            <Plus className="h-4 w-4" />
+            Ajouter une entreprise
+          </Button>
+        </HeaderActions>
       </div>
 
       {companies.length === 0 ? (
-        <Card className="border-dashed border-2 bg-muted/50">
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <Building2 className="h-12 w-12 text-muted-foreground opacity-30 mb-4" />
-            <h3 className="text-lg font-medium mb-2">Aucune entreprise</h3>
-            <p className="text-muted-foreground text-center max-w-md mb-6">
-              Vous n&apos;avez pas encore ajouté d&apos;entreprise. 
-              Créez votre première entreprise pour commencer à générer des bulletins de paie.
-            </p>
+        <EmptyState
+          title="Aucune entreprise"
+          description="Vous n'avez pas encore ajouté d'entreprise. Créez votre première entreprise pour commencer à générer des bulletins de paie."
+          icon={Building2}
+          action={
             <Button onClick={createCompany} className="flex items-center gap-2">
               <Plus className="h-4 w-4" />
               Ajouter ma première entreprise
             </Button>
-          </CardContent>
-        </Card>
+          }
+        />
       ) : (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {companies.map((company) => (
             <Card key={company.id} className="overflow-hidden hover:shadow-md transition-shadow">
               <CardHeader className="pb-3">
                 <div className="flex justify-between items-start">
-                  <CardTitle className="text-xl font-bold line-clamp-1">{company.name}</CardTitle>
+                  <CardTitle 
+                    onClick={() => viewCompanyDetails(company.id)}
+                    className="text-xl font-bold line-clamp-1 cursor-pointer hover:text-primary hover:underline transition-colors"
+                  >
+                    {company.name}
+                  </CardTitle>
                   <Badge variant="outline" className="font-normal">
                     {company.legalForm || "Entreprise"}
                   </Badge>
@@ -270,14 +277,16 @@ export default function DashboardCompany() {
                     <FileText className="h-4 w-4 mr-1" />
                     Bulletin
                   </Button>
-                  <Button 
-                    size="sm" 
-                    variant="destructive"
-                    onClick={() => deleteCompany(company.id)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    <span className="sr-only">Supprimer</span>
-                  </Button>
+                  <DeleteConfirmationDialog
+                    itemName="l'entreprise"
+                    onConfirm={() => deleteCompany(company.id)}
+                    trigger={
+                      <Button size="sm" variant="destructive">
+                        <Trash2 className="h-4 w-4" />
+                        <span className="sr-only">Supprimer</span>
+                      </Button>
+                    }
+                  />
                 </div>
               </CardFooter>
             </Card>

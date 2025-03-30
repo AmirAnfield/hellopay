@@ -60,6 +60,10 @@ model User {
   passwordHash   String
   resetToken     String?        // Pour la réinitialisation de mot de passe
   resetExpires   DateTime?      // Date d'expiration du token
+  metadata       String?        // Stockage JSON pour des données additionnelles
+  
+  @@index([role])
+  @@index([createdAt])
 }
 
 model VerificationToken {
@@ -163,6 +167,10 @@ model Employee {
   @@index([companyId])
   @@index([socialSecurityNumber])
   @@index([lastName])
+  @@index([firstName])
+  @@index([startDate])
+  @@index([endDate])
+  @@index([contractType])
 }
 
 // Modèle pour les fiches de paie (mis à jour)
@@ -224,11 +232,18 @@ model Payslip {
   cumulativePeriodEnd        DateTime  // Fin de période des cumuls (normalement 31 décembre)
 
   // État du bulletin
-  status                     String    @default("draft") // "draft", "validated"
+  status                     String    @default("draft") // "draft", "final"
   locked                     Boolean   @default(false)
   validatedAt                DateTime?
+  validatedBy                String?   // ID de l'utilisateur qui a validé le bulletin
+  
+  // Audit trail
+  modificationLog            String?   // JSON array des modifications avec timestamp, userId, champ modifié, valeurs avant/après
 
   pdfUrl                      String?  // URL du PDF stocké dans Supabase
+
+  // Contributions directement liées au bulletin de paie
+  contributions              Contribution[]
 
   @@index([employeeName])
   @@index([periodStart])
@@ -238,48 +253,76 @@ model Payslip {
   @@index([employeeId])
   @@index([fiscalYear])
   @@index([status])
+  @@index([paymentDate])
+  @@index([grossSalary])
+  @@index([periodStart, periodEnd])
 }
 
-// Modèle pour les contrats de travail (mis à jour)
+// Modèle pour les contributions du bulletin de paie
+model Contribution {
+  id                String    @id @default(cuid())
+  payslipId         String
+  payslip           Payslip   @relation(fields: [payslipId], references: [id], onDelete: Cascade)
+  
+  // Informations sur la contribution
+  category          String    // "Santé", "Retraite", "Chômage", "Famille", "Autres"
+  label             String    // Nom de la contribution
+  baseType          String    // "Salaire brut", "Plafond de la Sécurité Sociale", etc.
+  baseAmount        Float     // Montant de la base de calcul
+  employeeRate      Float     // Taux salarial en pourcentage
+  employerRate      Float     // Taux patronal en pourcentage
+  employeeAmount    Float     // Montant salarial
+  employerAmount    Float     // Montant patronal
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  @@index([payslipId])
+  @@index([category])
+}
+
+// Modèle pour les contrats
 model Contract {
-  id                String   @id @default(cuid())
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id               String    @id @default(cuid())
+  title            String
+  description      String?
+  reference        String?
+  status           String    // draft, active, terminated, expired
+  contractType     String    // employment, service, nda, partnership, other
+  startDate        DateTime?
+  endDate          DateTime?
+  companyId        String
+  company          Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  counterpartyName String?
+  counterpartyEmail String?
+  tags             String?   // Tags séparés par des virgules
   
-  // Relations
-  userId            String
-  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  companyId         String?
-  company           Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  // Informations sur le fichier
+  fileName         String
+  fileSize         Int
+  fileType         String
+  fileUrl          String
+  fileKey          String    // Clé pour le stockage (UploadThing)
   
-  // Informations employeur
-  employerName      String
-  employerAddress   String
-  employerSiret     String
-  employerUrssaf    String
-  
-  // Informations salarié
-  employeeName      String
-  employeeAddress   String
-  employeePosition  String
-  employeeSocialSecurityNumber String
-  
-  // Informations contrat
-  contractType      String   // "CDI", "CDD", "Temps partiel", "Temps complet"
-  startDate         DateTime
-  endDate           DateTime? // Null pour CDI
-  trialPeriod       Int?     // Période d'essai en jours
-  salary            Float    // Salaire brut
-  workingHours      Float?   // Heures de travail hebdomadaires
-  jobDescription    String   // Description du poste
-  collectiveAgreement String? // Convention collective
-  
-  pdfUrl            String?  // URL du PDF stocké dans Supabase
-  
+  // Métadonnées
+  userId           String
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  // Index pour optimiser les performances
   @@index([userId])
   @@index([companyId])
-  @@index([employeeName])
+  @@index([status])
   @@index([contractType])
+  @@index([createdAt])
+  @@index([updatedAt])
+  @@index([startDate])
+  @@index([endDate])
+  @@index([title])
+  @@index([reference])
+  @@index([counterpartyName])
+  @@index([tags])
 }
 
 // Modèle pour les attestations (mis à jour)

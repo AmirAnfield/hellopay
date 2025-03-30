@@ -10,8 +10,13 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, User, Settings, CreditCard, Bell, Mail, Check, AlertTriangle } from "lucide-react";
+import { User, Settings, CreditCard, Bell, Mail, Check, AlertTriangle } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
+import { 
+  PageContainer, 
+  PageHeader, 
+  LoadingState
+} from "@/components/shared/PageContainer";
 
 interface UserData {
   firstName: string;
@@ -112,291 +117,293 @@ export default function ProfilePage() {
 
   if (isLoading) {
     return (
-      <div className="container py-10 flex items-center justify-center min-h-[calc(100vh-8rem)]">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
+      <PageContainer>
+        <PageHeader
+          title="Mon profil"
+          description="Gérez vos informations personnelles et vos préférences"
+        />
+        <LoadingState message="Chargement de vos informations..." />
+      </PageContainer>
     );
   }
 
   return (
-    <div className="container py-10">
-      <div className="flex flex-col gap-6">
-        <div className="flex flex-col gap-2">
-          <h1 className="text-3xl font-bold tracking-tight">Mon profil</h1>
-          <p className="text-muted-foreground">
-            Gérez vos informations personnelles et vos préférences
-          </p>
-        </div>
+    <PageContainer>
+      <PageHeader
+        title="Mon profil"
+        description="Gérez vos informations personnelles et vos préférences"
+      />
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="mb-6">
-            <TabsTrigger value="general" className="flex items-center gap-2">
-              <User className="h-4 w-4" />
-              Informations personnelles
-            </TabsTrigger>
-            <TabsTrigger value="security" className="flex items-center gap-2">
-              <Settings className="h-4 w-4" />
-              Sécurité
-            </TabsTrigger>
-            <TabsTrigger value="billing" className="flex items-center gap-2">
-              <CreditCard className="h-4 w-4" />
-              Facturation
-            </TabsTrigger>
-            <TabsTrigger value="notifications" className="flex items-center gap-2">
-              <Bell className="h-4 w-4" />
-              Notifications
-            </TabsTrigger>
-          </TabsList>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="mb-6 flex w-full flex-wrap overflow-x-auto md:flex-nowrap">
+          <TabsTrigger value="general" className="flex items-center gap-2 flex-1 min-w-[130px]">
+            <User className="h-4 w-4 flex-shrink-0" />
+            <span className="truncate">Informations</span>
+          </TabsTrigger>
+          <TabsTrigger value="security" className="flex items-center gap-2 flex-1 min-w-[130px]">
+            <Settings className="h-4 w-4 flex-shrink-0" />
+            <span className="truncate">Sécurité</span>
+          </TabsTrigger>
+          <TabsTrigger value="billing" className="flex items-center gap-2 flex-1 min-w-[130px]">
+            <CreditCard className="h-4 w-4 flex-shrink-0" />
+            <span className="truncate">Facturation</span>
+          </TabsTrigger>
+          <TabsTrigger value="notifications" className="flex items-center gap-2 flex-1 min-w-[130px]">
+            <Bell className="h-4 w-4 flex-shrink-0" />
+            <span className="truncate">Notifications</span>
+          </TabsTrigger>
+        </TabsList>
 
-          {/* Informations personnelles */}
-          <TabsContent value="general">
-            <Card>
-              <CardHeader>
-                <CardTitle>Informations personnelles</CardTitle>
-                <CardDescription>
-                  Mettez à jour vos informations personnelles et professionnelles
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="firstName">Prénom</Label>
-                    <Input 
-                      id="firstName" 
-                      value={user?.firstName || ""} 
-                      onChange={(e) => setUser(user ? {...user, firstName: e.target.value} : null)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="lastName">Nom</Label>
-                    <Input 
-                      id="lastName" 
-                      value={user?.lastName || ""} 
-                      onChange={(e) => setUser(user ? {...user, lastName: e.target.value} : null)}
-                    />
-                  </div>
-                </div>
-
+        {/* Informations personnelles */}
+        <TabsContent value="general">
+          <Card>
+            <CardHeader className="px-4 sm:px-6">
+              <CardTitle>Informations personnelles</CardTitle>
+              <CardDescription>
+                Mettez à jour vos informations personnelles et professionnelles
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6 px-4 sm:px-6">
+              <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="email">Adresse e-mail</Label>
-                    {user?.emailVerified ? (
-                      <Badge variant="outline" className="text-green-500 border-green-200 bg-green-50 dark:bg-green-950 dark:border-green-800">
-                        <Check className="h-3 w-3 mr-1" /> Vérifiée
-                      </Badge>
-                    ) : (
-                      <Badge variant="outline" className="text-amber-500 border-amber-200 bg-amber-50 dark:bg-amber-950 dark:border-amber-800">
-                        <AlertTriangle className="h-3 w-3 mr-1" /> Non vérifiée
-                      </Badge>
-                    )}
-                  </div>
+                  <Label htmlFor="firstName">Prénom</Label>
                   <Input 
-                    id="email" 
-                    type="email" 
-                    value={user?.email || ""} 
-                    onChange={(e) => setUser(user ? {...user, email: e.target.value, emailVerified: false} : null)}
+                    id="firstName" 
+                    value={user?.firstName || ""} 
+                    onChange={(e) => setUser(user ? {...user, firstName: e.target.value} : null)}
                   />
-                  {!user?.emailVerified && (
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="mt-2"
-                      onClick={handleVerifyEmail}
-                    >
-                      <Mail className="h-4 w-4 mr-2" />
-                      Vérifier cette adresse
-                    </Button>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="lastName">Nom</Label>
+                  <Input 
+                    id="lastName" 
+                    value={user?.lastName || ""} 
+                    onChange={(e) => setUser(user ? {...user, lastName: e.target.value} : null)}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <Label htmlFor="email">Adresse e-mail</Label>
+                  {user?.emailVerified ? (
+                    <Badge variant="outline" className="text-green-500 border-green-200 bg-green-50 dark:bg-green-950 dark:border-green-800">
+                      <Check className="h-3 w-3 mr-1" /> Vérifiée
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-amber-500 border-amber-200 bg-amber-50 dark:bg-amber-950 dark:border-amber-800">
+                      <AlertTriangle className="h-3 w-3 mr-1" /> Non vérifiée
+                    </Badge>
                   )}
                 </div>
+                <Input 
+                  id="email" 
+                  type="email" 
+                  value={user?.email || ""} 
+                  onChange={(e) => setUser(user ? {...user, email: e.target.value, emailVerified: false} : null)}
+                />
+                {!user?.emailVerified && (
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="mt-2"
+                    onClick={handleVerifyEmail}
+                  >
+                    <Mail className="h-4 w-4 mr-2" />
+                    Vérifier cette adresse
+                  </Button>
+                )}
+              </div>
 
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="jobTitle">Poste</Label>
-                    <Input 
-                      id="jobTitle" 
-                      value={user?.jobTitle || ""} 
-                      onChange={(e) => setUser(user ? {...user, jobTitle: e.target.value} : null)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="company">Entreprise</Label>
-                    <Input 
-                      id="company" 
-                      value={user?.company || ""} 
-                      onChange={(e) => setUser(user ? {...user, company: e.target.value} : null)}
-                    />
-                  </div>
-                </div>
-
+              <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="phoneNumber">Numéro de téléphone</Label>
+                  <Label htmlFor="jobTitle">Poste</Label>
                   <Input 
-                    id="phoneNumber" 
-                    value={user?.phoneNumber || ""} 
-                    onChange={(e) => setUser(user ? {...user, phoneNumber: e.target.value} : null)}
+                    id="jobTitle" 
+                    value={user?.jobTitle || ""} 
+                    onChange={(e) => setUser(user ? {...user, jobTitle: e.target.value} : null)}
                   />
                 </div>
-              </CardContent>
-              <CardFooter>
-                <Button onClick={handleSaveProfile}>Enregistrer les modifications</Button>
-              </CardFooter>
-            </Card>
-          </TabsContent>
-
-          {/* Sécurité */}
-          <TabsContent value="security">
-            <Card>
-              <CardHeader>
-                <CardTitle>Sécurité</CardTitle>
-                <CardDescription>
-                  Gérez la sécurité de votre compte et modifiez votre mot de passe
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-4">
-                  <h3 className="text-lg font-medium">Changer votre mot de passe</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Pour des raisons de sécurité, vous recevrez un email contenant un lien pour réinitialiser votre mot de passe.
-                  </p>
-                  <Button variant="outline" onClick={handlePasswordChange}>
-                    Réinitialiser mon mot de passe
-                  </Button>
+                <div className="space-y-2">
+                  <Label htmlFor="company">Entreprise</Label>
+                  <Input 
+                    id="company" 
+                    value={user?.company || ""} 
+                    onChange={(e) => setUser(user ? {...user, company: e.target.value} : null)}
+                  />
                 </div>
+              </div>
 
-                <Separator />
+              <div className="space-y-2">
+                <Label htmlFor="phoneNumber">Numéro de téléphone</Label>
+                <Input 
+                  id="phoneNumber" 
+                  value={user?.phoneNumber || ""} 
+                  onChange={(e) => setUser(user ? {...user, phoneNumber: e.target.value} : null)}
+                />
+              </div>
+            </CardContent>
+            <CardFooter className="px-4 sm:px-6 flex flex-col sm:flex-row gap-3">
+              <Button onClick={handleSaveProfile} className="w-full sm:w-auto">Enregistrer les modifications</Button>
+            </CardFooter>
+          </Card>
+        </TabsContent>
 
-                <div className="space-y-4">
-                  <h3 className="text-lg font-medium">Sessions actives</h3>
-                  <div className="rounded-md border p-4">
-                    <div className="flex flex-col space-y-2">
-                      <p className="font-medium">Session actuelle</p>
-                      <p className="text-sm text-muted-foreground">
-                        Dernière connexion: {new Date().toLocaleDateString()} à {new Date().toLocaleTimeString()}
-                      </p>
-                      <div className="flex items-center gap-2 text-sm">
-                        <Badge variant="outline">Chrome</Badge>
-                        <Badge variant="outline">macOS</Badge>
-                        <Badge variant="outline">Paris, France</Badge>
-                      </div>
+        {/* Sécurité */}
+        <TabsContent value="security">
+          <Card>
+            <CardHeader className="px-4 sm:px-6">
+              <CardTitle>Sécurité</CardTitle>
+              <CardDescription>
+                Gérez la sécurité de votre compte et modifiez votre mot de passe
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6 px-4 sm:px-6">
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">Changer votre mot de passe</h3>
+                <p className="text-sm text-muted-foreground">
+                  Pour des raisons de sécurité, vous recevrez un email contenant un lien pour réinitialiser votre mot de passe.
+                </p>
+                <Button variant="outline" onClick={handlePasswordChange} className="w-full sm:w-auto">
+                  Réinitialiser mon mot de passe
+                </Button>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">Sessions actives</h3>
+                <div className="rounded-md border p-3 sm:p-4">
+                  <div className="flex flex-col space-y-2">
+                    <p className="font-medium">Session actuelle</p>
+                    <p className="text-sm text-muted-foreground">
+                      Dernière connexion: {new Date().toLocaleDateString()} à {new Date().toLocaleTimeString()}
+                    </p>
+                    <div className="flex flex-wrap items-center gap-2 text-sm">
+                      <Badge variant="outline">Chrome</Badge>
+                      <Badge variant="outline">macOS</Badge>
+                      <Badge variant="outline">Paris, France</Badge>
                     </div>
                   </div>
                 </div>
+              </div>
 
-                <Separator />
+              <Separator />
 
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="text-lg font-medium">Authentification à deux facteurs</h3>
-                      <p className="text-sm text-muted-foreground">
-                        Ajoutez une couche de sécurité supplémentaire à votre compte
-                      </p>
-                    </div>
-                    <Switch id="2fa" />
+              <div className="space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-lg font-medium">Authentification à deux facteurs</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Ajoutez une couche de sécurité supplémentaire à votre compte
+                    </p>
                   </div>
+                  <Switch id="2fa" className="mt-2 sm:mt-0" />
                 </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-          {/* Facturation */}
-          <TabsContent value="billing">
-            <Card>
-              <CardHeader>
-                <CardTitle>Facturation</CardTitle>
-                <CardDescription>
-                  Gérez votre plan d&apos;abonnement et vos informations de paiement
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="rounded-md border p-4">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <p className="font-medium">Plan Actuel: Gratuit</p>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        Vous utilisez actuellement le plan gratuit limité à 3 fiches de paie par mois
-                      </p>
-                    </div>
-                    <Button variant="outline">Mettre à niveau</Button>
+        {/* Facturation */}
+        <TabsContent value="billing">
+          <Card>
+            <CardHeader className="px-4 sm:px-6">
+              <CardTitle>Facturation</CardTitle>
+              <CardDescription>
+                Gérez votre plan d&apos;abonnement et vos informations de paiement
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6 px-4 sm:px-6">
+              <div className="rounded-md border p-3 sm:p-4">
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                  <div>
+                    <p className="font-medium">Plan Actuel: Gratuit</p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Vous utilisez actuellement le plan gratuit limité à 3 fiches de paie par mois
+                    </p>
                   </div>
+                  <Button variant="outline" className="mt-2 sm:mt-0 w-full sm:w-auto">Mettre à niveau</Button>
                 </div>
+              </div>
 
-                <Separator />
+              <Separator />
 
-                <div className="space-y-4">
-                  <h3 className="text-lg font-medium">Méthodes de paiement</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Vous n&apos;avez pas encore ajouté de méthode de paiement
-                  </p>
-                  <Button variant="outline">
-                    <CreditCard className="h-4 w-4 mr-2" />
-                    Ajouter une carte de crédit
-                  </Button>
-                </div>
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">Méthodes de paiement</h3>
+                <p className="text-sm text-muted-foreground">
+                  Vous n&apos;avez pas encore ajouté de méthode de paiement
+                </p>
+                <Button variant="outline" className="w-full sm:w-auto">
+                  <CreditCard className="h-4 w-4 mr-2" />
+                  Ajouter une carte de crédit
+                </Button>
+              </div>
 
-                <Separator />
+              <Separator />
 
-                <div className="space-y-4">
-                  <h3 className="text-lg font-medium">Historique de facturation</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Vous n&apos;avez pas encore d&apos;historique de facturation
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">Historique de facturation</h3>
+                <p className="text-sm text-muted-foreground">
+                  Vous n&apos;avez pas encore d&apos;historique de facturation
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-          {/* Notifications */}
-          <TabsContent value="notifications">
-            <Card>
-              <CardHeader>
-                <CardTitle>Notifications</CardTitle>
-                <CardDescription>
-                  Configurez comment et quand vous souhaitez être notifié
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <h3 className="font-medium">Notifications par email</h3>
-                      <p className="text-sm text-muted-foreground">
-                        Recevez des notifications par email concernant votre compte
-                      </p>
-                    </div>
-                    <Switch 
-                      id="email-notifications" 
-                      checked={emailNotifications}
-                      onCheckedChange={setEmailNotifications}
-                    />
+        {/* Notifications */}
+        <TabsContent value="notifications">
+          <Card>
+            <CardHeader className="px-4 sm:px-6">
+              <CardTitle>Notifications</CardTitle>
+              <CardDescription>
+                Configurez comment et quand vous souhaitez être notifié
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6 px-4 sm:px-6">
+              <div className="space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="space-y-0.5">
+                    <h3 className="font-medium">Notifications par email</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Recevez des notifications par email concernant votre compte
+                    </p>
                   </div>
+                  <Switch 
+                    id="email-notifications" 
+                    checked={emailNotifications}
+                    onCheckedChange={setEmailNotifications}
+                    className="mt-2 sm:mt-0"
+                  />
                 </div>
+              </div>
 
-                <Separator />
+              <Separator />
 
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <h3 className="font-medium">Emails marketing</h3>
-                      <p className="text-sm text-muted-foreground">
-                        Recevez des emails concernant les nouveautés et offres spéciales
-                      </p>
-                    </div>
-                    <Switch 
-                      id="marketing-emails" 
-                      checked={marketingEmails}
-                      onCheckedChange={setMarketingEmails}
-                    />
+              <div className="space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="space-y-0.5">
+                    <h3 className="font-medium">Emails marketing</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Recevez des emails concernant les nouveautés et offres spéciales
+                    </p>
                   </div>
+                  <Switch 
+                    id="marketing-emails" 
+                    checked={marketingEmails}
+                    onCheckedChange={setMarketingEmails}
+                    className="mt-2 sm:mt-0"
+                  />
                 </div>
-              </CardContent>
-              <CardFooter>
-                <Button onClick={handleSaveNotifications}>Enregistrer les préférences</Button>
-              </CardFooter>
-            </Card>
-          </TabsContent>
-        </Tabs>
-      </div>
-    </div>
+              </div>
+            </CardContent>
+            <CardFooter className="px-4 sm:px-6 flex flex-col sm:flex-row gap-3">
+              <Button onClick={handleSaveNotifications} className="w-full sm:w-auto">Enregistrer les préférences</Button>
+            </CardFooter>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </PageContainer>
   );
 } 

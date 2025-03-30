@@ -9,6 +9,7 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { EyeIcon, EyeOffIcon, Loader2 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
+import { useRouter } from 'next/navigation';
 
 const registerSchema = z.object({
   firstName: z.string().min(2, 'Le prénom doit contenir au moins 2 caractères'),
@@ -33,6 +34,7 @@ export default function RegisterForm({ onSuccess, onLoginClick }: RegisterFormPr
   const [error, setError] = useState<string | null>(null);
   const [isRegistered, setIsRegistered] = useState(false);
   const { toast } = useToast();
+  const router = useRouter();
 
   const {
     register,
@@ -51,42 +53,40 @@ export default function RegisterForm({ onSuccess, onLoginClick }: RegisterFormPr
 
   const onSubmit = async (data: RegisterFormValues) => {
     setIsLoading(true);
-    setError(null);
-    
+
     try {
-      // Simulation d'une inscription (à remplacer par le vrai code d'inscription)
-      console.log('Tentative d\'inscription avec:', data);
-      
-      // Attendre un peu pour simuler l'appel API
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // Simulation de stockage des données utilisateur
-      localStorage.setItem('user', JSON.stringify({
-        firstName: data.firstName,
-        lastName: data.lastName,
-        email: data.email,
-        emailVerified: false
-      }));
-      
-      localStorage.setItem('isAuthenticated', 'true');
-      
-      // Afficher un message de succès
-      toast({
-        variant: "success",
-        title: "Inscription réussie",
-        description: "Un email de confirmation a été envoyé à votre adresse. Veuillez vérifier votre boîte de réception pour valider votre compte."
+      // Appeler l'API d'inscription
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: data.name,
+          email: data.email,
+          password: data.password,
+        }),
       });
-      
-      setIsRegistered(true);
-      onSuccess();
-    } catch (err) {
-      setError("L'inscription a échoué. Veuillez réessayer.");
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Erreur lors de l'inscription");
+      }
+
+      // Succès de l'inscription
+      toast({
+        title: "Inscription réussie",
+        description: "Votre compte a été créé avec succès. Vous allez être redirigé vers la connexion.",
+      });
+
+      // Redirection vers la connexion ou le tableau de bord
+      router.push("/auth/login");
+    } catch (error) {
       toast({
         variant: "destructive",
-        title: "Erreur",
-        description: "L'inscription a échoué. Veuillez réessayer."
+        title: "Erreur d'inscription",
+        description: error instanceof Error ? error.message : "Une erreur est survenue lors de la création de votre compte.",
       });
-      console.error(err);
     } finally {
       setIsLoading(false);
     }

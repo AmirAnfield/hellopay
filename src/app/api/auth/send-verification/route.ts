@@ -41,16 +41,13 @@ export async function POST(req: Request) {
     });
     
     // Créer le lien de vérification
-    const verificationLink = `${process.env.NEXT_PUBLIC_APP_URL}/auth/verify?token=${verificationToken}`;
+    const verificationLink = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/auth/verify?token=${verificationToken.token}`;
     
-    // Simuler l'envoi d'un email (à remplacer par un vrai service d'email)
-    console.log(`Lien de vérification pour ${email}: ${verificationLink}`);
-    
-    // En production, utiliser un service comme SendGrid, Mailgun, etc.
+    // TODO: Envoyer l'email de vérification via un service d'email réel
     // await sendVerificationEmail(email, verificationLink);
     
     return NextResponse.json(
-      { message: 'Si votre email est enregistré, un lien de vérification vous a été envoyé.' },
+      { message: 'Email de vérification envoyé avec succès' },
       { status: 200 }
     );
   } catch (error) {

@@ -4,6 +4,11 @@ import { useState } from 'react';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 import type { PayslipData } from './PayslipCalculator';
 import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
+import { useToast } from '@/components/ui/use-toast';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { FileText, Download, Lock, Unlock, CheckCircle, Edit } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 
 // Définition des styles pour le PDF
 const styles = StyleSheet.create({
@@ -242,92 +247,171 @@ const PayslipDocument = ({ data }: { data: PayslipData }) => (
 );
 
 interface PayslipDownloadProps {
-  payslip: PayslipData;
-  onUpload?: (file: Blob) => Promise<void>;
+  payslipId: string;
+  isLocked?: boolean;
+  status?: 'draft' | 'validated';
+  onUnlock?: (payslipId: string) => Promise<void>;
+  onReturn?: () => void;
 }
 
-export default function PayslipDownload({ payslip, onUpload }: PayslipDownloadProps) {
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploaded, setUploaded] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+export function PayslipDownload({ 
+  payslipId, 
+  isLocked = false,
+  status = 'draft',
+  onUnlock,
+  onReturn
+}: PayslipDownloadProps) {
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [isUnlocking, setIsUnlocking] = useState(false);
+  const { toast } = useToast();
 
-  const handleBlobGenerated = async (blob: Blob) => {
-    if (onUpload) {
-      try {
-        setIsUploading(true);
-        setError(null);
-        await onUpload(blob);
-        setUploaded(true);
-      } catch (err: any) {
-        setError(err.message || 'Erreur lors de l\'upload du PDF');
-        console.error(err);
-      } finally {
-        setIsUploading(false);
+  const handleDownload = async () => {
+    setIsDownloading(true);
+
+    try {
+      const response = await fetch(`/api/payslips/${payslipId}/download`);
+      
+      if (!response.ok) {
+        throw new Error('Erreur lors du téléchargement du bulletin');
       }
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `bulletin-de-paie-${payslipId}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      
+      toast({
+        title: 'Téléchargement réussi',
+        description: 'Le bulletin de paie a été téléchargé avec succès.'
+      });
+    } catch (error) {
+      console.error('Erreur de téléchargement:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Erreur de téléchargement',
+        description: error instanceof Error ? error.message : 'Une erreur est survenue lors du téléchargement du bulletin'
+      });
+    } finally {
+      setIsDownloading(false);
     }
   };
 
-  const fileName = `bulletin_paie_${payslip.employeeName.replace(/\s+/g, '_')}_${payslip.periodStart.toISOString().slice(0, 7)}.pdf`;
+  const handleUnlock = async () => {
+    if (!onUnlock) return;
+    
+    setIsUnlocking(true);
+    
+    try {
+      await onUnlock(payslipId);
+      toast({
+        title: 'Bulletin débloqué',
+        description: 'Le bulletin de paie a été débloqué avec succès et peut être modifié.'
+      });
+    } catch (error) {
+      console.error('Erreur de déblocage:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Erreur de déblocage',
+        description: error instanceof Error ? error.message : 'Une erreur est survenue lors du déblocage du bulletin'
+      });
+    } finally {
+      setIsUnlocking(false);
+    }
+  };
+
+  const isValidated = status === 'validated';
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <PDFDownloadLink
-          document={<PayslipDocument data={payslip} />}
-          fileName={fileName}
-          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-        >
-          {({ loading }) => (loading ? 'Génération du PDF...' : 'Télécharger le PDF')}
-        </PDFDownloadLink>
-
-        {onUpload && (
-          <button
-            onClick={async () => {
-              const blob = await new Promise<Blob>((resolve) => {
-                const renderer = <PayslipDocument data={payslip} />;
-                const doc = renderer.document;
-                if (doc) {
-                  doc.on('blob', resolve);
-                }
-              });
-              await handleBlobGenerated(blob);
-            }}
-            disabled={isUploading || uploaded}
-            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50"
-          >
-            {isUploading
-              ? 'Enregistrement...'
-              : uploaded
-              ? 'PDF enregistré ✓'
-              : 'Enregistrer dans votre espace'}
-          </button>
-        )}
-      </div>
-
-      {error && (
-        <div className="bg-red-50 border-l-4 border-red-400 p-4">
-          <div className="flex">
-            <div className="flex-shrink-0">
-              <svg
-                className="h-5 w-5 text-red-400"
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 20 20"
-                fill="currentColor"
-                aria-hidden="true"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                  clipRule="evenodd"
-                />
-              </svg>
-            </div>
-            <div className="ml-3">
-              <p className="text-sm text-red-700">{error}</p>
+    <div className="w-full max-w-md mx-auto">
+      <Card className="shadow-lg border">
+        <CardHeader className="pb-4">
+          <CardTitle className="text-center text-xl">
+            Bulletin de paie
+          </CardTitle>
+          <CardDescription className="text-center">
+            {isLocked ? (
+              <span className="flex items-center justify-center gap-1 text-amber-600">
+                <Lock className="h-4 w-4" />
+                Ce bulletin est verrouillé
+              </span>
+            ) : isValidated ? (
+              <span className="flex items-center justify-center gap-1 text-green-600">
+                <CheckCircle className="h-4 w-4" />
+                Ce bulletin est validé
+              </span>
+            ) : (
+              <span className="flex items-center justify-center gap-1 text-blue-600">
+                <Edit className="h-4 w-4" />
+                Ce bulletin peut être modifié
+              </span>
+            )}
+          </CardDescription>
+        </CardHeader>
+        
+        <CardContent className="flex flex-col items-center space-y-5 pt-0">
+          <div className="w-full flex justify-center mb-4">
+            <div className="bg-gray-100 p-6 rounded-lg w-24 h-32 flex items-center justify-center">
+              <FileText className="h-12 w-12 text-primary" />
             </div>
           </div>
-        </div>
-      )}
+          
+          <div className="space-y-3 w-full">
+            <Button 
+              className="w-full flex items-center justify-center gap-2" 
+              onClick={handleDownload}
+              disabled={isDownloading}
+            >
+              {isDownloading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Téléchargement...
+                </>
+              ) : (
+                <>
+                  <Download className="h-4 w-4" />
+                  Télécharger le bulletin
+                </>
+              )}
+            </Button>
+            
+            {isLocked && onUnlock && (
+              <Button 
+                variant="outline" 
+                className="w-full flex items-center justify-center gap-2"
+                onClick={handleUnlock}
+                disabled={isUnlocking}
+              >
+                {isUnlocking ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Déblocage en cours...
+                  </>
+                ) : (
+                  <>
+                    <Unlock className="h-4 w-4" />
+                    Débloquer le bulletin
+                  </>
+                )}
+              </Button>
+            )}
+            
+            {onReturn && (
+              <Button 
+                variant="secondary" 
+                className="w-full"
+                onClick={onReturn}
+              >
+                Retour à la sélection
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 } 

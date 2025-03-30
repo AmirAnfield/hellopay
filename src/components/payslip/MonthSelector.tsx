@@ -170,28 +170,50 @@ export function MonthSelector({
     monthsByYear[year].push(month);
   });
 
+  // Calcul des statistiques
+  const selectedMonths = availableMonths.filter(month => month.selected);
+  const selectedMonthsCount = selectedMonths.length;
+  const totalGrossSalary = selectedMonths.reduce((total, month) => total + month.grossSalary, 0);
+
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div className="flex items-center space-x-2">
-          <Checkbox 
-            id="select-all" 
-            checked={selectAll}
-            onCheckedChange={handleSelectAll}
-          />
-          <Label htmlFor="select-all">Tout sélectionner</Label>
+      <div className="bg-white p-4 rounded-lg border shadow-sm mb-4">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div>
+            <h3 className="font-medium mb-1">Résumé de la sélection</h3>
+            <p className="text-gray-600 text-sm">
+              {selectedMonthsCount === 0 
+                ? "Aucun mois sélectionné" 
+                : `${selectedMonthsCount} mois sélectionné${selectedMonthsCount > 1 ? 's' : ''}`}
+            </p>
+            {selectedMonthsCount > 0 && (
+              <p className="text-sm text-primary font-medium mt-1">
+                Montant total brut : {new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(totalGrossSalary)}
+              </p>
+            )}
+          </div>
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2">
+              <Checkbox 
+                id="select-all" 
+                checked={selectAll}
+                onCheckedChange={handleSelectAll}
+              />
+              <Label htmlFor="select-all">Tout sélectionner</Label>
+            </div>
+            
+            <Button 
+              onClick={handleGeneratePayslips}
+              disabled={!availableMonths.some(m => m.selected)}
+            >
+              Générer les bulletins sélectionnés
+            </Button>
+          </div>
         </div>
-        
-        <Button 
-          onClick={handleGeneratePayslips}
-          disabled={!availableMonths.some(m => m.selected)}
-        >
-          Générer les bulletins sélectionnés
-        </Button>
       </div>
       
       {Object.entries(monthsByYear).map(([year, months]) => (
-        <Card key={year} className={hasPaid ? '' : 'relative blur-sm'}>
+        <Card key={year} className={`${hasPaid ? '' : 'relative blur-sm'} overflow-hidden`}>
           {!hasPaid && (
             <div className="absolute inset-0 flex items-center justify-center z-10">
               <div className="bg-white/90 p-4 rounded-md shadow-lg">
@@ -200,16 +222,20 @@ export function MonthSelector({
             </div>
           )}
           
-          <CardHeader>
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent to-blue-50/30 opacity-40"></div>
+          
+          <CardHeader className="relative z-1 bg-gradient-to-r from-transparent to-blue-50/50">
             <CardTitle>{year}</CardTitle>
           </CardHeader>
           
-          <CardContent>
+          <CardContent className="relative z-1">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {months.map(month => (
                 <div 
                   key={month.key} 
-                  className={`p-4 border rounded-md ${
+                  className={`p-4 border rounded-md transition-all duration-200 ${
+                    month.selected ? 'border-blue-300 bg-blue-50/50' : ''
+                  } ${
                     month.locked ? 'bg-gray-100' : 'hover:border-blue-300'
                   } ${
                     month.validated ? 'border-green-300' : ''
@@ -226,12 +252,12 @@ export function MonthSelector({
                       <Label htmlFor={`month-${month.key}`} className="font-medium">
                         {month.label}
                         {month.locked && (
-                          <span className="text-xs ml-2 bg-gray-200 px-1 py-0.5 rounded">
+                          <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-200 text-gray-800">
                             Verrouillé
                           </span>
                         )}
                         {month.validated && (
-                          <span className="text-xs ml-2 bg-green-100 px-1 py-0.5 rounded text-green-800">
+                          <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
                             Validé
                           </span>
                         )}
@@ -253,57 +279,28 @@ export function MonthSelector({
                           }
                         }}
                       >
-                        Déverrouiller
+                        Débloquer
                       </Button>
                     )}
                   </div>
                   
-                  <div className="mt-4 space-y-3">
-                    <div>
-                      <Label htmlFor={`gross-${month.key}`} className="text-sm">
-                        Salaire brut (€)
+                  <div className="mt-3">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor={`salary-${month.key}`} className="text-xs text-gray-500">
+                        Salaire brut
                       </Label>
-                      <Input 
-                        id={`gross-${month.key}`}
-                        type="number" 
-                        value={month.grossSalary}
-                        onChange={(e) => handleGrossSalaryChange(month.key, e.target.value)}
-                        className="mt-1"
-                        disabled={month.locked}
-                        step="0.01"
-                      />
+                      <span className="text-xs text-gray-500">
+                        Net: {new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(month.netSalary)}
+                      </span>
                     </div>
-                    
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <Label className="text-xs text-gray-500">Net</Label>
-                        <p className="font-medium">
-                          {new Intl.NumberFormat('fr-FR', { 
-                            style: 'currency', 
-                            currency: 'EUR' 
-                          }).format(month.netSalary)}
-                        </p>
-                      </div>
-                      <div>
-                        <Label className="text-xs text-gray-500">Cotisations</Label>
-                        <p className="font-medium">
-                          {new Intl.NumberFormat('fr-FR', { 
-                            style: 'currency', 
-                            currency: 'EUR' 
-                          }).format(month.contributions)}
-                        </p>
-                      </div>
-                    </div>
-                    
-                    <div>
-                      <Label className="text-xs text-gray-500">Coût employeur</Label>
-                      <p className="font-medium">
-                        {new Intl.NumberFormat('fr-FR', { 
-                          style: 'currency', 
-                          currency: 'EUR' 
-                        }).format(month.employerCost)}
-                      </p>
-                    </div>
+                    <Input
+                      id={`salary-${month.key}`}
+                      type="number"
+                      value={month.grossSalary || ''}
+                      onChange={(e) => handleGrossSalaryChange(month.key, e.target.value)}
+                      disabled={month.locked}
+                      className="mt-1"
+                    />
                   </div>
                 </div>
               ))}

@@ -1,3 +1,8 @@
+/**
+ * @deprecated Cette page va être migrée vers /dashboard/payslips/create
+ * À utiliser uniquement pendant la phase de transition
+ */
+
 "use client";
 
 import { useState } from "react";
@@ -11,7 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/components/ui/use-toast";
-import { Loader2, Save, FileText, ArrowLeft } from "lucide-react";
+import { Loader2, ArrowLeft, FileText } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -51,7 +56,7 @@ type PayslipFormValues = z.infer<typeof payslipSchema>;
 export default function NewPayslipPage() {
   const router = useRouter();
   const { toast } = useToast();
-  const { data: session, status } = useSession();
+  const { status } = useSession();
   const [isLoading, setIsLoading] = useState(false);
 
   const {
@@ -110,7 +115,7 @@ export default function NewPayslipPage() {
       };
 
       // Appel à l'API pour générer le bulletin
-      const response = await fetch("/api/generate-payslip", {
+      const response = await fetch("/api/payslips/generate", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -242,7 +247,15 @@ export default function NewPayslipPage() {
                   </div>
                 </CardContent>
                 <CardFooter className="flex justify-end">
-                  <Button type="button" onClick={() => document.querySelector('[data-value="employee"]')?.click()}>
+                  <Button 
+                    type="button" 
+                    onClick={() => {
+                      const tab = document.querySelector('[data-value="employee"]');
+                      if (tab instanceof HTMLElement) {
+                        tab.click();
+                      }
+                    }}
+                  >
                     Suivant
                   </Button>
                 </CardFooter>
@@ -321,10 +334,27 @@ export default function NewPayslipPage() {
                   </div>
                 </CardContent>
                 <CardFooter className="flex justify-between">
-                  <Button type="button" variant="outline" onClick={() => document.querySelector('[data-value="employer"]')?.click()}>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => {
+                      const tab = document.querySelector('[data-value="employer"]');
+                      if (tab instanceof HTMLElement) {
+                        tab.click();
+                      }
+                    }}
+                  >
                     Précédent
                   </Button>
-                  <Button type="button" onClick={() => document.querySelector('[data-value="salary"]')?.click()}>
+                  <Button 
+                    type="button" 
+                    onClick={() => {
+                      const tab = document.querySelector('[data-value="salary"]');
+                      if (tab instanceof HTMLElement) {
+                        tab.click();
+                      }
+                    }}
+                  >
                     Suivant
                   </Button>
                 </CardFooter>
@@ -441,10 +471,27 @@ export default function NewPayslipPage() {
                   </div>
                 </CardContent>
                 <CardFooter className="flex justify-between">
-                  <Button type="button" variant="outline" onClick={() => document.querySelector('[data-value="employee"]')?.click()}>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => {
+                      const tab = document.querySelector('[data-value="employee"]');
+                      if (tab instanceof HTMLElement) {
+                        tab.click();
+                      }
+                    }}
+                  >
                     Précédent
                   </Button>
-                  <Button type="button" onClick={() => document.querySelector('[data-value="preview"]')?.click()}>
+                  <Button 
+                    type="button" 
+                    onClick={() => {
+                      const tab = document.querySelector('[data-value="preview"]');
+                      if (tab instanceof HTMLElement) {
+                        tab.click();
+                      }
+                    }}
+                  >
                     Aperçu
                   </Button>
                 </CardFooter>
@@ -531,7 +578,16 @@ export default function NewPayslipPage() {
                   </div>
                 </CardContent>
                 <CardFooter className="flex justify-between">
-                  <Button type="button" variant="outline" onClick={() => document.querySelector('[data-value="salary"]')?.click()}>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => {
+                      const tab = document.querySelector('[data-value="salary"]');
+                      if (tab instanceof HTMLElement) {
+                        tab.click();
+                      }
+                    }}
+                  >
                     Précédent
                   </Button>
                   <Button type="submit" disabled={isLoading} className="gap-2">

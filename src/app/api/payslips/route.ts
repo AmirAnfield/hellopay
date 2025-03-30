@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { getServerSession } from 'next-auth';
+import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { Prisma } from '@prisma/client';
+import { listPayslipsQuerySchema } from '@/lib/validators/pagination';
+import { getPayslips } from '@/lib/db/queries';
+import { logAPIEvent, LogLevel, SecurityEvent } from '@/lib/security/logger';
 
 // Constantes pour les cotisations sociales (taux simplifiés pour l'exemple)
 const COTISATIONS = {
@@ -34,7 +37,7 @@ export async function POST(req: NextRequest) {
     
     if (!session?.user) {
       return NextResponse.json(
-        { error: "Vous devez être connecté pour effectuer cette action" },
+        { success: false, message: "Vous devez être connecté pour effectuer cette action" },
         { status: 401 }
       );
     }
@@ -44,7 +47,7 @@ export async function POST(req: NextRequest) {
     
     if (!employeeId || !companyId || !periodDate) {
       return NextResponse.json(
-        { error: "Informations manquantes pour générer la fiche de paie" },
+        { success: false, message: "Informations manquantes pour générer la fiche de paie" },
         { status: 400 }
       );
     }
@@ -60,7 +63,7 @@ export async function POST(req: NextRequest) {
     
     if (!employee || !company) {
       return NextResponse.json(
-        { error: "Employé ou entreprise non trouvé" },
+        { success: false, message: "Employé ou entreprise non trouvé" },
         { status: 404 }
       );
     }
@@ -68,7 +71,7 @@ export async function POST(req: NextRequest) {
     // Vérifier que l'employé appartient à l'entreprise
     if (employee.companyId !== companyId) {
       return NextResponse.json(
-        { error: "L'employé n'appartient pas à cette entreprise" },
+        { success: false, message: "L'employé n'appartient pas à cette entreprise" },
         { status: 400 }
       );
     }
@@ -94,7 +97,7 @@ export async function POST(req: NextRequest) {
     
     if (existingPayslip) {
       return NextResponse.json(
-        { error: "Une fiche de paie existe déjà pour cette période" },
+        { success: false, message: "Une fiche de paie existe déjà pour cette période" },
         { status: 400 }
       );
     }
@@ -245,71 +248,135 @@ export async function POST(req: NextRequest) {
       data: { paidLeaveBalance: paidLeaveRemaining }
     });
     
+    // Journaliser l'événement
+    logAPIEvent(
+      req,
+      SecurityEvent.INFO,
+      `Bulletin de paie généré pour ${employee.firstName} ${employee.lastName}`,
+      LogLevel.INFO,
+      {
+        userId: session.user.id,
+        employeeId,
+        companyId,
+        payslipId: payslip.id,
+        period: `${periodStart.getMonth() + 1}/${periodStart.getFullYear()}`
+      }
+    );
+    
     return NextResponse.json({ 
       success: true, 
       message: "Fiche de paie générée avec succès",
       payslip
     });
   } catch (error) {
-    console.error("Erreur lors de la création de la fiche de paie:", error);
+    console.error("Erreur lors de la génération de la fiche de paie:", error);
     return NextResponse.json(
-      { error: "Une erreur est survenue lors de la création de la fiche de paie" },
+      { success: false, message: "Une erreur est survenue lors de la génération de la fiche de paie" },
       { status: 500 }
     );
   }
 }
 
-// GET /api/payslips - Récupérer les fiches de paie
+// GET /api/payslips - Récupérer les fiches de paie avec pagination
 export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     
-    if (!session?.user) {
+    if (!session?.user?.id) {
       return NextResponse.json(
-        { error: "Vous devez être connecté pour effectuer cette action" },
+        { success: false, message: "Vous devez être connecté pour effectuer cette action" },
         { status: 401 }
       );
     }
     
+    // Récupérer les paramètres de requête
     const { searchParams } = new URL(req.url);
-    const employeeId = searchParams.get('employeeId');
-    const companyId = searchParams.get('companyId');
-    const month = searchParams.get('month');
-    const year = searchParams.get('year');
+    const queryParams = Object.fromEntries(searchParams.entries());
     
-    const where: Prisma.PayslipWhereInput = { userId: session.user.id };
+    // Valider les paramètres de requête
+    const validationResult = listPayslipsQuerySchema.safeParse(queryParams);
     
-    if (employeeId) where.employeeId = employeeId;
-    if (companyId) where.companyId = companyId;
-    
-    if (month && year) {
-      const periodStart = new Date(parseInt(year), parseInt(month) - 1, 1);
-      const periodEnd = new Date(parseInt(year), parseInt(month), 0);
-      
-      where.periodStart = {
-        gte: periodStart
-      };
-      where.periodEnd = {
-        lte: periodEnd
-      };
-    } else if (year) {
-      where.fiscalYear = parseInt(year);
+    if (!validationResult.success) {
+      return NextResponse.json(
+        { 
+          success: false, 
+          message: "Paramètres de requête invalides",
+          errors: validationResult.error.errors
+        },
+        { status: 400 }
+      );
     }
     
-    const payslips = await prisma.payslip.findMany({
-      where,
-      orderBy: { periodStart: 'desc' },
-      include: {
-        employee: true,
-        company: true
-      }
-    });
+    const params = validationResult.data;
     
-    return NextResponse.json({ payslips });
+    // Vérifier les permissions si companyId est spécifié
+    if (params.companyId) {
+      const company = await prisma.company.findFirst({
+        where: {
+          id: params.companyId,
+          userId: session.user.id,
+        },
+        select: { id: true }
+      });
+
+      if (!company) {
+        return NextResponse.json(
+          { success: false, message: 'Entreprise non trouvée ou non autorisée.' },
+          { status: 404 }
+        );
+      }
+    }
+    
+    // Vérifier les permissions si employeeId est spécifié
+    if (params.employeeId) {
+      const employee = await prisma.employee.findFirst({
+        where: {
+          id: params.employeeId,
+          company: {
+            userId: session.user.id
+          }
+        },
+        select: { id: true }
+      });
+
+      if (!employee) {
+        return NextResponse.json(
+          { success: false, message: 'Employé non trouvé ou non autorisé.' },
+          { status: 404 }
+        );
+      }
+    }
+    
+    // Récupérer les bulletins de paie avec pagination
+    const result = await getPayslips(params);
+    
+    // Journaliser l'événement
+    logAPIEvent(
+      req,
+      SecurityEvent.INFO,
+      `Liste des bulletins de paie récupérée (${result.meta.total} résultats)`,
+      LogLevel.INFO,
+      { 
+        userId: session.user.id,
+        companyId: params.companyId,
+        employeeId: params.employeeId,
+        page: params.page,
+        limit: params.limit
+      }
+    );
+    
+    // Retourner la réponse
+    return NextResponse.json(
+      { 
+        success: true, 
+        ...result
+      },
+      { status: 200 }
+    );
   } catch (error) {
     console.error("Erreur lors de la récupération des fiches de paie:", error);
     return NextResponse.json(
-      { error: "Une erreur est survenue lors de la récupération des fiches de paie" },
+      { success: false, message: "Une erreur est survenue lors de la récupération des fiches de paie" },
       { status: 500 }
     );
   }

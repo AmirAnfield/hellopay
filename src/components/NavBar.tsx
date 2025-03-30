@@ -13,9 +13,7 @@ import {
   LogIn,
   LogOut,
   Menu,
-  Moon,
   Settings,
-  Sun,
   User,
   Users,
   X,
@@ -33,7 +31,6 @@ import {
   DropdownMenuTrigger,
   DropdownMenuGroup,
 } from "@/components/ui/dropdown-menu";
-import { useTheme } from "next-themes";
 import { signOut, useSession } from "next-auth/react";
 import {
   Tooltip,
@@ -46,7 +43,6 @@ import { Badge } from "@/components/ui/badge";
 export default function NavBar() {
   const router = useRouter();
   const pathname = usePathname();
-  const { theme, setTheme } = useTheme();
   const { data: session, status } = useSession();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -166,18 +162,6 @@ export default function NavBar() {
 
         {/* Actions - Desktop */}
         <div className="hidden md:flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label="Toggle theme"
-            className="rounded-full"
-            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-          >
-            <Sun className="h-5 w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-            <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-            <span className="sr-only">Changer de thème</span>
-          </Button>
-
           {isAuthenticated ? (
             <>
               {/* Indicateur d'email non vérifié */}
@@ -289,27 +273,6 @@ export default function NavBar() {
 
         {/* Bouton menu mobile */}
         <div className="md:hidden flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label="Toggle theme"
-            className="rounded-full"
-            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-          >
-            <Sun className="h-5 w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-            <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-            <span className="sr-only">Changer de thème</span>
-          </Button>
-
-          {/* Indicateur d'email non vérifié (version mobile) */}
-          {isAuthenticated && !emailVerified && (
-            <Link href="/auth/verify/pending">
-              <Button variant="outline" size="icon" className="rounded-full text-amber-600 border-amber-400">
-                <AlertTriangle className="h-5 w-5" />
-              </Button>
-            </Link>
-          )}
-
           <Button
             variant="ghost"
             size="icon"

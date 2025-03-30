@@ -1,76 +1,59 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import bcrypt from 'bcrypt';
+import { resetPasswordSchema } from '@/lib/validators/auth';
+import { validateRouteBody } from '@/lib/validators/adapters';
 
 export async function POST(req: Request) {
   try {
-    const { token, password } = await req.json();
+    // Valider les données avec le schéma Zod
+    const validation = await validateRouteBody(resetPasswordSchema)(req.clone());
     
-    if (!token || !password) {
+    if (!validation.success) {
       return NextResponse.json(
-        { message: 'Token de réinitialisation et nouveau mot de passe requis' },
+        { success: false, ...validation.error },
         { status: 400 }
       );
     }
     
-    // Rechercher le token de vérification
-    const verificationToken = await prisma.verificationToken.findUnique({
-      where: { token }
-    });
+    const { token, password } = validation.data;
     
-    if (!verificationToken) {
-      return NextResponse.json(
-        { message: 'Token de réinitialisation invalide' },
-        { status: 400 }
-      );
-    }
-    
-    // Vérifier si le token n'est pas expiré
-    if (new Date(verificationToken.expires) < new Date()) {
-      await prisma.verificationToken.delete({
-        where: { token }
-      });
-      
-      return NextResponse.json(
-        { message: 'Token de réinitialisation expiré. Veuillez demander un nouveau lien.' },
-        { status: 400 }
-      );
-    }
-    
-    // Identifier l'utilisateur et réinitialiser son mot de passe
-    const user = await prisma.user.findUnique({
-      where: { id: verificationToken.identifier }
+    // Rechercher l'utilisateur avec ce token de réinitialisation
+    const user = await prisma.user.findFirst({
+      where: { 
+        resetToken: token,
+        resetExpires: { gt: new Date() }
+      }
     });
     
     if (!user) {
       return NextResponse.json(
-        { message: 'Utilisateur introuvable' },
-        { status: 404 }
+        { success: false, message: 'Token de réinitialisation invalide ou expiré' },
+        { status: 400 }
       );
     }
     
     // Hasher le nouveau mot de passe
     const hashedPassword = await bcrypt.hash(password, 10);
     
-    // Mettre à jour le mot de passe de l'utilisateur
+    // Mettre à jour le mot de passe de l'utilisateur et effacer le token
     await prisma.user.update({
       where: { id: user.id },
-      data: { passwordHash: hashedPassword }
-    });
-    
-    // Supprimer le token utilisé
-    await prisma.verificationToken.delete({
-      where: { token }
+      data: { 
+        passwordHash: hashedPassword,
+        resetToken: null,
+        resetExpires: null
+      }
     });
     
     return NextResponse.json(
-      { message: 'Mot de passe réinitialisé avec succès' },
+      { success: true, message: 'Mot de passe réinitialisé avec succès' },
       { status: 200 }
     );
   } catch (error) {
     console.error('Erreur lors de la réinitialisation du mot de passe:', error);
     return NextResponse.json(
-      { message: 'Une erreur est survenue lors de la réinitialisation du mot de passe' },
+      { success: false, message: 'Une erreur est survenue lors de la réinitialisation du mot de passe' },
       { status: 500 }
     );
   }
