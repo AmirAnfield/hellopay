@@ -64,10 +64,8 @@ interface Contribution {
 }
 
 // Fonction pour obtenir l'historique annuel des bulletins de paie d'un employé
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     // Vérifier si l'ID de l'employé est fourni
     if (!params.id) {

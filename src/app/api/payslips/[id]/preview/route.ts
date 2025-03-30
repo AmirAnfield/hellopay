@@ -8,10 +8,8 @@ import path from 'path';
 import { format } from 'date-fns';
 import { v4 as uuidv4 } from 'uuid';
 
-export async function POST(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function POST(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const id = params.id;
     

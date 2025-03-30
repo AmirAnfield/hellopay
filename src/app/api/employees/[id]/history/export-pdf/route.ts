@@ -9,10 +9,8 @@ interface ContributionAmounts {
   employer: number;
 }
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     // Vérifier si l'ID de l'employé est fourni
     if (!params.id) {
