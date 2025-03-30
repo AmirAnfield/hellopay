@@ -1,22 +1,19 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { randomBytes } from 'crypto';
-import { forgotPasswordSchema } from '@/lib/validators/auth';
-import { validateRouteBody } from '@/lib/validators/adapters';
+import { sendPasswordResetEmail } from '@/lib/email';
 
 export async function POST(req: Request) {
   try {
-    // Valider les données avec le schéma Zod
-    const validation = await validateRouteBody(forgotPasswordSchema)(req.clone());
+    const { email } = await req.json();
     
-    if (!validation.success) {
+    if (!email) {
+      console.log('Tentative de réinitialisation de mot de passe sans adresse email');
       return NextResponse.json(
-        { success: false, ...validation.error },
+        { message: 'Adresse email requise' },
         { status: 400 }
       );
     }
-    
-    const { email } = validation.data;
     
     // Vérifier si l'utilisateur existe
     const user = await prisma.user.findUnique({
@@ -25,41 +22,58 @@ export async function POST(req: Request) {
     
     if (!user) {
       // Ne pas divulguer que l'utilisateur n'existe pas pour des raisons de sécurité
+      console.log(`Tentative de réinitialisation pour un email non enregistré: ${email}`);
       return NextResponse.json(
-        { success: true, message: 'Si votre email est enregistré, vous recevrez un lien de réinitialisation.' },
+        { message: 'Si votre email est enregistré, un lien de réinitialisation vous a été envoyé.' },
         { status: 200 }
       );
     }
     
     // Générer un token de réinitialisation
     const resetToken = randomBytes(32).toString('hex');
-    const tokenExpiry = new Date();
-    tokenExpiry.setHours(tokenExpiry.getHours() + 1); // Expire après 1h
+    
+    // Date d'expiration (1 heure)
+    const resetExpires = new Date();
+    resetExpires.setHours(resetExpires.getHours() + 1);
     
     // Mettre à jour l'utilisateur avec le token de réinitialisation
-    await prisma.user.update({
-      where: { id: user.id },
-      data: {
-        resetToken,
-        resetExpires: tokenExpiry
-      }
-    });
+    try {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          resetToken,
+          resetExpires
+        }
+      });
+      console.log(`Token de réinitialisation créé pour ${email}, expire le: ${resetExpires}`);
+    } catch (error) {
+      console.error(`Erreur lors de la mise à jour du token pour ${email}:`, error);
+      return NextResponse.json(
+        { message: 'Une erreur est survenue lors de la création du token de réinitialisation' },
+        { status: 500 }
+      );
+    }
     
-    // Créer le lien de réinitialisation
-    const resetLink = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/auth/reset-password?token=${resetToken}`;
-    
-    // TODO: Envoyer l'email de réinitialisation via un service d'email réel
-    console.log(`Lien de réinitialisation pour ${email}: ${resetLink}`);
-    // await sendResetPasswordEmail(email, resetLink);
+    // Envoyer l'email de réinitialisation
+    try {
+      await sendPasswordResetEmail(email, resetToken);
+      console.log(`Email de réinitialisation envoyé avec succès à ${email}`);
+    } catch (error) {
+      console.error(`Erreur lors de l'envoi de l'email à ${email}:`, error);
+      return NextResponse.json(
+        { message: 'Une erreur est survenue lors de l\'envoi de l\'email' },
+        { status: 500 }
+      );
+    }
     
     return NextResponse.json(
-      { success: true, message: 'Si votre email est enregistré, vous recevrez un lien de réinitialisation.' },
+      { message: 'Si votre email est enregistré, un lien de réinitialisation vous a été envoyé.' },
       { status: 200 }
     );
   } catch (error) {
-    console.error('Erreur lors de la demande de réinitialisation de mot de passe:', error);
+    console.error('Erreur lors de l\'envoi de l\'email de réinitialisation:', error);
     return NextResponse.json(
-      { success: false, message: 'Une erreur est survenue lors de la demande de réinitialisation' },
+      { message: 'Une erreur est survenue lors de l\'envoi de l\'email' },
       { status: 500 }
     );
   }

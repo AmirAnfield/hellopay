@@ -7,7 +7,7 @@ import { getCurrentUser } from "@/lib/session";
 // GET /api/contracts/[id] - Récupère un contrat spécifique
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  props: { params: Promise<{ id: string }> }
 ) {
   try {
     // Vérifier l'authentification de l'utilisateur
@@ -21,6 +21,7 @@ export async function GET(
     }
 
     // Récupérer l'ID du contrat depuis les paramètres
+    const params = await props.params;
     const { id } = params;
 
     if (!id) {
@@ -77,7 +78,7 @@ export async function GET(
 // PUT /api/contracts/[id] - Met à jour un contrat existant
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  props: { params: Promise<{ id: string }> }
 ) {
   try {
     // Vérifier l'authentification de l'utilisateur
@@ -91,6 +92,7 @@ export async function PUT(
     }
 
     // Récupérer l'ID du contrat depuis les paramètres
+    const params = await props.params;
     const { id } = params;
 
     if (!id) {
@@ -263,7 +265,7 @@ export async function PUT(
 // DELETE /api/contracts/[id] - Supprime un contrat existant
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  props: { params: Promise<{ id: string }> }
 ) {
   try {
     // Vérifier l'authentification de l'utilisateur
@@ -277,6 +279,7 @@ export async function DELETE(
     }
 
     // Récupérer l'ID du contrat depuis les paramètres
+    const params = await props.params;
     const { id } = params;
 
     if (!id) {

@@ -2,15 +2,60 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --foreground-rgb: 0, 0, 0;
-  --background-start-rgb: 245, 247, 250;
-  --background-end-rgb: 255, 255, 255;
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 221.2 83.2% 53.3%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 221.2 83.2% 53.3%;
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 217.2 91.2% 59.8%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 224.3 76.3% 48%;
+  }
 }
 
-body {
-  color: rgb(var(--foreground-rgb));
-  background: rgb(var(--background-start-rgb));
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
 }
 
 /* Styles pour les formulaires */
@@ -37,7 +82,7 @@ th {
 }
 
 tbody tr:hover {
-  background-color: rgba(243, 244, 246, 0.5);
+  @apply bg-muted/50;
 }
 
 /* Personnalisation du scroll */
@@ -47,17 +92,15 @@ tbody tr:hover {
 }
 
 ::-webkit-scrollbar-track {
-  background: rgb(243, 244, 246);
-  border-radius: 4px;
+  @apply bg-muted rounded;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgb(209, 213, 219);
-  border-radius: 4px;
+  @apply bg-border rounded;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgb(156, 163, 175);
+  @apply bg-muted-foreground/30;
 }
 
 /* Animation de chargement */
@@ -88,7 +131,7 @@ tbody tr:hover {
   }
 
   .payslip-table th {
-    @apply text-left p-2 bg-gray-50 font-medium text-sm border;
+    @apply text-left p-2 bg-muted font-medium text-sm border;
   }
 
   .payslip-table td {
@@ -96,7 +139,7 @@ tbody tr:hover {
   }
 
   .contribution-item {
-    @apply grid grid-cols-4 py-1 text-sm border-b border-gray-100;
+    @apply grid grid-cols-4 py-1 text-sm border-b border-border/50;
   }
 
   .contribution-header {
@@ -116,7 +159,7 @@ tbody tr:hover {
   }
 
   .contribution-totals {
-    @apply grid grid-cols-4 py-2 font-bold text-sm border-t border-gray-400 mt-2;
+    @apply grid grid-cols-4 py-2 font-bold text-sm border-t border-border mt-2;
   }
 
   .payslip-summary {
@@ -128,7 +171,7 @@ tbody tr:hover {
   }
 
   .summary-title {
-    @apply text-sm text-gray-500 mb-1;
+    @apply text-sm text-muted-foreground mb-1;
   }
 
   .summary-value {

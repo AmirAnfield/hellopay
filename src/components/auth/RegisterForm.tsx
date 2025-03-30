@@ -9,7 +9,6 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { EyeIcon, EyeOffIcon, Loader2 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
-import { useRouter } from 'next/navigation';
 
 const registerSchema = z.object({
   firstName: z.string().min(2, 'Le prénom doit contenir au moins 2 caractères'),
@@ -34,7 +33,6 @@ export default function RegisterForm({ onSuccess, onLoginClick }: RegisterFormPr
   const [error, setError] = useState<string | null>(null);
   const [isRegistered, setIsRegistered] = useState(false);
   const { toast } = useToast();
-  const router = useRouter();
 
   const {
     register,
@@ -53,6 +51,7 @@ export default function RegisterForm({ onSuccess, onLoginClick }: RegisterFormPr
 
   const onSubmit = async (data: RegisterFormValues) => {
     setIsLoading(true);
+    setError(null);
 
     try {
       // Appeler l'API d'inscription
@@ -62,30 +61,42 @@ export default function RegisterForm({ onSuccess, onLoginClick }: RegisterFormPr
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          name: data.name,
+          name: `${data.firstName} ${data.lastName}`,
           email: data.email,
           password: data.password,
         }),
       });
 
+      // Analyser les erreurs de l'API
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || "Erreur lors de l'inscription");
+        
+        if (response.status === 409) {
+          setError("Un compte existe déjà avec cette adresse email.");
+        } else {
+          setError(errorData.message || "Erreur lors de l'inscription");
+        }
+        
+        return;
       }
 
-      // Succès de l'inscription
+      // Afficher le succès et rediriger
+      setIsRegistered(true);
+      onSuccess();
+      
       toast({
         title: "Inscription réussie",
-        description: "Votre compte a été créé avec succès. Vous allez être redirigé vers la connexion.",
+        description: "Votre compte a été créé avec succès. Consultez votre boîte mail pour confirmer votre adresse email.",
       });
 
-      // Redirection vers la connexion ou le tableau de bord
-      router.push("/auth/login");
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Une erreur est survenue lors de la création de votre compte";
+      setError(errorMessage);
+      
       toast({
         variant: "destructive",
         title: "Erreur d'inscription",
-        description: error instanceof Error ? error.message : "Une erreur est survenue lors de la création de votre compte.",
+        description: errorMessage,
       });
     } finally {
       setIsLoading(false);
@@ -100,7 +111,7 @@ export default function RegisterForm({ onSuccess, onLoginClick }: RegisterFormPr
             <h3 className="font-medium text-green-800 mb-2">Inscription réussie!</h3>
             <p className="text-sm text-green-700">
               Un email de confirmation a été envoyé à votre adresse email.
-              Veuillez cliquer sur le lien dans l'email pour activer votre compte.
+              Veuillez cliquer sur le lien dans l&apos;email pour activer votre compte.
             </p>
           </div>
           <Button 
@@ -119,7 +130,7 @@ export default function RegisterForm({ onSuccess, onLoginClick }: RegisterFormPr
             </div>
           )}
           
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="firstName">Prénom</Label>
               <Input
@@ -128,6 +139,7 @@ export default function RegisterForm({ onSuccess, onLoginClick }: RegisterFormPr
                 placeholder="Jean"
                 {...register('firstName')}
                 disabled={isLoading}
+                autoComplete="given-name"
               />
               {errors.firstName && (
                 <p className="text-sm text-red-500">{errors.firstName.message}</p>
@@ -142,6 +154,7 @@ export default function RegisterForm({ onSuccess, onLoginClick }: RegisterFormPr
                 placeholder="Dupont"
                 {...register('lastName')}
                 disabled={isLoading}
+                autoComplete="family-name"
               />
               {errors.lastName && (
                 <p className="text-sm text-red-500">{errors.lastName.message}</p>
@@ -157,6 +170,7 @@ export default function RegisterForm({ onSuccess, onLoginClick }: RegisterFormPr
               placeholder="votre@email.com"
               {...register('email')}
               disabled={isLoading}
+              autoComplete="email"
             />
             {errors.email && (
               <p className="text-sm text-red-500">{errors.email.message}</p>
@@ -173,11 +187,13 @@ export default function RegisterForm({ onSuccess, onLoginClick }: RegisterFormPr
                 {...register('password')}
                 disabled={isLoading}
                 className="pr-10"
+                autoComplete="new-password"
               />
               <button
                 type="button"
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500"
                 onClick={() => setShowPassword(!showPassword)}
+                aria-label={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
               >
                 {showPassword ? (
                   <EyeOffIcon className="h-4 w-4" />
@@ -189,24 +205,27 @@ export default function RegisterForm({ onSuccess, onLoginClick }: RegisterFormPr
             {errors.password && (
               <p className="text-sm text-red-500">{errors.password.message}</p>
             )}
+            <div className="text-xs text-muted-foreground mt-1">
+              Le mot de passe doit contenir au moins 8 caractères
+            </div>
           </div>
           
           <div className="flex items-start space-x-2">
             <input 
               type="checkbox"
               id="acceptTerms"
-              className="rounded border-gray-300 text-primary-600 shadow-sm focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50"
+              className="rounded border-gray-300 text-primary-600 shadow-sm focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50 mt-1"
               {...register('acceptTerms')}
               disabled={isLoading}
             />
             <div className="grid gap-1.5 leading-none">
               <Label htmlFor="acceptTerms" className="text-sm font-normal cursor-pointer">
                 J&apos;accepte les{' '}
-                <a href="/terms" className="text-blue-600 hover:underline">
+                <a href="/mentions-legales" className="text-blue-600 hover:underline">
                   conditions d&apos;utilisation
                 </a>{' '}
                 et la{' '}
-                <a href="/privacy" className="text-blue-600 hover:underline">
+                <a href="/confidentialite" className="text-blue-600 hover:underline">
                   politique de confidentialité
                 </a>
               </Label>
@@ -232,7 +251,7 @@ export default function RegisterForm({ onSuccess, onLoginClick }: RegisterFormPr
             <button
               type="button"
               onClick={onLoginClick}
-              className="text-blue-600 hover:underline font-medium"
+              className="text-sm text-blue-600 hover:underline font-medium"
             >
               Se connecter
             </button>

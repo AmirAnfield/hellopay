@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -9,7 +9,7 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { EyeIcon, EyeOffIcon, Loader2 } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { signIn } from 'next-auth/react';
 
 const loginSchema = z.object({
@@ -30,6 +30,28 @@ export default function LoginForm({ onSuccess, onRegisterClick }: LoginFormProps
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const callbackUrl = searchParams?.get('callbackUrl') || '/dashboard';
+
+  // Effet pour gérer les erreurs d'authentification provenant de l'URL
+  useEffect(() => {
+    const errorParam = searchParams?.get('error');
+    if (errorParam) {
+      switch (errorParam) {
+        case 'CredentialsSignin':
+          setError('Identifiants incorrects. Veuillez vérifier votre email et mot de passe.');
+          break;
+        case 'SessionRequired':
+          setError('Vous devez être connecté pour accéder à cette page.');
+          break;
+        case 'AccessDenied':
+          setError('Accès refusé. Vous n\'avez pas les permissions nécessaires.');
+          break;
+        default:
+          setError('Une erreur d\'authentification est survenue.');
+      }
+    }
+  }, [searchParams]);
 
   const {
     register,
@@ -46,6 +68,7 @@ export default function LoginForm({ onSuccess, onRegisterClick }: LoginFormProps
 
   const onSubmit = async (data: LoginFormValues) => {
     setIsLoading(true);
+    setError(null);
 
     try {
       // Connexion via NextAuth
@@ -56,7 +79,17 @@ export default function LoginForm({ onSuccess, onRegisterClick }: LoginFormProps
       });
 
       if (signInResult?.error) {
-        throw new Error(signInResult.error);
+        // Gestion détaillée des erreurs
+        switch (signInResult.error) {
+          case 'Identifiants manquants':
+          case 'Identifiants incorrects':
+          case 'Mot de passe incorrect':
+            setError(signInResult.error);
+            break;
+          default:
+            setError('Erreur lors de la connexion. Veuillez réessayer.');
+        }
+        return;
       }
 
       // Succès : redirection
@@ -65,10 +98,14 @@ export default function LoginForm({ onSuccess, onRegisterClick }: LoginFormProps
         description: "Vous êtes maintenant connecté",
       });
 
-      // Redirection vers le tableau de bord
-      router.push("/dashboard");
+      // Appel du callback de succès
+      onSuccess();
+
+      // Redirection vers le tableau de bord ou l'URL de callback
+      router.push(callbackUrl);
       router.refresh();
     } catch (error) {
+      setError(error instanceof Error ? error.message : "Une erreur est survenue lors de la connexion");
       toast({
         variant: "destructive",
         title: "Erreur de connexion",
@@ -95,6 +132,7 @@ export default function LoginForm({ onSuccess, onRegisterClick }: LoginFormProps
           placeholder="votre@email.com"
           {...register('email')}
           disabled={isLoading}
+          autoComplete="email"
         />
         {errors.email && (
           <p className="text-sm text-red-500">{errors.email.message}</p>
@@ -105,7 +143,7 @@ export default function LoginForm({ onSuccess, onRegisterClick }: LoginFormProps
         <div className="flex items-center justify-between">
           <Label htmlFor="password">Mot de passe</Label>
           <a
-            href="/auth/reset-password"
+            href="/auth/forgot-password"
             className="text-sm text-blue-600 hover:underline"
           >
             Mot de passe oublié ?
@@ -119,11 +157,13 @@ export default function LoginForm({ onSuccess, onRegisterClick }: LoginFormProps
             {...register('password')}
             disabled={isLoading}
             className="pr-10"
+            autoComplete="current-password"
           />
           <button
             type="button"
             className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500"
             onClick={() => setShowPassword(!showPassword)}
+            aria-label={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
           >
             {showPassword ? (
               <EyeOffIcon className="h-4 w-4" />
@@ -166,7 +206,7 @@ export default function LoginForm({ onSuccess, onRegisterClick }: LoginFormProps
         <button
           type="button"
           onClick={onRegisterClick}
-          className="text-blue-600 hover:underline font-medium"
+          className="text-sm text-blue-600 hover:underline font-medium"
         >
           S&apos;inscrire
         </button>

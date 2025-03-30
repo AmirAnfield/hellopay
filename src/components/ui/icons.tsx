@@ -1,4 +1,5 @@
 import React from 'react';
+import { Loader2, Moon, Sun } from "lucide-react";
 
 interface IconProps extends React.SVGProps<SVGSVGElement> {
   size?: number;
@@ -523,4 +524,10 @@ export function ChevronRightIcon({ className, ...props }: IconProps) {
       <polyline points="9 18 15 12 9 6"/>
     </svg>
   );
-} 
+}
+
+export const Icons = {
+  sun: Sun,
+  moon: Moon,
+  spinner: Loader2,
+}; 

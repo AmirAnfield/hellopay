@@ -1,11 +1,13 @@
 import "./globals.css";
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import { ThemeScript } from "@/components/theme-provider";
 import NavBar from "@/components/NavBar";
 import SessionProviderWrapper from "@/components/SessionProviderWrapper";
 import ClientProviders from "./client-providers";
 import Providers from "./providers";
 import { ToastProvider } from "@/components/shared/ToastProvider";
+import { cn } from "@/lib/utils";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -22,7 +24,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="fr" suppressHydrationWarning>
-      <body className={inter.className}>
+      <head>
+        <ThemeScript />
+      </head>
+      <body className={cn(inter.className, "min-h-screen bg-background")}>
         <Providers>
           <SessionProviderWrapper>
             <ClientProviders>
@@ -34,13 +39,13 @@ export default function RootLayout({
               </main>
               <footer className="border-t py-6 mt-10">
                 <div className="container max-w-7xl mx-auto px-4 flex flex-col md:flex-row justify-between items-center">
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-muted-foreground">
                     &copy; {new Date().getFullYear()} HelloPay. Tous droits réservés.
                   </p>
-                  <div className="mt-4 md:mt-0 flex items-center space-x-4 text-sm text-gray-500">
-                    <a href="/mentions-legales" className="hover:text-gray-900 hover:underline">Mentions légales</a>
-                    <a href="/confidentialite" className="hover:text-gray-900 hover:underline">Politique de confidentialité</a>
-                    <a href="/contact" className="hover:text-gray-900 hover:underline">Contact</a>
+                  <div className="mt-4 md:mt-0 flex items-center space-x-4 text-sm text-muted-foreground">
+                    <a href="/mentions-legales" className="hover:text-foreground hover:underline">Mentions légales</a>
+                    <a href="/confidentialite" className="hover:text-foreground hover:underline">Politique de confidentialité</a>
+                    <a href="/contact" className="hover:text-foreground hover:underline">Contact</a>
                   </div>
                 </div>
               </footer>

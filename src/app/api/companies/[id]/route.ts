@@ -6,7 +6,7 @@ import { prisma } from '@/lib/prisma';
 // GET /api/companies/[id] - Récupère une entreprise spécifique
 export async function GET(
   request: NextRequest,
-  context: { params: { id: string } }
+  props: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -18,7 +18,8 @@ export async function GET(
       );
     }
 
-    const { id } = context.params;
+    const params = await props.params;
+    const id = params.id;
 
     const company = await prisma.company.findFirst({
       where: {
@@ -54,7 +55,7 @@ export async function GET(
 // PUT /api/companies/[id] - Met à jour une entreprise
 export async function PUT(
   request: NextRequest,
-  context: { params: { id: string } }
+  props: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -66,7 +67,8 @@ export async function PUT(
       );
     }
 
-    const { id } = context.params;
+    const params = await props.params;
+    const id = params.id;
     const data = await request.json();
 
     // Vérifier si l'entreprise existe et appartient à l'utilisateur
@@ -103,7 +105,7 @@ export async function PUT(
 // DELETE /api/companies/[id] - Supprime une entreprise
 export async function DELETE(
   request: NextRequest,
-  context: { params: { id: string } }
+  props: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -115,7 +117,8 @@ export async function DELETE(
       );
     }
 
-    const { id } = context.params;
+    const params = await props.params;
+    const id = params.id;
 
     // Vérifier si l'entreprise existe et appartient à l'utilisateur
     const existingCompany = await prisma.company.findFirst({

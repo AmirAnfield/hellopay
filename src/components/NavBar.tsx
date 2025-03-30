@@ -39,6 +39,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export default function NavBar() {
   const router = useRouter();
@@ -162,6 +163,9 @@ export default function NavBar() {
 
         {/* Actions - Desktop */}
         <div className="hidden md:flex items-center gap-4">
+          {/* Sélecteur de thème */}
+          <ThemeToggle />
+          
           {isAuthenticated ? (
             <>
               {/* Indicateur d'email non vérifié */}
@@ -271,8 +275,9 @@ export default function NavBar() {
           )}
         </div>
 
-        {/* Bouton menu mobile */}
+        {/* Bouton menu mobile et sélecteur de thème */}
         <div className="md:hidden flex items-center gap-2">
+          <ThemeToggle />
           <Button
             variant="ghost"
             size="icon"

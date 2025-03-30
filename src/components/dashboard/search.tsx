@@ -19,7 +19,7 @@ export function Search() {
           placeholder="Rechercher..."
           value={value}
           onChange={(e) => setValue(e.target.value)}
-          className="w-full pl-8 md:w-[300px] lg:w-[440px]"
+          className="w-full pl-8 md:w-[200px] lg:w-[250px] bg-background"
         />
       </div>
     </div>

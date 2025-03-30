@@ -1,13 +1,10 @@
 'use client';
 
 import React from 'react';
-import { usePathname } from 'next/navigation';
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth";
 import { MainNav } from "@/components/dashboard/main-nav";
 import { Search } from "@/components/dashboard/search";
 import { UserNav } from "@/components/dashboard/user-nav";
-import { ModeToggle } from "@/components/theme-toggle";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { SideNav } from "@/components/dashboard/side-nav";
 import { Toaster } from "sonner";
 import { PropsWithChildren } from "react";
@@ -21,23 +18,13 @@ import { PropsWithChildren } from "react";
 export default function DashboardLayout({
   children,
 }: PropsWithChildren) {
-  const pathname = usePathname();
-  const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
-
-  const toggleMobileMenu = () => {
-    setMobileMenuOpen(!mobileMenuOpen);
-  };
-
-  // Note: La vérification d'authentification doit être faite côté serveur
-  // Nous utilisons ici un composant client, donc ces opérations ne sont pas possibles ici
-
   return (
     <div className="flex min-h-screen flex-col">
       <header className="sticky top-0 z-50 flex h-16 items-center gap-4 border-b bg-background px-4 md:px-6">
         <MainNav />
         <div className="ml-auto flex items-center gap-4">
           <Search />
-          <ModeToggle />
+          <ThemeToggle />
           <UserNav />
         </div>
       </header>
@@ -109,6 +96,11 @@ export default function DashboardLayout({
               title: "Paramètres",
               href: "/dashboard/settings",
               icon: "settings",
+            },
+            {
+              title: "Diagnostics",
+              href: "/dashboard/diagnostics",
+              icon: "list",
             },
           ]}
         />
