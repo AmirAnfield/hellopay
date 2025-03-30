@@ -17,45 +17,47 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
-import { Switch } from "@/components/ui/switch";
-import { Loader2, Building2, ArrowLeft, Save } from "lucide-react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Loader2, ArrowLeft, Save } from "lucide-react";
 
 // Schéma de validation avec Zod
 const companyFormSchema = z.object({
+  // Champs obligatoires - exactement comme dans src/lib/validators/companies.ts
   name: z.string()
-    .min(2, { message: "Le nom doit contenir au moins 2 caractères" })
-    .max(100, { message: "Le nom ne peut pas dépasser 100 caractères" }),
+    .min(2, "La raison sociale doit comporter au moins 2 caractères")
+    .trim(),
   
   siret: z.string()
-    .regex(/^\d{14}$/, { message: "Le SIRET doit contenir exactement 14 chiffres" }),
+    .regex(/^\d{14}$/, "Le SIRET doit comporter exactement 14 chiffres")
+    .trim(),
   
   address: z.string()
-    .min(5, { message: "L'adresse doit contenir au moins 5 caractères" })
-    .max(200, { message: "L'adresse ne peut pas dépasser 200 caractères" }),
-  
-  postalCode: z.string()
-    .regex(/^\d{5}$/, { message: "Le code postal doit contenir 5 chiffres" }),
+    .min(5, "L'adresse doit comporter au moins 5 caractères")
+    .trim(),
   
   city: z.string()
-    .min(2, { message: "La ville doit contenir au moins 2 caractères" })
-    .max(100, { message: "La ville ne peut pas dépasser 100 caractères" }),
+    .min(2, "La ville doit comporter au moins 2 caractères")
+    .trim(),
   
-  country: z.string().default("France"),
+  postalCode: z.string()
+    .min(2, "Le code postal doit comporter au moins 2 caractères")
+    .trim(),
   
-  // Champs optionnels
-  activityCode: z.string().regex(/^\d{4}[A-Z]$/, { message: "Le code APE doit être au format NNNNL (ex: 6201Z)" }).optional().or(z.literal("")),
-  urssafNumber: z.string().regex(/^\d{9}$/, { message: "Le numéro URSSAF doit contenir 9 chiffres" }).optional().or(z.literal("")),
-  legalForm: z.string().optional(),
-  vatNumber: z.string().regex(/^FR\d{11}$/, { message: "Le numéro de TVA doit être au format FRXXXXXXXXXXX" }).optional().or(z.literal("")),
-  phoneNumber: z.string().optional(),
-  email: z.string().email({ message: "Veuillez entrer une adresse email valide" }).optional().or(z.literal("")),
-  website: z.string().url({ message: "Veuillez entrer une URL valide" }).optional().or(z.literal("")),
-  legalRepresentative: z.string().optional(),
-  legalRepresentativeRole: z.string().optional(),
+  country: z.string()
+    .trim()
+    .default("France"),
+  
+  // Champs optionnels - exactement comme dans le schéma serveur
+  activityCode: z.string().trim().optional().nullable(),
+  urssafNumber: z.string().trim().optional().nullable(),
+  legalForm: z.string().trim().default("SARL").optional().nullable(),
+  vatNumber: z.string().trim().optional().nullable(),
+  phoneNumber: z.string().trim().optional().nullable(),
+  email: z.string().email("Format d'email invalide").trim().optional().nullable(),
+  website: z.string().url("Format d'URL invalide").trim().optional().nullable(),
+  legalRepresentative: z.string().trim().optional().nullable(),
+  legalRepresentativeRole: z.string().trim().optional().nullable(),
 });
 
 // Types pour les props et le formulaire
@@ -105,9 +107,19 @@ export default function CompanyForm({ companyId }: CompanyFormProps) {
     setIsFetching(true);
     try {
       const response = await fetch(`/api/companies/${companyId}`);
+      
       if (!response.ok) {
-        throw new Error("Erreur lors de la récupération des données de l'entreprise");
+        const errorMsg = `Erreur ${response.status}: Impossible de récupérer les données de l'entreprise`;
+        console.error(errorMsg);
+        toast({
+          variant: "destructive",
+          title: "Erreur",
+          description: "Impossible de charger les informations de l'entreprise."
+        });
+        setIsFetching(false);
+        return;
       }
+      
       const data = await response.json();
       
       // Remplir le formulaire avec les données existantes
@@ -145,6 +157,16 @@ export default function CompanyForm({ companyId }: CompanyFormProps) {
 
   async function onSubmit(data: CompanyFormValues) {
     setIsLoading(true);
+    
+    // Trim all string fields to remove leading/trailing whitespace
+    Object.keys(data).forEach(key => {
+      if (typeof data[key as keyof CompanyFormValues] === 'string') {
+        data[key as keyof CompanyFormValues] = (data[key as keyof CompanyFormValues] as string).trim();
+      }
+    });
+    
+    console.log("Données soumises:", data);
+    
     try {
       const url = isEditMode ? `/api/companies/${companyId}` : "/api/companies";
       const method = isEditMode ? "PUT" : "POST";
@@ -158,8 +180,45 @@ export default function CompanyForm({ companyId }: CompanyFormProps) {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Une erreur est survenue");
+        let errorMessage = "Une erreur est survenue";
+        
+        // Tenter d'extraire le message d'erreur JSON si disponible
+        const contentType = response.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+          try {
+            const errorData = await response.json();
+            if (errorData.error || errorData.message) {
+              errorMessage = errorData.error || errorData.message;
+            }
+            
+            // Si nous avons des erreurs de validation détaillées, les afficher
+            if (errorData.errors && Array.isArray(errorData.errors)) {
+              errorMessage += ": " + errorData.errors.map((err: { message?: string; path?: string[] }) => 
+                err.message || (err.path ? err.path.join('.') : 'Erreur de validation')
+              ).join(', ');
+            }
+          } catch (e) {
+            // Ignorer l'erreur de parsing JSON et utiliser le message par défaut
+            console.error("Erreur de parsing JSON:", e);
+          }
+        } else {
+          // Utiliser le statut HTTP comme information d'erreur si pas de JSON
+          errorMessage = `Erreur ${response.status}: ${response.statusText || 'Erreur serveur'}`;
+        }
+        
+        // Afficher l'erreur dans la console pour le débogage
+        console.error("Erreur API:", errorMessage);
+        
+        // Afficher l'erreur à l'utilisateur
+        toast({
+          variant: "destructive",
+          title: "Erreur",
+          description: errorMessage
+        });
+        
+        // Terminer la fonction sans throw pour éviter l'erreur de console
+        setIsLoading(false);
+        return;
       }
 
       toast({
@@ -217,7 +276,7 @@ export default function CompanyForm({ companyId }: CompanyFormProps) {
             <CardHeader>
               <CardTitle className="text-xl">Informations générales</CardTitle>
               <CardDescription>
-                Les informations principales de votre entreprise
+                Les informations principales de votre entreprise - <span className="text-destructive font-medium">* Champs obligatoires</span>
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -343,7 +402,7 @@ export default function CompanyForm({ companyId }: CompanyFormProps) {
             <CardHeader>
               <CardTitle className="text-xl">Adresse</CardTitle>
               <CardDescription>
-                L'adresse principale de votre entreprise
+                Adresse du siège social - <span className="text-destructive font-medium">* Champs obligatoires</span>
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -354,7 +413,7 @@ export default function CompanyForm({ companyId }: CompanyFormProps) {
                   <FormItem>
                     <FormLabel>Adresse <span className="text-destructive">*</span></FormLabel>
                     <FormControl>
-                      <Textarea placeholder="Numéro, rue, complément d'adresse..." {...field} />
+                      <Input placeholder="Numéro et nom de rue" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -396,9 +455,9 @@ export default function CompanyForm({ companyId }: CompanyFormProps) {
                 name="country"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Pays</FormLabel>
+                    <FormLabel>Pays <span className="text-destructive">*</span></FormLabel>
                     <FormControl>
-                      <Input placeholder="France" {...field} />
+                      <Input placeholder="Pays" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -467,38 +526,27 @@ export default function CompanyForm({ companyId }: CompanyFormProps) {
             <CardHeader>
               <CardTitle className="text-xl">Représentant légal</CardTitle>
               <CardDescription>
-                Informations sur le représentant légal de l'entreprise
+                Informations sur le représentant légal de l&apos;entreprise
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <FormField
-                  control={form.control}
-                  name="legalRepresentative"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Nom et prénom</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Nom et prénom du représentant" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="legalRepresentativeRole"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Fonction</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Ex: Gérant, Président, Directeur..." {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <FormLabel htmlFor="legalRepresentative">Représentant légal</FormLabel>
+                  <Input
+                    id="legalRepresentative"
+                    placeholder="Nom et prénom"
+                    {...form.register("legalRepresentative")}
+                  />
+                </div>
+                <div>
+                  <FormLabel htmlFor="legalRepresentativeRole">Fonction</FormLabel>
+                  <Input
+                    id="legalRepresentativeRole"
+                    placeholder="Ex: Gérant, Président, etc."
+                    {...form.register("legalRepresentativeRole")}
+                  />
+                </div>
               </div>
             </CardContent>
           </Card>

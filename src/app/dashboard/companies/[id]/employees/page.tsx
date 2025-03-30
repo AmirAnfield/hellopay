@@ -7,15 +7,17 @@ export const metadata: Metadata = {
 };
 
 interface EmployeesPageProps {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 }
 
-export default function EmployeesPage({ params }: EmployeesPageProps) {
+export default async function EmployeesPage({ params }: EmployeesPageProps) {
+  const { id } = await params;
+  
   return (
     <div className="container py-10 max-w-7xl mx-auto px-4 md:px-6">
-      <DashboardEmployee companyId={params.id} />
+      <DashboardEmployee companyId={id} />
     </div>
   );
 } 

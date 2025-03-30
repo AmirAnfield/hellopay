@@ -31,9 +31,9 @@ export const metadata: Metadata = {
 };
 
 interface CompanyDetailsPageProps {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 }
 
 async function getCompany(id: string) {
@@ -57,7 +57,8 @@ async function getCompany(id: string) {
 }
 
 export default async function CompanyDetailsPage({ params }: CompanyDetailsPageProps) {
-  const company = await getCompany(params.id);
+  const { id } = await params;
+  const company = await getCompany(id);
   
   if (!company) {
     return (

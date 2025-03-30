@@ -100,6 +100,10 @@ export const authOptions: NextAuthOptions = {
       if (url.startsWith("/")) return `${baseUrl}${url}`;
       if (url.startsWith(baseUrl)) return url;
       return baseUrl;
+    },
+    async signIn() {
+      // Considérer tous les utilisateurs comme vérifiés pour les tests
+      return true;
     }
   }
 };

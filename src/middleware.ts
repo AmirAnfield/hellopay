@@ -79,11 +79,14 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL('/dashboard', request.url));
     }
     
+    // DÉSACTIVÉ POUR LES TESTS UTILISATEURS: Vérification de l'email
     // Si l'email n'est pas vérifié et que ce n'est pas une route d'onboarding
+    /*
     if (!token.emailVerified && !pathname.includes('/auth/verify') && !pathname.includes('/dashboard/onboarding')) {
       console.log(`Redirection: Email non vérifié pour ${token.email}`);
       return NextResponse.redirect(new URL('/dashboard/onboarding', request.url));
     }
+    */
   }
   
   // Par défaut, laisser passer la requête

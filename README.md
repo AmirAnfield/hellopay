@@ -2,7 +2,18 @@
 
 HelloPay est une application moderne de gestion RH qui simplifie la gestion des bulletins de paie, des contrats et des documents administratifs pour les PME françaises.
 
-## Fonctionnalités principales (MVP 0.15)
+## Comptes de test pour les utilisateurs
+
+Pour faciliter les tests, vous pouvez utiliser les comptes suivants:
+
+| Email | Mot de passe | Notes |
+|-------|-------------|-------|
+| test@hellopay.fr | password123 | Compte déjà configuré avec entreprises et employés |
+| demo@hellopay.fr | password123 | Compte avec plusieurs bulletins de paie générés |
+
+⚠️ **Note importante pour les testeurs**: La vérification d'email a été temporairement désactivée pour faciliter les tests. Dans un environnement de production, cette vérification serait obligatoire.
+
+## Fonctionnalités principales (MVP 0.21)
 
 - **Génération automatique de bulletins de paie**
   - Calcul automatique des cotisations sociales selon les règles françaises

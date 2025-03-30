@@ -1,7 +1,6 @@
 'use client';
 
 import React from 'react';
-import { MainNav } from "@/components/dashboard/main-nav";
 import { Search } from "@/components/dashboard/search";
 import { UserNav } from "@/components/dashboard/user-nav";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -20,14 +19,6 @@ export default function DashboardLayout({
 }: PropsWithChildren) {
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="sticky top-0 z-50 flex h-16 items-center gap-4 border-b bg-background px-4 md:px-6">
-        <MainNav />
-        <div className="ml-auto flex items-center gap-4">
-          <Search />
-          <ThemeToggle />
-          <UserNav />
-        </div>
-      </header>
       <div className="flex flex-1">
         <SideNav 
           links={[
@@ -104,7 +95,7 @@ export default function DashboardLayout({
             },
           ]}
         />
-        <main className="flex-1">{children}</main>
+        <main className="flex-1 p-4">{children}</main>
       </div>
       <Toaster richColors position="top-right" />
     </div>

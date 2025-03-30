@@ -1,17 +1,84 @@
+"use client";
+
+import { useState } from "react";
 import { Metadata } from "next";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Mail, Phone, MapPin } from "lucide-react";
+import { Mail, Phone, MapPin, Loader2 } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import { useToast } from "@/components/ui/use-toast";
 
 export const metadata: Metadata = {
   title: "Contact | HelloPay",
   description: "Contactez l'équipe HelloPay pour toute question ou demande d'information",
 };
 
+// Schéma de validation pour le formulaire de contact
+const contactFormSchema = z.object({
+  firstName: z.string().min(2, "Le prénom doit comporter au moins 2 caractères").trim(),
+  lastName: z.string().min(2, "Le nom doit comporter au moins 2 caractères").trim(),
+  email: z.string().email("Format d'email invalide").trim(),
+  subject: z.string().min(5, "Le sujet doit comporter au moins 5 caractères").trim(),
+  message: z.string().min(10, "Le message doit comporter au moins 10 caractères").trim(),
+});
+
+type ContactFormValues = z.infer<typeof contactFormSchema>;
+
 export default function ContactPage() {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { toast } = useToast();
+  
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm<ContactFormValues>({
+    resolver: zodResolver(contactFormSchema),
+    defaultValues: {
+      firstName: "",
+      lastName: "",
+      email: "",
+      subject: "",
+      message: "",
+    },
+  });
+  
+  const onSubmit = async (data: ContactFormValues) => {
+    setIsSubmitting(true);
+    
+    try {
+      // Simuler un appel API avec un délai
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Dans une application réelle, vous enverriez les données à une API
+      console.log("Données du formulaire envoyées:", data);
+      
+      // Afficher un message de succès
+      toast({
+        title: "Message envoyé",
+        description: "Nous avons bien reçu votre message et vous répondrons dans les plus brefs délais.",
+      });
+      
+      // Réinitialiser le formulaire
+      reset();
+    } catch (error) {
+      console.error("Erreur lors de l'envoi du formulaire:", error);
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: "Une erreur est survenue lors de l'envoi de votre message. Veuillez réessayer.",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <div className="container mx-auto py-12">
       <div className="max-w-5xl mx-auto">
@@ -98,26 +165,59 @@ export default function ContactPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <form className="space-y-4">
+                <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="first-name">Prénom</Label>
-                      <Input id="first-name" placeholder="Votre prénom" />
+                      <Label htmlFor="firstName">Prénom</Label>
+                      <Input 
+                        id="firstName" 
+                        placeholder="Votre prénom" 
+                        {...register("firstName")}
+                        className={errors.firstName ? "border-red-500" : ""}
+                      />
+                      {errors.firstName && (
+                        <p className="text-sm text-red-500">{errors.firstName.message}</p>
+                      )}
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="last-name">Nom</Label>
-                      <Input id="last-name" placeholder="Votre nom" />
+                      <Label htmlFor="lastName">Nom</Label>
+                      <Input 
+                        id="lastName" 
+                        placeholder="Votre nom" 
+                        {...register("lastName")}
+                        className={errors.lastName ? "border-red-500" : ""}
+                      />
+                      {errors.lastName && (
+                        <p className="text-sm text-red-500">{errors.lastName.message}</p>
+                      )}
                     </div>
                   </div>
                   
                   <div className="space-y-2">
                     <Label htmlFor="email">Email</Label>
-                    <Input id="email" type="email" placeholder="votre@email.com" />
+                    <Input 
+                      id="email" 
+                      type="email" 
+                      placeholder="votre@email.com" 
+                      {...register("email")}
+                      className={errors.email ? "border-red-500" : ""}
+                    />
+                    {errors.email && (
+                      <p className="text-sm text-red-500">{errors.email.message}</p>
+                    )}
                   </div>
                   
                   <div className="space-y-2">
                     <Label htmlFor="subject">Sujet</Label>
-                    <Input id="subject" placeholder="Objet de votre message" />
+                    <Input 
+                      id="subject" 
+                      placeholder="Objet de votre message" 
+                      {...register("subject")}
+                      className={errors.subject ? "border-red-500" : ""}
+                    />
+                    {errors.subject && (
+                      <p className="text-sm text-red-500">{errors.subject.message}</p>
+                    )}
                   </div>
                   
                   <div className="space-y-2">
@@ -125,12 +225,23 @@ export default function ContactPage() {
                     <Textarea 
                       id="message" 
                       placeholder="Décrivez votre demande en détail..." 
-                      className="min-h-[150px]"
+                      className={`min-h-[150px] ${errors.message ? "border-red-500" : ""}`}
+                      {...register("message")}
                     />
+                    {errors.message && (
+                      <p className="text-sm text-red-500">{errors.message.message}</p>
+                    )}
                   </div>
                   
-                  <Button type="submit" className="w-full">
-                    Envoyer le message
+                  <Button type="submit" className="w-full" disabled={isSubmitting}>
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Envoi en cours...
+                      </>
+                    ) : (
+                      "Envoyer le message"
+                    )}
                   </Button>
                   
                   <p className="text-xs text-gray-500 text-center">

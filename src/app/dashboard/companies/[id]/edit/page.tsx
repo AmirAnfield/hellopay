@@ -7,15 +7,17 @@ export const metadata: Metadata = {
 };
 
 interface EditCompanyPageProps {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 }
 
-export default function EditCompanyPage({ params }: EditCompanyPageProps) {
+export default async function EditCompanyPage({ params }: EditCompanyPageProps) {
+  const { id } = await params;
+  
   return (
     <div className="container py-10 max-w-7xl mx-auto px-4 md:px-6">
-      <CompanyForm companyId={params.id} />
+      <CompanyForm companyId={id} />
     </div>
   );
 } 
