@@ -1,18 +1,26 @@
 "use client";
 
-import { PageContainer, PageHeader } from "@/components/shared/PageContainer";
-import EmployeeForm from "@/components/dashboard/EmployeeForm";
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { Loader2 } from 'lucide-react';
 
-export default function NewEmployeePage() {
+/**
+ * Redirection vers la nouvelle URL standardisée
+ * Cette page existe pour maintenir la compatibilité avec les liens existants
+ */
+export default function EmployeeNewRedirect() {
+  const router = useRouter();
+  
+  useEffect(() => {
+    router.replace('/dashboard/employees/create');
+  }, [router]);
+  
   return (
-    <PageContainer>
-      <PageHeader
-        title="Ajouter un employé"
-        description="Créez un nouvel employé et associez-le à une entreprise"
-      />
-      <div className="max-w-3xl mx-auto mt-6">
-        <EmployeeForm />
+    <div className="flex items-center justify-center min-h-[200px]">
+      <div className="text-center">
+        <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2 text-primary" />
+        <p className="text-muted-foreground text-sm">Redirection...</p>
       </div>
-    </PageContainer>
+    </div>
   );
 } 
