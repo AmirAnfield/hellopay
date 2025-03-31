@@ -9,12 +9,18 @@ service firebase.storage {
     // Documents des utilisateurs
     match /users/{userId}/{allPaths=**} {
       // Permettre à l'utilisateur de lire/écrire ses propres documents
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      // avec vérification App Check
+      allow read, write: if request.auth != null && 
+                          request.auth.uid == userId && 
+                          request.app_check.token.token_verified;
       
       // Documents des employés
       match /employees/{employeeId}/{documentType}/{docId} {
         // Permettre à l'utilisateur de lire/écrire les documents de ses employés
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+        // avec vérification App Check
+        allow read, write: if request.auth != null && 
+                            request.auth.uid == userId && 
+                            request.app_check.token.token_verified;
         
         // Validation du type de fichier
         allow write: if request.resource.contentType.matches('application/pdf') || 
@@ -28,8 +34,10 @@ service firebase.storage {
     // Documents partagés (accessibles par plusieurs utilisateurs)
     match /shared/{docId} {
       // Vérification des droits d'accès via un document Firestore
+      // et vérification App Check
       allow read: if request.auth != null && 
-                    firestore.exists(/databases/(default)/documents/doc_access/$(docId)/users/$(request.auth.uid));
+                    firestore.exists(/databases/(default)/documents/doc_access/$(docId)/users/$(request.auth.uid)) &&
+                    request.app_check.token.token_verified;
     }
   }
 } 

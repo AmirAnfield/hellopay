@@ -1,6 +1,11 @@
 import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject, listAll, getMetadata } from "firebase/storage";
-import { auth } from "@/lib/firebase";
+import { auth, appCheck } from "@/lib/firebase";
 import { compressFile } from "@/lib/utils/file-utils";
+
+// S'assurer que App Check est initialisé
+if (!appCheck && typeof window !== 'undefined') {
+  console.warn("App Check n'est pas initialisé. Les requêtes Firebase pourraient être rejetées.");
+}
 
 const storage = getStorage();
 
