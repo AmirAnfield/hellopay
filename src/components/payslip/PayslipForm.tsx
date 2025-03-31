@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { Loader2 } from 'lucide-react';
 
 // Composants UI
 import { Input } from '@/components/ui/input';
@@ -73,12 +74,14 @@ interface PayslipFormProps {
   initialData?: Partial<PayslipFormValues>;
   onSubmit: (data: PayslipFormValues) => void;
   isLoading?: boolean;
+  onCancel?: () => void;
 }
 
 export function PayslipForm({ 
   initialData, 
   onSubmit, 
-  isLoading = false 
+  isLoading = false,
+  onCancel
 }: PayslipFormProps) {
   const [currentTab, setCurrentTab] = useState("enterprise");
   const [benefits, setBenefits] = useState<{name: string, amount: number}[]>(initialData?.benefits || []);
@@ -135,11 +138,11 @@ export function PayslipForm({
   
   React.useEffect(() => {
     const totalContributions = (
-      watchHealthInsurance || 0) + 
+      (watchHealthInsurance || 0) + 
       (watchRetirementBasic || 0) + 
       (watchRetirementComplementary || 0) + 
       (watchUnemploymentInsurance || 0) + 
-      (watchOtherContributions || 0
+      (watchOtherContributions || 0)
     );
     
     if (watchGrossSalary) {
@@ -610,12 +613,24 @@ export function PayslipForm({
             </div>
           </div>
           
-          <div className="flex justify-between">
-            <Button type="button" variant="outline" onClick={() => setCurrentTab("employee")}>
-              Précédent
+          <div className="flex justify-end gap-4 mt-6">
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={() => onCancel && onCancel()}
+              disabled={isLoading}
+            >
+              Annuler
             </Button>
             <Button type="submit" disabled={isLoading}>
-              {isLoading ? "Génération en cours..." : "Générer la fiche de paie"}
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Enregistrement...
+                </>
+              ) : (
+                "Enregistrer le bulletin"
+              )}
             </Button>
           </div>
         </TabsContent>
