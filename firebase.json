@@ -49,5 +49,8 @@
       "**/.*",
       "**/node_modules/**"
     ]
+  },
+  "storage": {
+    "rules": "scripts/firebase/storage.rules"
   }
 } 
