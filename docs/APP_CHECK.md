@@ -29,7 +29,7 @@ if (typeof window !== 'undefined') {
   
   // Initialiser AppCheck avec reCAPTCHA v3
   appCheck = initializeAppCheck(app, {
-    provider: new ReCaptchaV3Provider('SITE_KEY'), // Clé site web reCAPTCHA v3
+    provider: new ReCaptchaV3Provider('6LdUnwUrAAAAAL3u-4zxXrmXOCLMBEVLjkkd2Y4_'), // Clé site web reCAPTCHA v3
     isTokenAutoRefreshEnabled: true // Renouvellement automatique des tokens
   });
 }
@@ -49,7 +49,7 @@ service firebase.storage {
   match /b/{bucket}/o {
     // Règle globale exigeant App Check
     match /{allPaths=**} {
-      allow read, write: if request.auth != null && appCheck.token.token_verified;
+      allow read, write: if request.auth != null && request.app_check.token.token_verified;
     }
     
     // Autres règles spécifiques...
@@ -60,8 +60,9 @@ service firebase.storage {
 ## Configuration côté console Firebase
 
 1. App Check a été activé dans la console Firebase pour le projet HelloPay
-2. Le fournisseur reCAPTCHA v3 a été configuré
-3. Les services protégés incluent : Storage, Firestore et Hosting
+2. Le fournisseur reCAPTCHA v3 a été configuré avec la clé : `6LdUnwUrAAAAAL3u-4zxXrmXOCLMBEVLjkkd2Y4_`
+3. La clé secrète reCAPTCHA v3 a été configurée dans la console Firebase : `6LdUnwUrAAAAAJhbOJtiPlxl4hFkwlMSUkZ6Eyaz`
+4. Les services protégés incluent : Storage, Firestore et Hosting
 
 ## Tester App Check
 
@@ -70,6 +71,7 @@ Pour tester l'intégration d'App Check :
 1. En développement : le token de débogage est automatiquement activé
 2. En production : tout fonctionne normalement pour les utilisateurs légitimes
 3. Pour simuler un accès non autorisé : tentez d'accéder aux ressources Firebase depuis une application non enregistrée
+4. Utilisez la page de test dédiée à l'adresse : `/test-appcheck`
 
 ## Surveillance et maintenance
 

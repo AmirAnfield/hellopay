@@ -28,7 +28,7 @@ if (typeof window !== 'undefined') {
   
   // Initialiser AppCheck avec reCAPTCHA v3
   appCheck = initializeAppCheck(app, {
-    provider: new ReCaptchaV3Provider('6Le6fHspAAAAAMqSO3LZOqDYz0ZDEBTivwPxI0QZ'), // Clé site web reCAPTCHA v3
+    provider: new ReCaptchaV3Provider('6LdUnwUrAAAAAL3u-4zxXrmXOCLMBEVLjkkd2Y4_'), // Clé site web reCAPTCHA v3
     isTokenAutoRefreshEnabled: true // Renouvellement automatique des tokens
   });
 }
