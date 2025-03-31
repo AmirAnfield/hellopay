@@ -1,0 +1,75 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Fonctions utilitaires
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function hasRole(role) {
+      return isAuthenticated() && firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == role;
+    }
+    
+    function isAdmin() {
+      return hasRole('admin');
+    }
+    
+    function isValidContentType() {
+      return request.resource.contentType.matches('application/pdf') || 
+             request.resource.contentType.matches('image/.*');
+    }
+    
+    function isValidFileSize() {
+      // Limiter à 10 Mo
+      return request.resource.size < 10 * 1024 * 1024;
+    }
+    
+    // Fichiers de l'utilisateur
+    match /users/{userId}/{allPaths=**} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId) && isValidContentType() && isValidFileSize();
+      allow update: if isOwner(userId) && isValidContentType() && isValidFileSize();
+      allow delete: if isOwner(userId);
+    }
+    
+    // Fichiers spécifiques pour les bulletins de paie
+    match /users/{userId}/payslips/{payslipId}.pdf {
+      allow read: if isOwner(userId) || isAdmin();
+      // La création et mise à jour sont gérées par Cloud Functions
+      allow create, update: if isOwner(userId) || isAdmin();
+      allow delete: if isOwner(userId);
+    }
+    
+    // Fichiers spécifiques pour les entreprises
+    match /users/{userId}/companies/{companyId}/{allPaths=**} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId) && isValidContentType() && isValidFileSize();
+      allow update: if isOwner(userId) && isValidContentType() && isValidFileSize();
+      allow delete: if isOwner(userId);
+    }
+    
+    // Fichiers spécifiques pour les employés
+    match /users/{userId}/companies/{companyId}/employees/{employeeId}/{allPaths=**} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId) && isValidContentType() && isValidFileSize();
+      allow update: if isOwner(userId) && isValidContentType() && isValidFileSize();
+      allow delete: if isOwner(userId);
+    }
+    
+    // Fichiers publics
+    match /public/{allPaths=**} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    
+    // Par défaut, refuser l'accès
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+} 

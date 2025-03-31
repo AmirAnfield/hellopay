@@ -1,0 +1,89 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Fonctions utilitaires
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function hasRole(role) {
+      return isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == role;
+    }
+    
+    function isAdmin() {
+      return hasRole('admin');
+    }
+    
+    function isValidCompany() {
+      return request.resource.data.name is string &&
+             request.resource.data.siret is string &&
+             request.resource.data.siret.size() == 14 &&
+             request.resource.data.address is string &&
+             request.resource.data.city is string &&
+             request.resource.data.postalCode is string;
+    }
+    
+    function isValidEmployee() {
+      return request.resource.data.firstName is string &&
+             request.resource.data.lastName is string &&
+             request.resource.data.address is string &&
+             request.resource.data.socialSecurityNumber is string &&
+             request.resource.data.socialSecurityNumber.size() == 15 &&
+             request.resource.data.position is string;
+    }
+    
+    // Collection utilisateurs
+    match /users/{userId} {
+      // L'utilisateur ne peut lire et écrire que ses propres données
+      allow read, write: if isOwner(userId) || isAdmin();
+      
+      // Sous-collection entreprises
+      match /companies/{companyId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow create: if isOwner(userId) && isValidCompany();
+        allow update: if isOwner(userId) && isValidCompany();
+        allow delete: if isOwner(userId);
+        
+        // Sous-collection employés
+        match /employees/{employeeId} {
+          allow read: if isOwner(userId) || isAdmin();
+          allow create: if isOwner(userId) && isValidEmployee();
+          allow update: if isOwner(userId);
+          allow delete: if isOwner(userId);
+          
+          // Sous-collection bulletins de paie des employés
+          match /payslips/{payslipId} {
+            allow read: if isOwner(userId) || isAdmin();
+            allow create: if isOwner(userId);
+            allow update: if isOwner(userId) && (!resource.data.locked || request.resource.data.locked == resource.data.locked);
+            allow delete: if isOwner(userId) && !resource.data.locked;
+          }
+        }
+      }
+      
+      // Sous-collection bulletins de paie (collection principale)
+      match /payslips/{payslipId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow create: if isOwner(userId);
+        allow update: if isOwner(userId) && (!resource.data.locked || request.resource.data.locked == resource.data.locked);
+        allow delete: if isOwner(userId) && !resource.data.locked;
+      }
+    }
+    
+    // Collection des taux de cotisations
+    match /rates/{rateId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+    
+    // Par défaut, refuser l'accès
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+} 
