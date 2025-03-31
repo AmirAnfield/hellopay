@@ -68,9 +68,9 @@ export type DeleteCompanyInput = z.infer<typeof deleteCompanySchema>;
  * Schéma pour la liste des entreprises avec filtres
  */
 export const listCompaniesQuerySchema = z.object({
-  page: z.string().optional().transform(val => (val ? parseInt(val, 10) : 1)),
-  limit: z.string().optional().transform(val => (val ? parseInt(val, 10) : 10)),
-  search: z.string().optional(),
+  page: z.string().optional().nullable().transform(val => (val ? parseInt(val, 10) : 1)),
+  limit: z.string().optional().nullable().transform(val => (val ? parseInt(val, 10) : 10)),
+  search: z.string().optional().nullable(),
   sortBy: z.enum(['name', 'city', 'createdAt']).optional().default('name'),
   sortOrder: z.enum(['asc', 'desc']).optional().default('asc'),
 });
