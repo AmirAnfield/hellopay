@@ -5,6 +5,7 @@ import { ThemeScript } from "@/components/theme-provider";
 import NavBar from "@/components/NavBar";
 import { Providers } from "./providers";
 import { cn } from "@/lib/utils";
+import Script from 'next/script'
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -24,6 +25,10 @@ export default function RootLayout({
         <ThemeScript />
       </head>
       <body className={cn(inter.className, "min-h-screen bg-background")}>
+        <Script 
+          src="https://www.google.com/recaptcha/enterprise.js?render=6LdUnwUrAAAAAL3u-4zxXrmXOCLMBEVLjkkd2Y4_"
+          strategy="afterInteractive"
+        />
         <Providers>
           <div className="flex min-h-screen flex-col">
             <NavBar />
