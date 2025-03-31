@@ -6,8 +6,8 @@ import { z } from 'zod';
 export const paginationSchema = z.object({
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(100).default(10),
-  search: z.string().optional(),
-  sortBy: z.string().optional(),
+  search: z.string().optional().nullable(),
+  sortBy: z.string().optional().nullable(),
   sortOrder: z.enum(['asc', 'desc']).optional().default('asc')
 });
 
@@ -20,10 +20,10 @@ export type PaginationParams = z.infer<typeof paginationSchema>;
  * Schéma pour la liste des employés
  */
 export const listEmployeesQuerySchema = paginationSchema.extend({
-  companyId: z.string().optional(),
-  contractType: z.string().optional(),
+  companyId: z.string().optional().nullable(),
+  contractType: z.string().optional().nullable(),
   isActive: z.coerce.boolean().optional(),
-  department: z.string().optional(),
+  department: z.string().optional().nullable(),
   startDateFrom: z.coerce.date().optional(),
   startDateTo: z.coerce.date().optional()
 });
@@ -37,9 +37,9 @@ export type ListEmployeesParams = z.infer<typeof listEmployeesQuerySchema>;
  * Schéma pour la liste des bulletins de paie
  */
 export const listPayslipsQuerySchema = paginationSchema.extend({
-  companyId: z.string().optional(),
-  employeeId: z.string().optional(),
-  status: z.string().optional(),
+  companyId: z.string().optional().nullable(),
+  employeeId: z.string().optional().nullable(),
+  status: z.string().optional().nullable(),
   periodFrom: z.coerce.date().optional(),
   periodTo: z.coerce.date().optional(),
   fiscalYear: z.coerce.number().int().optional()
@@ -54,8 +54,8 @@ export type ListPayslipsParams = z.infer<typeof listPayslipsQuerySchema>;
  * Schéma pour la liste des entreprises
  */
 export const listCompaniesQuerySchema = paginationSchema.extend({
-  country: z.string().optional(),
-  legalForm: z.string().optional(),
+  country: z.string().optional().nullable(),
+  legalForm: z.string().optional().nullable(),
   createdFrom: z.coerce.date().optional(),
   createdTo: z.coerce.date().optional()
 });
@@ -69,9 +69,9 @@ export type ListCompaniesParams = z.infer<typeof listCompaniesQuerySchema>;
  * Schéma pour la liste des contrats
  */
 export const listContractsQuerySchema = paginationSchema.extend({
-  companyId: z.string().optional(),
-  status: z.string().optional(),
-  contractType: z.string().optional(),
+  companyId: z.string().optional().nullable(),
+  status: z.string().optional().nullable(),
+  contractType: z.string().optional().nullable(),
   startDateFrom: z.coerce.date().optional(),
   startDateTo: z.coerce.date().optional(),
   endDateFrom: z.coerce.date().optional(),

@@ -19,8 +19,6 @@ import {
   X,
   ChevronDown,
   LayoutDashboard,
-  AlertTriangle,
-  Mail,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -31,14 +29,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuGroup,
 } from "@/components/ui/dropdown-menu";
-import { signOut, useSession, signIn } from "next-auth/react";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { Badge } from "@/components/ui/badge";
+import { signOut, useSession } from "next-auth/react";
 
 export default function NavBar() {
   const router = useRouter();
@@ -48,8 +39,6 @@ export default function NavBar() {
 
   const isAuthenticated = status === "authenticated";
   const user = session?.user;
-  // Forcer emailVerified à true pour ignorer la vérification d'email
-  const emailVerified = true; // Bypass la vérification d'email
 
   const handleLogout = async () => {
     await signOut({ redirect: false });
@@ -105,18 +94,18 @@ export default function NavBar() {
                     <ChevronDown className="h-4 w-4" />
                   </DropdownMenuTrigger>
                   <DropdownMenuContent className="bg-background border shadow-lg">
-                    <DropdownMenuItem onClick={() => router.push("/dashboard/companies")}>
+                    <Link href="/dashboard/companies" className="flex items-center p-2 cursor-pointer hover:bg-accent text-sm">
                       <Building2 className="h-4 w-4 mr-2" />
                       Entreprises
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => router.push("/dashboard/employees")}>
+                    </Link>
+                    <Link href="/dashboard/employees" className="flex items-center p-2 cursor-pointer hover:bg-accent text-sm">
                       <Users className="h-4 w-4 mr-2" />
                       Employés
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => router.push("/dashboard/payslips/create")}>
+                    </Link>
+                    <Link href="/dashboard/payslips/create" className="flex items-center p-2 cursor-pointer hover:bg-accent text-sm">
                       <FileText className="h-4 w-4 mr-2" />
                       Nouveau bulletin
-                    </DropdownMenuItem>
+                    </Link>
                   </DropdownMenuContent>
                 </DropdownMenu>
                 <Link
@@ -132,9 +121,9 @@ export default function NavBar() {
               // Liens pour visiteurs
               <>
                 <Link
-                  href="/pricing"
+                  href="/tarifs"
                   className={`text-sm font-medium transition-colors hover:text-primary ${
-                    pathname === "/pricing" ? "text-primary" : "text-muted-foreground"
+                    pathname === "/tarifs" ? "text-primary" : "text-muted-foreground"
                   }`}
                 >
                   Tarifs
@@ -182,33 +171,33 @@ export default function NavBar() {
                   <span>Mon compte</span>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => router.push("/profile")}>
+                <Link href="/profile" className="flex items-center p-2 cursor-pointer hover:bg-accent text-sm">
                   <User className="h-4 w-4 mr-2" />
                   Profil
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => router.push("/profile/settings")}>
+                </Link>
+                <Link href="/profile/settings" className="flex items-center p-2 cursor-pointer hover:bg-accent text-sm">
                   <Settings className="h-4 w-4 mr-2" />
                   Paramètres
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => router.push("/profile/billing")}>
+                </Link>
+                <Link href="/profile/billing" className="flex items-center p-2 cursor-pointer hover:bg-accent text-sm">
                   <CreditCard className="h-4 w-4 mr-2" />
                   Facturation
-                </DropdownMenuItem>
+                </Link>
                 <DropdownMenuSeparator />
                 <DropdownMenuGroup>
                   <DropdownMenuLabel className="text-xs">Gestion</DropdownMenuLabel>
-                  <DropdownMenuItem onClick={() => router.push("/dashboard/companies")}>
+                  <Link href="/dashboard/companies" className="flex items-center p-2 cursor-pointer hover:bg-accent text-sm">
                     <Building2 className="h-4 w-4 mr-2" />
                     Mes entreprises
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => router.push("/dashboard/employees")}>
+                  </Link>
+                  <Link href="/dashboard/employees" className="flex items-center p-2 cursor-pointer hover:bg-accent text-sm">
                     <Users className="h-4 w-4 mr-2" />
                     Mes employés
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => router.push("/dashboard/documents")}>
+                  </Link>
+                  <Link href="/dashboard/documents" className="flex items-center p-2 cursor-pointer hover:bg-accent text-sm">
                     <FileText className="h-4 w-4 mr-2" />
                     Documents
-                  </DropdownMenuItem>
+                  </Link>
                 </DropdownMenuGroup>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleLogout}>
@@ -227,14 +216,14 @@ export default function NavBar() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56 bg-background border shadow-lg">
-                <DropdownMenuItem onClick={() => router.push("/auth/login")}>
+                <Link href="/auth/login" className="flex items-center p-2 cursor-pointer hover:bg-accent text-sm">
                   <LogIn className="h-4 w-4 mr-2" />
                   Connexion
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => router.push("/auth/register")}>
+                </Link>
+                <Link href="/auth/register" className="flex items-center p-2 cursor-pointer hover:bg-accent text-sm">
                   <User className="h-4 w-4 mr-2" />
                   Inscription
-                </DropdownMenuItem>
+                </Link>
               </DropdownMenuContent>
             </DropdownMenu>
           )}
@@ -325,6 +314,14 @@ export default function NavBar() {
                         Documents
                       </Link>
                       <Link
+                        href="/dashboard/payslips/create"
+                        className="-mx-3 block rounded-lg px-3 py-2 text-base font-medium leading-7 text-gray-900 hover:bg-gray-50"
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        <FileText className="h-4 w-4 inline-block mr-2" />
+                        Nouveau bulletin
+                      </Link>
+                      <Link
                         href="/profile"
                         className="-mx-3 block rounded-lg px-3 py-2 text-base font-medium leading-7 text-gray-900 hover:bg-gray-50"
                         onClick={() => setMobileMenuOpen(false)}
@@ -336,7 +333,7 @@ export default function NavBar() {
                   ) : (
                     <>
                       <Link
-                        href="/pricing"
+                        href="/tarifs"
                         className="-mx-3 block rounded-lg px-3 py-2 text-base font-medium leading-7 text-gray-900 hover:bg-gray-50"
                         onClick={() => setMobileMenuOpen(false)}
                       >

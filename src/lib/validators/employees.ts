@@ -61,9 +61,9 @@ export const createEmployeePersonalSchema = z.object({
   firstName: z.string().min(2, { message: "Le prénom est requis (minimum 2 caractères)" }),
   lastName: z.string().min(2, { message: "Le nom est requis (minimum 2 caractères)" }),
   email: z.string().email({ message: "Veuillez entrer une adresse email valide" }).optional(),
-  phone: z.string().optional(),
-  address: z.string().optional(),
-  birthDate: z.string().optional().refine(
+  phone: z.string().optional().nullable(),
+  address: z.string().optional().nullable(),
+  birthDate: z.string().optional().nullable().refine(
     val => !val || !isNaN(Date.parse(val)),
     { message: "La date de naissance doit être une date valide" }
   ),
@@ -80,7 +80,7 @@ export type CreateEmployeePersonalInput = z.infer<typeof createEmployeePersonalS
 export const createEmployeeProfessionalSchema = z.object({
   companyId: z.string().min(1, { message: "L'ID de l'entreprise est requis" }),
   position: z.string().min(1, { message: "Le poste est requis" }),
-  department: z.string().optional(),
+  department: z.string().optional().nullable(),
   hireDate: z.string().refine(
     val => !isNaN(Date.parse(val)),
     { message: "La date d'embauche doit être une date valide" }
@@ -103,7 +103,7 @@ export const createEmployeeCompensationSchema = z.object({
   bonusAmount: z.number().optional().default(0),
   benefitsAmount: z.number().optional().default(0),
   paidLeaveBalance: z.number().optional().default(0),
-  notes: z.string().optional(),
+  notes: z.string().optional().nullable(),
 });
 
 export type CreateEmployeeCompensationInput = z.infer<typeof createEmployeeCompensationSchema>;
@@ -139,13 +139,13 @@ export type GetEmployeeParams = z.infer<typeof getEmployeeParamsSchema>;
  * Schéma pour la liste des employés avec filtres
  */
 export const listEmployeesQuerySchema = z.object({
-  page: z.string().optional().transform(val => (val ? parseInt(val, 10) : 1)),
-  limit: z.string().optional().transform(val => (val ? parseInt(val, 10) : 10)),
-  companyId: z.string().optional(),
-  search: z.string().optional(),
-  department: z.string().optional(),
+  page: z.string().optional().nullable().transform(val => (val ? parseInt(val, 10) : 1)),
+  limit: z.string().optional().nullable().transform(val => (val ? parseInt(val, 10) : 10)),
+  companyId: z.string().optional().nullable(),
+  search: z.string().optional().nullable(),
+  department: z.string().optional().nullable(),
   contractType: z.enum(['CDI', 'CDD', 'Alternance', 'Stage', 'Autre']).optional(),
-  isExecutive: z.string().optional().transform(val => val === 'true'),
+  isExecutive: z.string().optional().nullable().transform(val => val === 'true'),
   sortBy: z.enum(['lastName', 'firstName', 'position', 'hireDate', 'grossSalary']).optional().default('lastName'),
   sortOrder: z.enum(['asc', 'desc']).optional().default('asc'),
 });

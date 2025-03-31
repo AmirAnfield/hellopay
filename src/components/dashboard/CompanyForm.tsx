@@ -49,15 +49,15 @@ const companyFormSchema = z.object({
     .default("France"),
   
   // Champs optionnels - exactement comme dans le schéma serveur
-  activityCode: z.string().trim().optional().nullable(),
-  urssafNumber: z.string().trim().optional().nullable(),
-  legalForm: z.string().trim().default("SARL").optional().nullable(),
-  vatNumber: z.string().trim().optional().nullable(),
-  phoneNumber: z.string().trim().optional().nullable(),
+  activityCode: z.trim().string().optional().nullable(),
+  urssafNumber: z.trim().string().optional().nullable(),
+  legalForm: z.trim().string().default("SARL").optional().nullable(),
+  vatNumber: z.trim().string().optional().nullable(),
+  phoneNumber: z.trim().string().optional().nullable(),
   email: z.string().email("Format d'email invalide").trim().optional().nullable(),
   website: z.string().url("Format d'URL invalide").trim().optional().nullable(),
-  legalRepresentative: z.string().trim().optional().nullable(),
-  legalRepresentativeRole: z.string().trim().optional().nullable(),
+  legalRepresentative: z.trim().string().optional().nullable(),
+  legalRepresentativeRole: z.trim().string().optional().nullable(),
 });
 
 // Types pour les props et le formulaire

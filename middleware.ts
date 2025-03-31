@@ -90,17 +90,39 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/dashboard', request.url));
   }
 
-  // Si le chemin est public ou que l'utilisateur est authentifié correctement, autoriser
-  if (isPublicPath || (isProtectedPath && token)) {
-    const response = NextResponse.next();
-    
-    // Ajout d'en-têtes de sécurité
-    response.headers.set('X-Content-Type-Options', 'nosniff');
-    response.headers.set('X-Frame-Options', 'DENY');
-    response.headers.set('X-XSS-Protection', '1; mode=block');
-    
-    return response;
+  // Préparer la réponse avec les en-têtes de sécurité
+  const response = NextResponse.next();
+  
+  // Ajout d'en-têtes de sécurité de base
+  response.headers.set('X-Content-Type-Options', 'nosniff');
+  response.headers.set('X-Frame-Options', 'DENY');
+  response.headers.set('X-XSS-Protection', '1; mode=block');
+  
+  // Politique de référencement
+  response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+  
+  // Permissions
+  response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  
+  // Content Security Policy
+  // Ajuster selon les besoins de l'application
+  const cspDirectives = [
+    "default-src 'self'",
+    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://js.stripe.com",
+    "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com",
+    "img-src 'self' data: https://*.stripe.com",
+    "font-src 'self' https://fonts.gstatic.com",
+    "connect-src 'self' https://api.stripe.com",
+    "frame-src https://js.stripe.com",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+  ];
+  
+  // N'activer CSP qu'en production pour éviter les problèmes en développement
+  if (process.env.NODE_ENV === 'production') {
+    response.headers.set('Content-Security-Policy', cspDirectives.join('; '));
   }
-
-  return NextResponse.next();
+  
+  return response;
 } 

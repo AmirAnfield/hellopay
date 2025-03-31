@@ -7,6 +7,14 @@ import { listEmployeesQuerySchema } from '@/lib/validators/pagination';
 import { logAPIEvent, LogLevel, SecurityEvent } from '@/lib/security/logger';
 import { validateRouteBody } from '@/lib/validators/adapters';
 import { employeeSchema } from '@/lib/validators/employees';
+import { 
+  createErrorResponse, 
+  createPaginatedResponse, 
+  createUnauthorizedResponse, 
+  createValidationErrorResponse,
+  createNotFoundResponse
+} from '@/lib/api-response';
+import { createAppError } from '@/lib/error-handler';
 
 // GET /api/employees - Récupère les salariés avec pagination
 export async function GET(request: NextRequest) {
@@ -14,10 +22,7 @@ export async function GET(request: NextRequest) {
     const session = await getServerSession(authOptions);
 
     if (!session?.user?.id) {
-      return NextResponse.json(
-        { success: false, message: 'Non autorisé. Veuillez vous connecter.' },
-        { status: 401 }
-      );
+      return createUnauthorizedResponse('Non autorisé. Veuillez vous connecter.');
     }
 
     // Récupérer les paramètres de requête
@@ -28,14 +33,7 @@ export async function GET(request: NextRequest) {
     const validationResult = listEmployeesQuerySchema.safeParse(queryParams);
     
     if (!validationResult.success) {
-      return NextResponse.json(
-        { 
-          success: false, 
-          message: "Paramètres de requête invalides",
-          errors: validationResult.error.errors
-        },
-        { status: 400 }
-      );
+      return createValidationErrorResponse(validationResult.error.errors);
     }
     
     const params = validationResult.data;
@@ -51,10 +49,7 @@ export async function GET(request: NextRequest) {
       });
 
       if (!company) {
-        return NextResponse.json(
-          { success: false, message: 'Entreprise non trouvée ou non autorisée.' },
-          { status: 404 }
-        );
+        return createNotFoundResponse('Entreprise non trouvée ou non autorisée.');
       }
     }
     
@@ -76,19 +71,14 @@ export async function GET(request: NextRequest) {
     );
     
     // Retourner la réponse
-    return NextResponse.json(
-      { 
-        success: true, 
-        ...result
-      },
-      { status: 200 }
+    return createPaginatedResponse(
+      result.data,
+      result.meta,
+      'Liste des employés récupérée avec succès'
     );
   } catch (error) {
     console.error('Erreur lors de la récupération des salariés:', error);
-    return NextResponse.json(
-      { success: false, message: 'Une erreur est survenue lors de la récupération des salariés.' },
-      { status: 500 }
-    );
+    return createErrorResponse(error);
   }
 }
 

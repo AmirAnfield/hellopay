@@ -2,16 +2,15 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { format } from "date-fns";
 import { useToast } from "@/components/ui/use-toast";
-import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import { format } from "date-fns";
+import { Loader2 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 
 // Types pour le formulaire
 interface EmployeeFormData {
@@ -62,7 +61,6 @@ export default function EmployeeForm({ employeeId, initialCompanyId }: EmployeeF
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState<EmployeeFormData>({
     firstName: "",
     lastName: "",
@@ -151,7 +149,6 @@ export default function EmployeeForm({ employeeId, initialCompanyId }: EmployeeF
       }
     } catch (err) {
       console.error("Erreur:", err);
-      setError("Impossible de charger les données de l'employé. Veuillez réessayer.");
       toast({
         variant: "destructive",
         title: "Erreur",
@@ -207,9 +204,40 @@ export default function EmployeeForm({ employeeId, initialCompanyId }: EmployeeF
     setIsSubmitting(true);
 
     try {
-      // Validation de base du formulaire
-      if (!formData.firstName || !formData.lastName || !formData.socialSecurityNumber || !formData.companyId) {
-        throw new Error("Veuillez remplir tous les champs obligatoires");
+      // Validation améliorée du formulaire
+      const validationErrors = [];
+      
+      if (!formData.firstName.trim()) validationErrors.push("Le prénom est obligatoire");
+      if (!formData.lastName.trim()) validationErrors.push("Le nom est obligatoire");
+      if (!formData.companyId) validationErrors.push("La sélection d'une entreprise est obligatoire");
+      
+      // Validation du numéro de sécurité sociale (format français: 13 ou 15 chiffres)
+      if (!formData.socialSecurityNumber.trim()) {
+        validationErrors.push("Le numéro de sécurité sociale est obligatoire");
+      } else if (!/^\d{13,15}$/.test(formData.socialSecurityNumber.trim())) {
+        validationErrors.push("Le numéro de sécurité sociale doit contenir entre 13 et 15 chiffres");
+      }
+      
+      // Validation email si fourni
+      if (!formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+        validationErrors.push("L&apos;adresse email n&apos;est pas valide");
+      }
+
+      // Si des erreurs de validation sont trouvées, les afficher et arrêter la soumission
+      if (validationErrors.length > 0) {
+        toast({
+          variant: "destructive",
+          title: "Erreurs de validation",
+          description: (
+            <ul className="list-disc pl-5 space-y-1 mt-2">
+              {validationErrors.map((error, index) => (
+                <li key={index}>{error}</li>
+              ))}
+            </ul>
+          ),
+        });
+        setIsSubmitting(false);
+        return;
       }
 
       // Création ou mise à jour de l'employé
@@ -235,8 +263,8 @@ export default function EmployeeForm({ employeeId, initialCompanyId }: EmployeeF
       toast({
         title: employeeId ? "Employé mis à jour" : "Employé créé",
         description: employeeId 
-          ? "L&apos;employé a été mis à jour avec succès." 
-          : "L&apos;employé a été créé avec succès.",
+          ? "L'employé a été mis à jour avec succès." 
+          : "L'employé a été créé avec succès.",
       });
 
       // Redirection après succès
@@ -250,7 +278,7 @@ export default function EmployeeForm({ employeeId, initialCompanyId }: EmployeeF
       toast({
         variant: "destructive",
         title: "Erreur",
-        description: err instanceof Error ? err.message : "Une erreur est survenue",
+        description: err instanceof Error ? err.message : "Une erreur est survenue lors de la sauvegarde de l'employé.",
       });
     } finally {
       setIsSubmitting(false);
@@ -632,15 +660,26 @@ export default function EmployeeForm({ employeeId, initialCompanyId }: EmployeeF
           </CardContent>
         </Card>
 
-        <div className="flex justify-end gap-4 mt-6">
-          <Button type="button" variant="outline" onClick={handleCancel}>
+        <CardFooter className="flex justify-between border-t pt-6">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleCancel}
+            disabled={isSubmitting}
+          >
             Annuler
           </Button>
           <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {employeeId ? "Mettre à jour" : "Créer"}
+            {isSubmitting ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                {employeeId ? "Mise à jour..." : "Création..."}
+              </>
+            ) : (
+              <>{employeeId ? "Mettre à jour" : "Créer"}</>
+            )}
           </Button>
-        </div>
+        </CardFooter>
       </form>
     </div>
   );

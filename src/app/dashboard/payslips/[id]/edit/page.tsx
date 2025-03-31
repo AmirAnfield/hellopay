@@ -37,7 +37,7 @@ import Link from 'next/link';
 
 // Définition du schéma de validation du formulaire
 const contributionSchema = z.object({
-  id: z.string().optional(),
+  id: z.string().optional().nullable(),
   category: z.string(),
   label: z.string(),
   baseType: z.string(),

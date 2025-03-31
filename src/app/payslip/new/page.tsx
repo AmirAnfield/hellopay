@@ -46,9 +46,9 @@ const payslipSchema = z.object({
   hoursWorked: z.string().min(1, { message: "Les heures travaillées sont requises" }),
   
   // Congés payés
-  paidLeaveAcquired: z.string().optional(),
-  paidLeaveTaken: z.string().optional(),
-  paidLeaveRemaining: z.string().optional(),
+  paidLeaveAcquired: z.string().optional().nullable(),
+  paidLeaveTaken: z.string().optional().nullable(),
+  paidLeaveRemaining: z.string().optional().nullable(),
 });
 
 type PayslipFormValues = z.infer<typeof payslipSchema>;
