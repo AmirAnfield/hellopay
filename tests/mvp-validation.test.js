@@ -166,7 +166,7 @@ describe('🔌 API Endpoints', () => {
 describe('📄 Bulletins de paie', () => {
   test('PAY-01: La page de génération de bulletins s\'affiche correctement', async () => {
     await login(page);
-    await page.goto(`${BASE_URL}/dashboard/payslips/generate`);
+    await page.goto(`${BASE_URL}/dashboard/payslips/create`);
     
     // Vérifier que les éléments principaux sont présents
     expect(await page.isVisible('select')).toBe(true); // Sélecteur d'entreprise/employé
