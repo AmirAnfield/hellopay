@@ -102,7 +102,9 @@ export const authOptions: NextAuthOptions = {
       return baseUrl;
     },
     async signIn() {
-      // Considérer tous les utilisateurs comme vérifiés pour les tests
+      // Pour le MVP 0.23, nous considérons tous les utilisateurs comme vérifiés
+      // Dans une version production, on pourrait ajouter une vérification comme:
+      // return user.emailVerified !== null;
       return true;
     }
   }
