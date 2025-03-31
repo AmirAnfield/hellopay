@@ -19,8 +19,6 @@ import {
   X,
   ChevronDown,
   LayoutDashboard,
-  AlertTriangle,
-  Mail,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -31,14 +29,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuGroup,
 } from "@/components/ui/dropdown-menu";
-import { signOut, useSession, signIn } from "next-auth/react";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { Badge } from "@/components/ui/badge";
+import { signOut, useSession } from "next-auth/react";
 
 export default function NavBar() {
   const router = useRouter();
@@ -48,8 +39,6 @@ export default function NavBar() {
 
   const isAuthenticated = status === "authenticated";
   const user = session?.user;
-  // Forcer emailVerified à true pour ignorer la vérification d'email
-  const emailVerified = true; // Bypass la vérification d'email
 
   const handleLogout = async () => {
     await signOut({ redirect: false });
