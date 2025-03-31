@@ -44,16 +44,16 @@ interface Company {
 // Validation du formulaire avec Zod
 const formSchema = z.object({
   title: z.string().min(3, "Le titre doit contenir au moins 3 caractères"),
-  description: z.string().optional(),
-  reference: z.string().optional(),
+  description: z.string().optional().nullable(),
+  reference: z.string().optional().nullable(),
   status: z.enum(["draft", "active", "terminated", "expired"]),
   contractType: z.enum(["employment", "service", "nda", "partnership", "other"]),
   startDate: z.date({ required_error: "La date de début est requise" }),
   endDate: z.date().optional().nullable(),
   companyId: z.string({ required_error: "L'entreprise est requise" }),
-  counterpartyName: z.string().optional(),
+  counterpartyName: z.string().optional().nullable(),
   counterpartyEmail: z.string().email("Email invalide").optional().or(z.literal("")),
-  tags: z.string().optional(),
+  tags: z.string().optional().nullable(),
 });
 
 interface ContractFormProps {

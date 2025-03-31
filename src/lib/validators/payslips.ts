@@ -7,7 +7,7 @@ export const payslipInputSchema = z.object({
   month: z.number().int().min(1).max(12, { message: "Le mois doit être compris entre 1 et 12" }),
   year: z.number().int().min(2000).max(2100, { message: "L'année doit être comprise entre 2000 et 2100" }),
   grossSalary: z.number().positive({ message: "Le salaire brut doit être positif" }),
-  id: z.string().optional(),
+  id: z.string().optional().nullable(),
 });
 
 export type PayslipInput = z.infer<typeof payslipInputSchema>;
@@ -65,15 +65,15 @@ export type UnlockPayslipInput = z.infer<typeof unlockPayslipSchema>;
  * Schéma pour la route /api/payslips avec filtres de recherche
  */
 export const listPayslipsQuerySchema = z.object({
-  page: z.string().optional().transform(val => (val ? parseInt(val, 10) : 1)),
-  limit: z.string().optional().transform(val => (val ? parseInt(val, 10) : 10)),
-  employeeId: z.string().optional(),
-  companyId: z.string().optional(),
-  startDate: z.string().optional().refine(
+  page: z.string().optional().nullable().transform(val => (val ? parseInt(val, 10) : 1)),
+  limit: z.string().optional().nullable().transform(val => (val ? parseInt(val, 10) : 10)),
+  employeeId: z.string().optional().nullable(),
+  companyId: z.string().optional().nullable(),
+  startDate: z.string().optional().nullable().refine(
     val => !val || !isNaN(Date.parse(val)),
     { message: "La date de début doit être une date valide" }
   ),
-  endDate: z.string().optional().refine(
+  endDate: z.string().optional().nullable().refine(
     val => !val || !isNaN(Date.parse(val)),
     { message: "La date de fin doit être une date valide" }
   ),

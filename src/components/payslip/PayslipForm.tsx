@@ -39,32 +39,32 @@ const payslipSchema = z.object({
   // Rémunération brute
   grossSalary: z.object({
     base: z.string().min(1, 'Le salaire de base est requis'),
-    overtime: z.string().optional(),
-    bonus: z.string().optional(),
-    indemnityCp: z.string().optional(),
-    other: z.string().optional(),
+    overtime: z.string().optional().nullable(),
+    bonus: z.string().optional().nullable(),
+    indemnityCp: z.string().optional().nullable(),
+    other: z.string().optional().nullable(),
   }),
   
   // Cotisations sociales
   contributions: z.object({
-    health: z.string().optional(),
-    retirement: z.string().optional(),
-    unemployment: z.string().optional(),
-    otherContributions: z.string().optional(),
+    health: z.string().optional().nullable(),
+    retirement: z.string().optional().nullable(),
+    unemployment: z.string().optional().nullable(),
+    otherContributions: z.string().optional().nullable(),
   }),
   
   // Avantages en nature
   benefits: z.object({
-    mealVouchers: z.string().optional(),
-    transport: z.string().optional(),
-    otherBenefits: z.string().optional(),
+    mealVouchers: z.string().optional().nullable(),
+    transport: z.string().optional().nullable(),
+    otherBenefits: z.string().optional().nullable(),
   }),
   
   // Net à payer
-  netSalary: z.string().optional(),
+  netSalary: z.string().optional().nullable(),
   
   // Commentaires
-  comments: z.string().optional(),
+  comments: z.string().optional().nullable(),
 });
 
 type PayslipFormValues = z.infer<typeof payslipSchema>;
