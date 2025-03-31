@@ -20,7 +20,8 @@ import {
 } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
 import { Loader2 } from "lucide-react";
-import { signIn } from "next-auth/react";
+import { useAuth } from "@/contexts/AuthContext";
+import { FirebaseError } from "firebase/app";
 
 // Schéma de validation
 const registerSchema = z.object({
@@ -42,6 +43,7 @@ export default function RegisterPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const { register: registerUser } = useAuth();
 
   const {
     register,
@@ -64,43 +66,8 @@ export default function RegisterPage() {
     setIsLoading(true);
 
     try {
-      // Appeler l'API d'inscription
-      const response = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: data.name,
-          email: data.email,
-          password: data.password,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Erreur lors de l'inscription");
-      }
-
-      // Connecter automatiquement l'utilisateur
-      const signInResponse = await signIn("credentials", {
-        redirect: false,
-        email: data.email,
-        password: data.password,
-      });
-
-      if (signInResponse?.error) {
-        throw new Error("Inscription réussie mais erreur lors de la connexion automatique");
-      }
-
-      // Envoyer un email de vérification
-      await fetch('/api/auth/send-verification', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email: data.email }),
-      });
+      // Utiliser Firebase Auth pour l'inscription
+      await registerUser(data.email, data.password, data.name);
 
       toast({
         title: "Inscription réussie",
@@ -112,10 +79,31 @@ export default function RegisterPage() {
       router.refresh();
     } catch (error) {
       console.error("Erreur d'inscription:", error);
+      
+      // Messages d'erreur personnalisés selon le code d'erreur Firebase
+      let errorMessage = "Une erreur est survenue lors de la création de votre compte. Veuillez réessayer.";
+      
+      if (error instanceof FirebaseError) {
+        switch (error.code) {
+          case 'auth/email-already-in-use':
+            errorMessage = "Cette adresse email est déjà utilisée.";
+            break;
+          case 'auth/invalid-email':
+            errorMessage = "L'adresse email n'est pas valide.";
+            break;
+          case 'auth/weak-password':
+            errorMessage = "Le mot de passe est trop faible. Utilisez au moins 8 caractères.";
+            break;
+          case 'auth/operation-not-allowed':
+            errorMessage = "La création de compte est temporairement désactivée.";
+            break;
+        }
+      }
+      
       toast({
         variant: "destructive",
         title: "Erreur d'inscription",
-        description: error instanceof Error ? error.message : "Une erreur est survenue lors de la création de votre compte. Veuillez réessayer.",
+        description: errorMessage,
       });
     } finally {
       setIsLoading(false);

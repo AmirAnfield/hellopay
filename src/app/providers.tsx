@@ -1,10 +1,17 @@
 "use client";
 
-import { ReactNode } from 'react';
+import { ThemeProvider } from 'next-themes';
+import { Toaster } from '@/components/ui/toaster';
+import { AuthProvider } from '@/contexts/AuthContext';
 
-export default function Providers({ children }: { children: ReactNode }) {
-  // Nous utilisons NextAuth pour l'authentification
-  // Ce composant est maintenu pour compatibilité structurelle
-  // mais ne contient plus de logique d'authentification personnalisée
-  return <>{children}</>;
+// Fournisseurs globaux pour l'application
+export function Providers({ children }: { children: React.ReactNode }) {
+  return (
+    <ThemeProvider attribute="class" defaultTheme="light">
+      <AuthProvider>
+        {children}
+        <Toaster />
+      </AuthProvider>
+    </ThemeProvider>
+  );
 } 

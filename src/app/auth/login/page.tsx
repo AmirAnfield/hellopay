@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
 import { Loader2 } from "lucide-react";
-import { signIn } from "next-auth/react";
+import { useAuth } from "@/contexts/AuthContext";
 
 // Schéma de validation
 const loginSchema = z.object({
@@ -35,6 +35,7 @@ export default function LoginPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const { login } = useAuth();
 
   const {
     register,
@@ -53,15 +54,8 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      const response = await signIn("credentials", {
-        redirect: false,
-        email: data.email,
-        password: data.password,
-      });
-
-      if (response?.error) {
-        throw new Error(response.error);
-      }
+      // Utiliser Firebase Auth via notre hook useAuth
+      await login(data.email, data.password);
 
       toast({
         title: "Connexion réussie",
@@ -71,12 +65,24 @@ export default function LoginPage() {
       // Rediriger vers le tableau de bord
       router.push("/dashboard");
       router.refresh();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erreur de connexion:", error);
+      
+      // Messages d'erreur personnalisés selon le code d'erreur Firebase
+      let errorMessage = "Email ou mot de passe incorrect. Veuillez réessayer.";
+      
+      if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+        errorMessage = "Email ou mot de passe incorrect. Veuillez réessayer.";
+      } else if (error.code === 'auth/too-many-requests') {
+        errorMessage = "Trop de tentatives de connexion. Veuillez réessayer plus tard.";
+      } else if (error.code === 'auth/user-disabled') {
+        errorMessage = "Ce compte a été désactivé.";
+      }
+      
       toast({
         variant: "destructive",
         title: "Erreur de connexion",
-        description: "Email ou mot de passe incorrect. Veuillez réessayer.",
+        description: errorMessage,
       });
     } finally {
       setIsLoading(false);
@@ -111,7 +117,7 @@ export default function LoginPage() {
               <div className="flex items-center justify-between">
                 <Label htmlFor="password">Mot de passe</Label>
                 <Link
-                  href="/auth/reset-password"
+                  href="/auth/forgot-password"
                   className="text-sm text-primary hover:underline"
                 >
                   Mot de passe oublié?

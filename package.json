@@ -11,7 +11,10 @@
     "test:watch": "jest --watch",
     "validate:zod": "node scripts/validate-zod-schemas.js",
     "test:mvp": "jest tests/mvp-validation.test.js",
-    "validate:mvp": "npm run validate:zod && npm run test:mvp"
+    "validate:mvp": "npm run validate:zod && npm run test:mvp",
+    "deploy": "next build && node scripts/generate-routes-config.js && firebase deploy --only hosting",
+    "firebase:serve": "next build && node scripts/generate-routes-config.js && firebase serve --only hosting",
+    "firebase:deploy": "firebase deploy --only hosting"
   },
   "dependencies": {
     "@next-auth/prisma-adapter": "^1.0.7",
@@ -42,6 +45,8 @@
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "decimal.js": "^10.5.0",
+    "firebase": "^11.5.0",
+    "firebase-admin": "^13.2.0",
     "jszip": "^3.10.1",
     "lucide-react": "^0.484.0",
     "next": "15.2.4",

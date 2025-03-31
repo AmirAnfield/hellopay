@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { Metadata } from "next";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -12,11 +11,6 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useToast } from "@/components/ui/use-toast";
-
-export const metadata: Metadata = {
-  title: "Contact | HelloPay",
-  description: "Contactez l'équipe HelloPay pour toute question ou demande d'information",
-};
 
 // Schéma de validation pour le formulaire de contact
 const contactFormSchema = z.object({
