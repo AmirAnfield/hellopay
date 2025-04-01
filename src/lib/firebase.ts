@@ -8,13 +8,13 @@ import { initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check';
 
 // Configuration Firebase
 const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "AIzaSyAb-L8tLHH1iiMEW7MCHHpIsupcfokINRo",
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "hellopay-a852d.firebaseapp.com",
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "hellopay-a852d",
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "hellopay-a852d.appspot.com",
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "1078999750007",
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || "1:1078999750007:web:839687e47416fde29ebd72",
-  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID || "G-1GPDHBPSBB"
+  apiKey: "AIzaSyAb-L8tLHH1iiMEW7MCHHpIsupcfokINRo",
+  authDomain: "hellopay-a852d.firebaseapp.com",
+  projectId: "hellopay-a852d",
+  storageBucket: "hellopay-a852d.appspot.com",
+  messagingSenderId: "1078999750007",
+  appId: "1:1078999750007:web:839687e47416fde29ebd72",
+  measurementId: "G-1GPDHBPSBB"
 };
 
 // Clé du site reCAPTCHA v3

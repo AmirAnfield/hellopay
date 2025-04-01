@@ -75,6 +75,8 @@ export default function NewCompanyPage() {
   const onSubmit = async (values: z.infer<typeof companyFormSchema>) => {
     setLoading(true);
     try {
+      console.log("Soumission du formulaire:", values);
+      
       // Créer l'entreprise dans Firestore
       const companyId = await createCompany(values);
       
@@ -83,8 +85,19 @@ export default function NewCompanyPage() {
       // Rediriger vers la page de détails de l'entreprise
       router.push(`/dashboard/companies/${companyId}`);
     } catch (error) {
-      console.error("Erreur lors de la création de l'entreprise:", error);
-      toast.error(error instanceof Error ? error.message : "Une erreur est survenue lors de la création de l'entreprise");
+      console.error("Erreur détaillée lors de la création de l'entreprise:", error);
+      
+      let errorMessage = "Une erreur est survenue lors de la création de l'entreprise";
+      
+      if (error instanceof Error) {
+        errorMessage = error.message;
+        // Afficher un message plus convivial pour les erreurs de validation
+        if (errorMessage.includes("Validation failed")) {
+          errorMessage = errorMessage.replace("Validation failed: ", "");
+        }
+      }
+      
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }

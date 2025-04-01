@@ -38,26 +38,54 @@ export default function ProfilePage() {
   const [marketingEmails, setMarketingEmails] = useState(false);
 
   useEffect(() => {
-    // Vérifier si l'utilisateur est connecté
-    const authStatus = localStorage.getItem("isAuthenticated") === "true";
-    
-    if (!authStatus) {
-      toast({
-        variant: "destructive",
-        title: "Accès refusé",
-        description: "Vous devez être connecté pour accéder à cette page."
-      });
-      router.push("/auth/login");
-      return;
-    }
-    
-    // Récupérer les informations de l'utilisateur
-    const userData = localStorage.getItem("user");
-    if (userData) {
+    // Récupérer les informations de l'utilisateur depuis Firebase Auth et Firestore
+    const getUserData = async () => {
       try {
-        const parsedUser = JSON.parse(userData) as UserData;
-        setUser(parsedUser);
-        setIsLoading(false);
+        setIsLoading(true);
+        
+        // Récupérer l'utilisateur Firebase actuel
+        const { auth, db } = await import('@/lib/firebase');
+        const currentUser = auth.currentUser;
+        
+        if (!currentUser) {
+          toast({
+            variant: "destructive",
+            title: "Accès refusé",
+            description: "Vous devez être connecté pour accéder à cette page."
+          });
+          router.push("/auth/login");
+          return;
+        }
+        
+        // Récupérer les données utilisateur supplémentaires depuis Firestore
+        const { doc, getDoc } = await import('firebase/firestore');
+        const userDocRef = doc(db, 'users', currentUser.uid);
+        const userDoc = await getDoc(userDocRef);
+        
+        if (userDoc.exists()) {
+          // Combiner les données Firebase Auth et Firestore
+          const firestoreData = userDoc.data();
+          setUser({
+            firstName: firestoreData.firstName || '',
+            lastName: firestoreData.lastName || '',
+            email: currentUser.email || '',
+            emailVerified: currentUser.emailVerified,
+            jobTitle: firestoreData.jobTitle || '',
+            company: firestoreData.companyName || '',
+            phoneNumber: firestoreData.phone || ''
+          });
+        } else {
+          // Utiliser uniquement les données de Firebase Auth si Firestore n'a pas de document
+          setUser({
+            firstName: '',
+            lastName: '',
+            email: currentUser.email || '',
+            emailVerified: currentUser.emailVerified,
+            jobTitle: '',
+            company: '',
+            phoneNumber: ''
+          });
+        }
       } catch (error) {
         console.error("Erreur lors de la récupération des données utilisateur:", error);
         toast({
@@ -66,53 +94,178 @@ export default function ProfilePage() {
           description: "Impossible de récupérer vos informations. Veuillez vous reconnecter."
         });
         router.push("/auth/login");
+      } finally {
+        setIsLoading(false);
       }
-    } else {
-      // Si pas de données utilisateur, créer un utilisateur fictif pour la démo
-      setUser({
-        firstName: "Marie",
-        lastName: "Dupont",
-        email: "marie.dupont@example.com",
-        emailVerified: true,
-        jobTitle: "Responsable RH",
-        company: "Tech Solutions",
-        phoneNumber: "06 12 34 56 78"
-      });
-      setIsLoading(false);
-    }
+    };
+
+    getUserData();
   }, [router, toast]);
 
-  const handleSaveProfile = () => {
-    toast({
-      title: "Profil mis à jour",
-      description: "Vos informations personnelles ont été mises à jour avec succès."
-    });
+  // Pour récupérer le paramètre d'URL pour l'onglet
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const tabParam = params.get('tab');
+      if (tabParam && ['general', 'security', 'billing', 'notifications'].includes(tabParam)) {
+        setActiveTab(tabParam);
+      }
+    }
+  }, []);
 
-    // En production, envoyez les données à l'API et mettez à jour le localStorage
-    if (user) {
-      localStorage.setItem("user", JSON.stringify(user));
+  const handleSaveProfile = async () => {
+    if (!user) return;
+    
+    try {
+      setIsLoading(true);
+      
+      // Récupérer les références Firebase
+      const { auth, db } = await import('@/lib/firebase');
+      const currentUser = auth.currentUser;
+      
+      if (!currentUser) {
+        toast({
+          variant: "destructive",
+          title: "Erreur",
+          description: "Vous devez être connecté pour effectuer cette action."
+        });
+        return;
+      }
+
+      // Mettre à jour les données dans Firestore
+      const { doc, updateDoc, serverTimestamp } = await import('firebase/firestore');
+      const userDocRef = doc(db, 'users', currentUser.uid);
+      
+      await updateDoc(userDocRef, {
+        firstName: user.firstName || '',
+        lastName: user.lastName || '',
+        jobTitle: user.jobTitle || '',
+        companyName: user.company || '',
+        phone: user.phoneNumber || '',
+        updatedAt: serverTimestamp(),
+      });
+
+      toast({
+        title: "Profil mis à jour",
+        description: "Vos informations personnelles ont été mises à jour avec succès."
+      });
+    } catch (error) {
+      console.error("Erreur lors de la mise à jour du profil:", error);
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: "Impossible de mettre à jour votre profil. Veuillez réessayer."
+      });
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleVerifyEmail = () => {
-    toast({
-      title: "Email de vérification envoyé",
-      description: "Veuillez vérifier votre boîte mail pour confirmer votre adresse email."
-    });
+  const handleVerifyEmail = async () => {
+    try {
+      // Récupérer l'utilisateur Firebase actuel
+      const { auth } = await import('@/lib/firebase');
+      const currentUser = auth.currentUser;
+      
+      if (!currentUser) {
+        toast({
+          variant: "destructive",
+          title: "Erreur",
+          description: "Vous devez être connecté pour effectuer cette action."
+        });
+        return;
+      }
+
+      // Envoyer un email de vérification
+      const { sendEmailVerification } = await import('firebase/auth');
+      await sendEmailVerification(currentUser);
+      
+      toast({
+        title: "Email de vérification envoyé",
+        description: "Veuillez vérifier votre boîte mail pour confirmer votre adresse email."
+      });
+    } catch (error) {
+      console.error("Erreur lors de l'envoi de l'email de vérification:", error);
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: "Impossible d'envoyer l'email de vérification. Veuillez réessayer plus tard."
+      });
+    }
   };
 
-  const handlePasswordChange = () => {
-    toast({
-      title: "Email envoyé",
-      description: "Un lien pour réinitialiser votre mot de passe vous a été envoyé par email."
-    });
+  const handlePasswordChange = async () => {
+    try {
+      // Récupérer l'utilisateur Firebase actuel
+      const { auth } = await import('@/lib/firebase');
+      const currentUser = auth.currentUser;
+      
+      if (!currentUser || !currentUser.email) {
+        toast({
+          variant: "destructive",
+          title: "Erreur",
+          description: "Vous devez être connecté pour effectuer cette action."
+        });
+        return;
+      }
+
+      // Envoyer un email de réinitialisation de mot de passe
+      const { sendPasswordResetEmail } = await import('firebase/auth');
+      await sendPasswordResetEmail(auth, currentUser.email);
+      
+      toast({
+        title: "Email envoyé",
+        description: "Un lien pour réinitialiser votre mot de passe vous a été envoyé par email."
+      });
+    } catch (error) {
+      console.error("Erreur lors de l'envoi de l'email de réinitialisation:", error);
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: "Impossible d'envoyer l'email de réinitialisation. Veuillez réessayer plus tard."
+      });
+    }
   };
 
-  const handleSaveNotifications = () => {
-    toast({
-      title: "Préférences de notification mises à jour",
-      description: "Vos préférences de notification ont été enregistrées."
-    });
+  const handleSaveNotifications = async () => {
+    try {
+      // Récupérer l'utilisateur Firebase actuel
+      const { auth, db } = await import('@/lib/firebase');
+      const currentUser = auth.currentUser;
+      
+      if (!currentUser) {
+        toast({
+          variant: "destructive",
+          title: "Erreur",
+          description: "Vous devez être connecté pour effectuer cette action."
+        });
+        return;
+      }
+
+      // Mettre à jour les préférences de notification dans Firestore
+      const { doc, updateDoc, serverTimestamp } = await import('firebase/firestore');
+      const userDocRef = doc(db, 'users', currentUser.uid);
+      
+      await updateDoc(userDocRef, {
+        notifications: {
+          email: emailNotifications,
+          marketing: marketingEmails
+        },
+        updatedAt: serverTimestamp()
+      });
+      
+      toast({
+        title: "Préférences de notification mises à jour",
+        description: "Vos préférences de notification ont été enregistrées."
+      });
+    } catch (error) {
+      console.error("Erreur lors de la mise à jour des préférences de notification:", error);
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: "Impossible de mettre à jour vos préférences. Veuillez réessayer."
+      });
+    }
   };
 
   if (isLoading) {

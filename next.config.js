@@ -42,6 +42,15 @@ const nextConfig = {
     };
     
     config.externals = [...config.externals, { 'utf-8-validate': 'commonjs utf-8-validate', 'bufferutil': 'commonjs bufferutil' }];
+    
+    // Ajouter le support pour les imports node:*
+    config.resolve.fallback = {
+      ...config.resolve.fallback,
+      "stream": require.resolve("stream-browserify"),
+      "crypto": require.resolve("crypto-browserify"),
+      "process": require.resolve("process/browser"),
+    };
+    
     return config;
   },
 };

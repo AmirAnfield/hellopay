@@ -2,7 +2,7 @@
 
 import { ThemeProvider } from 'next-themes';
 import { Toaster } from '@/components/ui/toaster';
-import { AuthProvider } from '@/contexts/AuthContext';
+import { AuthProvider } from '@/hooks/useAuth';
 
 // Fournisseurs globaux pour l'application
 export function Providers({ children }: { children: React.ReactNode }) {

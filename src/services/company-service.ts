@@ -77,34 +77,58 @@ export async function createCompany(companyData: CompanyInput): Promise<string> 
     throw new Error("Utilisateur non authentifié");
   }
   
-  // Préparer les données complètes
-  const data: Partial<FirebaseCompany> = {
-    ...companyData,
-    ownerId: auth.currentUser.uid,
-  };
-  
-  // Valider les données avec le schéma
-  validateOrThrow(data, companyValidationSchema);
-  
-  // Vérifier si une entreprise avec ce SIRET existe déjà
-  const existingCompanies = await getDocuments<Company>(`users/${auth.currentUser.uid}/companies`, {
-    where: [{ field: 'siret', operator: '==', value: companyData.siret }]
-  });
-  
-  if (existingCompanies.length > 0) {
-    throw new Error(`Une entreprise avec le SIRET ${companyData.siret} existe déjà`);
+  try {
+    console.log("Début création entreprise:", companyData);
+    
+    // Préparer les données complètes
+    const data: Partial<FirebaseCompany> = {
+      ...companyData,
+      ownerId: auth.currentUser.uid,
+    };
+    
+    // Valider les données avec le schéma
+    validateOrThrow(data, companyValidationSchema);
+    
+    // Vérifier si une entreprise avec ce SIRET existe déjà
+    const existingCompanies = await getDocuments<Company>(`users/${auth.currentUser.uid}/companies`, {
+      where: [{ field: 'siret', operator: '==', value: companyData.siret }]
+    });
+    
+    if (existingCompanies.length > 0) {
+      throw new Error(`Une entreprise avec le SIRET ${companyData.siret} existe déjà`);
+    }
+    
+    // Créer un ID unique pour la nouvelle entreprise
+    const companyId = `company_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    
+    // Nettoyer les données selon le schéma
+    const sanitizedData = sanitizeData(data, companyValidationSchema);
+    
+    // Créer l'entreprise dans Firestore
+    console.log("Données à sauvegarder:", sanitizedData);
+    await setDocument(`users/${auth.currentUser.uid}/companies`, companyId, sanitizedData, false);
+    
+    console.log("Entreprise créée avec succès:", companyId);
+    return companyId;
+  } catch (error) {
+    console.error("Erreur détaillée lors de la création de l'entreprise:", error);
+    
+    // Améliorer le message d'erreur
+    if (error instanceof Error) {
+      // Vérifier si c'est une erreur Firebase
+      if (error.message.includes("permission-denied")) {
+        throw new Error("Vous n'avez pas les permissions nécessaires pour créer une entreprise");
+      } else if (error.message.includes("unavailable")) {
+        throw new Error("Service temporairement indisponible. Veuillez réessayer plus tard");
+      } else if (error.message.includes("network-request-failed")) {
+        throw new Error("Problème de connexion réseau. Vérifiez votre connexion internet");
+      } else {
+        throw error;
+      }
+    } else {
+      throw new Error("Une erreur inconnue s'est produite");
+    }
   }
-  
-  // Créer un ID unique pour la nouvelle entreprise
-  const companyId = `company_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-  
-  // Nettoyer les données selon le schéma
-  const sanitizedData = sanitizeData(data, companyValidationSchema);
-  
-  // Créer l'entreprise dans Firestore
-  await setDocument(`users/${auth.currentUser.uid}/companies`, companyId, sanitizedData, false);
-  
-  return companyId;
 }
 
 /**

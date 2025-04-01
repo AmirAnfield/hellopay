@@ -18,7 +18,8 @@ import {
   WithFieldValue,
   Timestamp,
   onSnapshot,
-  CollectionReference
+  CollectionReference,
+  QueryConstraint
 } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
 
@@ -26,10 +27,28 @@ import { db, auth } from '@/lib/firebase';
  * Interface pour les options de requête
  */
 export interface QueryOptions {
-  where?: { field: string; operator: string; value: any }[];
-  orderBy?: { field: string; direction?: 'asc' | 'desc' }[];
+  where?: Array<{ field: string; operator: '==' | '!=' | '>' | '>=' | '<' | '<='; value: any }>;
+  orderBy?: Array<{ field: string; direction?: 'asc' | 'desc' }>;
   limit?: number;
 }
+
+/**
+ * Fonction de debug pour tracer les erreurs Firestore
+ */
+const logFirestoreOperation = (operation: string, path: string, id: string | null, error?: any) => {
+  const timestamp = new Date().toISOString();
+  const user = auth.currentUser ? `UID: ${auth.currentUser.uid}` : 'Non authentifié';
+  
+  if (error) {
+    console.error(`🔥 [${timestamp}] Erreur Firestore (${operation}) - ${user} - Chemin: ${path}, ID: ${id || 'N/A'}`);
+    console.error(`   Code: ${error.code || 'inconnu'}, Message: ${error.message || error.toString()}`);
+    if (error.stack) {
+      console.error(`   Stack: ${error.stack.split('\n')[0]}`);
+    }
+  } else {
+    console.log(`🔵 [${timestamp}] Opération Firestore (${operation}) - ${user} - Chemin: ${path}, ID: ${id || 'N/A'} - Succès`);
+  }
+};
 
 /**
  * Récupérer un document par son ID
@@ -43,12 +62,26 @@ export async function getDocument<T = DocumentData>(
     const docSnap = await getDoc(docRef);
     
     if (docSnap.exists()) {
-      return { id: docSnap.id, ...docSnap.data() } as T;
-    } else {
-      return null;
+      const data = docSnap.data();
+      // Convertir les timestamps Firestore en objets Date JS
+      const result = { ...data, id: docId } as T;
+      
+      // Convertir les timestamps en dates
+      const resultObj = result as unknown as Record<string, any>;
+      Object.keys(resultObj).forEach(key => {
+        if (resultObj[key] instanceof Timestamp) {
+          resultObj[key] = resultObj[key].toDate();
+        }
+      });
+      
+      logFirestoreOperation('READ', collectionPath, docId);
+      return result;
     }
+    
+    logFirestoreOperation('READ', collectionPath, docId, { message: 'Document n\'existe pas' });
+    return null;
   } catch (error) {
-    console.error(`Erreur lors de la récupération du document ${collectionPath}/${docId}:`, error);
+    logFirestoreOperation('READ', collectionPath, docId, error);
     throw error;
   }
 }
@@ -61,34 +94,55 @@ export async function getDocuments<T = DocumentData>(
   options?: QueryOptions
 ): Promise<T[]> {
   try {
-    let collectionRef = collection(db, collectionPath);
-    let queryRef = collectionRef;
+    const collectionRef = collection(db, collectionPath);
+    const constraints: QueryConstraint[] = [];
     
-    if (options) {
-      // Appliquer les filtres where
-      if (options.where && options.where.length > 0) {
-        options.where.forEach((condition) => {
-          queryRef = query(queryRef, where(condition.field, condition.operator as any, condition.value));
-        });
-      }
-      
-      // Appliquer les tris
-      if (options.orderBy && options.orderBy.length > 0) {
-        options.orderBy.forEach((sort) => {
-          queryRef = query(queryRef, orderBy(sort.field, sort.direction || 'asc'));
-        });
-      }
-      
-      // Appliquer la limite
-      if (options.limit) {
-        queryRef = query(queryRef, limit(options.limit));
-      }
+    // Ajouter les filtres where
+    if (options && options.where && options.where.length > 0) {
+      options.where.forEach(filter => {
+        constraints.push(where(filter.field, filter.operator, filter.value));
+      });
     }
     
-    const querySnapshot = await getDocs(queryRef);
-    return querySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as T);
+    // Ajouter les ordres de tri
+    if (options && options.orderBy && options.orderBy.length > 0) {
+      options.orderBy.forEach(sort => {
+        constraints.push(orderBy(sort.field, sort.direction || 'asc'));
+      });
+    }
+    
+    // Appliquer la limite
+    if (options && options.limit) {
+      constraints.push(limit(options.limit));
+    }
+    
+    // Créer la requête
+    const q = query(collectionRef, ...constraints);
+    
+    // Exécuter la requête
+    const querySnapshot = await getDocs(q);
+    
+    // Convertir les résultats
+    const results: T[] = [];
+    querySnapshot.forEach(doc => {
+      const data = doc.data();
+      const result = { ...data, id: doc.id } as T;
+      
+      // Convertir les timestamps en dates
+      const resultObj = result as unknown as Record<string, any>;
+      Object.keys(resultObj).forEach(key => {
+        if (resultObj[key] instanceof Timestamp) {
+          resultObj[key] = resultObj[key].toDate();
+        }
+      });
+      
+      results.push(result);
+    });
+    
+    logFirestoreOperation('QUERY', collectionPath, null, null);
+    return results;
   } catch (error) {
-    console.error(`Erreur lors de la récupération des documents ${collectionPath}:`, error);
+    logFirestoreOperation('QUERY', collectionPath, null, error);
     throw error;
   }
 }
@@ -101,21 +155,21 @@ export async function setDocument<T = DocumentData>(
   docId: string,
   data: WithFieldValue<T>,
   merge: boolean = true
-): Promise<string> {
+): Promise<void> {
   try {
     const docRef = doc(db, collectionPath, docId);
     
     // Ajouter les timestamps automatiquement
-    const timestampedData = {
+    const enhancedData = {
       ...data as object,
+      createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
-      ...(merge ? {} : { createdAt: serverTimestamp() })
     };
     
-    await setDoc(docRef, timestampedData, { merge });
-    return docId;
+    await setDoc(docRef, enhancedData, { merge });
+    logFirestoreOperation('SET', collectionPath, docId);
   } catch (error) {
-    console.error(`Erreur lors de la création/mise à jour du document ${collectionPath}/${docId}:`, error);
+    logFirestoreOperation('SET', collectionPath, docId, error);
     throw error;
   }
 }
@@ -132,14 +186,15 @@ export async function updateDocument<T = DocumentData>(
     const docRef = doc(db, collectionPath, docId);
     
     // Ajouter le timestamp de mise à jour
-    const timestampedData = {
+    const enhancedData = {
       ...data,
-      updatedAt: serverTimestamp()
+      updatedAt: serverTimestamp(),
     };
     
-    await updateDoc(docRef, timestampedData as any);
+    await updateDoc(docRef, enhancedData as any);
+    logFirestoreOperation('UPDATE', collectionPath, docId);
   } catch (error) {
-    console.error(`Erreur lors de la mise à jour du document ${collectionPath}/${docId}:`, error);
+    logFirestoreOperation('UPDATE', collectionPath, docId, error);
     throw error;
   }
 }
@@ -154,8 +209,9 @@ export async function deleteDocument(
   try {
     const docRef = doc(db, collectionPath, docId);
     await deleteDoc(docRef);
+    logFirestoreOperation('DELETE', collectionPath, docId);
   } catch (error) {
-    console.error(`Erreur lors de la suppression du document ${collectionPath}/${docId}:`, error);
+    logFirestoreOperation('DELETE', collectionPath, docId, error);
     throw error;
   }
 }

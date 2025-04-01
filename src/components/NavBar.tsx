@@ -29,19 +29,18 @@ import {
   DropdownMenuTrigger,
   DropdownMenuGroup,
 } from "@/components/ui/dropdown-menu";
-import { signOut, useSession } from "next-auth/react";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function NavBar() {
   const router = useRouter();
   const pathname = usePathname();
-  const { data: session, status } = useSession();
+  const { user, logoutUser } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  const isAuthenticated = status === "authenticated";
-  const user = session?.user;
+  const isAuthenticated = !!user;
 
   const handleLogout = async () => {
-    await signOut({ redirect: false });
+    await logoutUser();
     setMobileMenuOpen(false);
     router.push("/");
   };
@@ -162,7 +161,7 @@ export default function NavBar() {
                   className="flex items-center gap-2 px-3 py-2"
                 >
                   <User className="h-4 w-4" />
-                  <span className="max-w-[120px] truncate">{user?.name || "Mon compte"}</span>
+                  <span className="max-w-[120px] truncate">{user?.email || "Mon compte"}</span>
                   <ChevronDown className="h-4 w-4 ml-1" />
                 </Button>
               </DropdownMenuTrigger>

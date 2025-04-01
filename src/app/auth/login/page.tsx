@@ -20,7 +20,8 @@ import {
 } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
 import { Loader2 } from "lucide-react";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/hooks/useAuth";
+import { getFirebaseErrorMessage } from "@/lib/utils/firebase-errors";
 
 // Schéma de validation
 const loginSchema = z.object({
@@ -35,7 +36,7 @@ export default function LoginPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
-  const { login } = useAuth();
+  const { loginUser } = useAuth();
 
   const {
     register,
@@ -55,7 +56,7 @@ export default function LoginPage() {
 
     try {
       // Utiliser Firebase Auth via notre hook useAuth
-      await login(data.email, data.password);
+      await loginUser(data.email, data.password);
 
       toast({
         title: "Connexion réussie",
@@ -69,15 +70,7 @@ export default function LoginPage() {
       console.error("Erreur de connexion:", error);
       
       // Messages d'erreur personnalisés selon le code d'erreur Firebase
-      let errorMessage = "Email ou mot de passe incorrect. Veuillez réessayer.";
-      
-      if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
-        errorMessage = "Email ou mot de passe incorrect. Veuillez réessayer.";
-      } else if (error.code === 'auth/too-many-requests') {
-        errorMessage = "Trop de tentatives de connexion. Veuillez réessayer plus tard.";
-      } else if (error.code === 'auth/user-disabled') {
-        errorMessage = "Ce compte a été désactivé.";
-      }
+      let errorMessage = getFirebaseErrorMessage(error);
       
       toast({
         variant: "destructive",

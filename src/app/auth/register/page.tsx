@@ -20,7 +20,8 @@ import {
 } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
 import { Loader2 } from "lucide-react";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/hooks/useAuth";
+import { getFirebaseErrorMessage } from "@/lib/utils/firebase-errors";
 import { FirebaseError } from "firebase/app";
 
 // Schéma de validation
@@ -43,7 +44,7 @@ export default function RegisterPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
-  const { register: registerUser } = useAuth();
+  const { registerUser } = useAuth();
 
   const {
     register,
@@ -81,24 +82,7 @@ export default function RegisterPage() {
       console.error("Erreur d'inscription:", error);
       
       // Messages d'erreur personnalisés selon le code d'erreur Firebase
-      let errorMessage = "Une erreur est survenue lors de la création de votre compte. Veuillez réessayer.";
-      
-      if (error instanceof FirebaseError) {
-        switch (error.code) {
-          case 'auth/email-already-in-use':
-            errorMessage = "Cette adresse email est déjà utilisée.";
-            break;
-          case 'auth/invalid-email':
-            errorMessage = "L'adresse email n'est pas valide.";
-            break;
-          case 'auth/weak-password':
-            errorMessage = "Le mot de passe est trop faible. Utilisez au moins 8 caractères.";
-            break;
-          case 'auth/operation-not-allowed':
-            errorMessage = "La création de compte est temporairement désactivée.";
-            break;
-        }
-      }
+      let errorMessage = getFirebaseErrorMessage(error);
       
       toast({
         variant: "destructive",
