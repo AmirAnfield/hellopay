@@ -67,16 +67,19 @@ export function fileToBase64(file: File): Promise<string> {
 /**
  * Formate la taille d'un fichier en unité lisible
  * @param bytes Taille en octets
+ * @param decimals Nombre de décimales (par défaut: 2)
  * @returns Taille formatée (ex: "2.5 MB")
  */
-export function formatFileSize(bytes: number): string {
+export function formatFileSize(bytes: number, decimals: number = 2): string {
   if (bytes === 0) return '0 Bytes';
   
   const k = 1024;
-  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+  const dm = decimals < 0 ? 0 : decimals;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
+  
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
 }
 
 /**
@@ -86,6 +89,11 @@ export function formatFileSize(bytes: number): string {
  * @returns True si le type est autorisé
  */
 export function validateFileType(file: File, allowedTypes: string[]): boolean {
+  // Vérification du type MIME
+  if (!file || !file.type) {
+    return false;
+  }
+  
   return allowedTypes.includes(file.type);
 }
 
@@ -96,5 +104,41 @@ export function validateFileType(file: File, allowedTypes: string[]): boolean {
  * @returns True si la taille est valide
  */
 export function validateFileSize(file: File, maxSizeMB: number): boolean {
-  return file.size <= maxSizeMB * 1024 * 1024;
+  if (!file) {
+    return false;
+  }
+  
+  // Conversion MB en octets
+  const maxSizeBytes = maxSizeMB * 1024 * 1024;
+  
+  return file.size <= maxSizeBytes;
+}
+
+/**
+ * Obtient l'extension d'un fichier à partir de son nom
+ * @param fileName Nom du fichier
+ * @returns Extension du fichier (sans le point)
+ */
+export function getFileExtension(fileName: string): string {
+  if (!fileName) return '';
+  
+  const parts = fileName.split('.');
+  if (parts.length === 1) return '';
+  
+  return parts[parts.length - 1].toLowerCase();
+}
+
+/**
+ * Génère un nom de fichier unique
+ * @param prefix Préfixe du nom (par défaut: "file")
+ * @param extension Extension du fichier (sans le point)
+ * @returns Nom de fichier unique
+ */
+export function generateUniqueFileName(prefix: string = 'file', extension?: string): string {
+  const timestamp = Date.now();
+  const randomStr = Math.random().toString(36).substring(2, 10);
+  
+  return extension
+    ? `${prefix}-${timestamp}-${randomStr}.${extension}`
+    : `${prefix}-${timestamp}-${randomStr}`;
 } 

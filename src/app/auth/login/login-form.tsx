@@ -1,119 +1,145 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { signIn } from "next-auth/react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { LoginFormValues } from "@/lib/types";
-import { AlertCircle } from "lucide-react";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import * as z from "zod";
+import { toast } from "sonner";
+import { loginUser } from "@/services/auth-service";
+import { getFirebaseErrorMessage } from "@/lib/utils/firebase-errors";
+import { auth } from "@/lib/firebase";
+
+// Schéma de validation du formulaire
+const formSchema = z.object({
+  email: z.string().email({
+    message: "Veuillez entrer une adresse email valide.",
+  }),
+  password: z.string().min(6, {
+    message: "Le mot de passe doit contenir au moins 6 caractères.",
+  }),
+});
 
 export default function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const callbackUrl = searchParams.get("callbackUrl") || "/dashboard";
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [formValues, setFormValues] = useState<LoginFormValues>({
-    email: "",
-    password: ""
+
+  // Initialiser le formulaire
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      email: "",
+      password: "",
+    },
   });
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormValues((prev) => ({
-      ...prev,
-      [name]: value
-    }));
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Gérer la soumission du formulaire
+  const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setLoading(true);
-    setError(null);
-
     try {
-      const result = await signIn("credentials", {
-        email: formValues.email,
-        password: formValues.password,
-        redirect: false
+      // Connecter l'utilisateur avec Firebase
+      await loginUser(values.email, values.password);
+
+      // Créer un cookie de session valide pour le middleware
+      const idToken = await auth.currentUser?.getIdToken();
+      await fetch('/api/auth/session', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ idToken }),
       });
 
-      if (result?.error) {
-        setError("Identifiants invalides. Veuillez réessayer.");
-      } else {
-        router.push("/dashboard");
-        router.refresh();
-      }
+      toast.success("Connexion réussie");
+      router.push(callbackUrl);
     } catch (error) {
-      setError("Une erreur est survenue. Veuillez réessayer.");
+      console.error("Erreur lors de la connexion:", error);
+      toast.error(getFirebaseErrorMessage(error) || "Échec de la connexion");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      {error && (
-        <div className="bg-red-50 text-red-600 p-3 rounded-md flex items-center gap-2 text-sm">
-          <AlertCircle size={16} />
-          <span>{error}</span>
-        </div>
-      )}
-
-      <div className="space-y-2">
-        <label htmlFor="email" className="block text-sm font-medium">
-          Email
-        </label>
-        <Input
-          id="email"
-          name="email"
-          type="email"
-          required
-          value={formValues.email}
-          onChange={handleChange}
-          placeholder="nom@example.com"
-          disabled={loading}
-        />
+    <div className="space-y-6">
+      <div className="space-y-2 text-center">
+        <h1 className="text-3xl font-bold">Connexion</h1>
+        <p className="text-gray-500 dark:text-gray-400">
+          Entrez vos identifiants pour vous connecter
+        </p>
       </div>
-
-      <div className="space-y-2">
-        <div className="flex justify-between">
-          <label htmlFor="password" className="block text-sm font-medium">
-            Mot de passe
-          </label>
-          <Link
-            href="/auth/forgot-password"
-            className="text-sm text-primary hover:underline"
-          >
-            Mot de passe oublié?
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <FormField
+            control={form.control}
+            name="email"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Email</FormLabel>
+                <FormControl>
+                  <Input
+                    placeholder="votre@email.com"
+                    type="email"
+                    autoComplete="email"
+                    {...field}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="password"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Mot de passe</FormLabel>
+                <FormControl>
+                  <Input
+                    placeholder="••••••••"
+                    type="password"
+                    autoComplete="current-password"
+                    {...field}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <div className="flex items-center justify-between">
+            <Link
+              href="/auth/reset-password"
+              className="text-sm text-blue-500 hover:underline"
+            >
+              Mot de passe oublié ?
+            </Link>
+          </div>
+          <Button type="submit" className="w-full" disabled={loading}>
+            {loading ? "Connexion en cours..." : "Se connecter"}
+          </Button>
+        </form>
+      </Form>
+      <div className="text-center">
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          Vous n&apos;avez pas de compte ?{" "}
+          <Link href="/auth/register" className="text-blue-500 hover:underline">
+            Créer un compte
           </Link>
-        </div>
-        <Input
-          id="password"
-          name="password"
-          type="password"
-          required
-          value={formValues.password}
-          onChange={handleChange}
-          placeholder="••••••••"
-          disabled={loading}
-        />
+        </p>
       </div>
-
-      <Button
-        type="submit"
-        className="w-full"
-        disabled={loading}
-      >
-        {loading ? "Connexion en cours..." : "Se connecter"}
-      </Button>
-
-      <div className="text-center text-sm text-gray-600 mt-4">
-        Pas encore de compte?{" "}
-        <Link href="/auth/register" className="text-primary hover:underline">
-          Créer un compte
-        </Link>
-      </div>
-    </form>
+    </div>
   );
 } 

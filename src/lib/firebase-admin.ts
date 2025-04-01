@@ -1,37 +1,25 @@
-import { getApps, initializeApp, cert, ServiceAccount } from 'firebase-admin/app';
+import { initializeApp, getApps, cert } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
+import { getStorage } from 'firebase-admin/storage';
 
-// Vérifie si les apps sont déjà initialisées
+// Vérifier si Firebase Admin est déjà initialisé
 const apps = getApps();
 
-// Fonction pour récupérer les informations de service account depuis les variables d'environnement
-const getServiceAccount = (): ServiceAccount => {
-  try {
-    // Si la variable est un JSON stringifié, on la parse
-    if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
-      return JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY) as ServiceAccount;
-    }
-    
-    // Si non, on crée un objet à partir des variables d'environnement individuelles
-    return {
-      projectId: process.env.FIREBASE_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n') || '',
-    };
-  } catch (error) {
-    console.error('Erreur lors du parsing du service account:', error);
-    throw new Error('Configuration Firebase Admin invalide');
-  }
-};
+// Initialiser Firebase Admin s'il n'est pas déjà initialisé
+export const admin = apps.length
+  ? apps[0]
+  : initializeApp({
+      credential: cert({
+        projectId: process.env.FIREBASE_PROJECT_ID,
+        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+        // Remplacer les caractères d'échappement dans la clé privée
+        privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+      }),
+      storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
+    });
 
-// Initialiser l'application si ce n'est pas déjà fait
-if (!apps.length) {
-  initializeApp({
-    credential: cert(getServiceAccount()),
-  });
-}
-
-// Exporter l'instance d'authentification
-const auth = getAuth();
-
-export { auth }; 
+// Exporter les instances des services Firebase Admin
+export const db = getFirestore();
+export const auth = getAuth();
+export const storage = getStorage(); 

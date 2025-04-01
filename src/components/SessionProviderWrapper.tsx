@@ -1,20 +1,12 @@
 'use client';
 
-import { SessionProvider } from 'next-auth/react';
-import { ReactNode } from 'react';
+import React from 'react';
+import { AuthProvider } from '@/hooks/useAuth';
 
-export default function SessionProviderWrapper({ 
-  children 
-}: { 
-  children: ReactNode 
-}) {
+export const SessionProviderWrapper = ({ children }: { children: React.ReactNode }) => {
   return (
-    <SessionProvider
-      maxAge={30 * 24 * 60 * 60}
-      updateAge={24 * 60 * 60}
-      strategy="jwt"
-    >
+    <AuthProvider>
       {children}
-    </SessionProvider>
+    </AuthProvider>
   );
-} 
+}; 

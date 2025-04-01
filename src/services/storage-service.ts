@@ -1,13 +1,44 @@
-import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject, listAll, getMetadata } from "firebase/storage";
-import { auth, appCheck } from "@/lib/firebase";
-import { compressFile } from "@/lib/utils/file-utils";
+import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject, listAll, getMetadata, StorageError } from "firebase/storage";
+import { auth } from "@/lib/firebase";
+import { compressFile, validateFileType, validateFileSize } from "@/lib/utils/file-utils";
 
-// S'assurer que App Check est initialisé
+// Vérifie l'initialisation d'AppCheck
+// Importation sûre de appCheck
+let appCheck: unknown;
+// Utiliser une IIFE pour l'import
+(async () => {
+  try {
+    const firebase = await import("@/lib/firebase");
+    appCheck = firebase.appCheck;
+  } catch {
+    console.warn("Module AppCheck non disponible");
+  }
+})().catch(e => {
+  console.error("Erreur lors de l'initialisation d'AppCheck:", e);
+});
+
 if (!appCheck && typeof window !== 'undefined') {
-  console.warn("App Check n'est pas initialisé. Les requêtes Firebase pourraient être rejetées.");
+  console.warn("AppCheck n'est pas initialisé. Les requêtes Firebase pourraient être rejetées si la sécurité est activée.");
 }
 
+// Initialisation du service de stockage
 const storage = getStorage();
+
+// Types d'erreurs pouvant survenir avec les requêtes Storage
+export enum StorageErrorType {
+  UNAUTHORIZED = 'unauthorized',
+  NOT_FOUND = 'not_found',
+  QUOTA_EXCEEDED = 'quota_exceeded',
+  INVALID_FILE = 'invalid_file',
+  UNKNOWN = 'unknown'
+}
+
+// Structure pour les erreurs
+export interface StorageErrorInfo {
+  type: StorageErrorType;
+  message: string;
+  originalError?: unknown;
+}
 
 // Limites de stockage (en octets)
 export const STORAGE_LIMITS = {
@@ -16,10 +47,21 @@ export const STORAGE_LIMITS = {
   ENTERPRISE_TIER: 10 * 1024 * 1024 * 1024, // 10 GB
 };
 
-/**
- * Types de documents supportés
- */
+// Types de documents supportés
 export type DocumentType = 'payslip' | 'contract' | 'certificate';
+
+// Types de fichiers acceptés et leurs limites
+export const ACCEPTED_FILE_TYPES = {
+  pdf: ['application/pdf'],
+  image: ['image/jpeg', 'image/png', 'image/webp'],
+  document: ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
+};
+
+export const FILE_SIZE_LIMITS = {
+  pdf: 10, // 10 MB
+  image: 5, // 5 MB
+  document: 15 // 15 MB
+};
 
 /**
  * Interface pour les métadonnées de document
@@ -41,6 +83,54 @@ export interface UploadOptions {
   metadata?: Record<string, string>;
   compress?: boolean;
   maxSizeMB?: number;
+}
+
+/**
+ * Gère les erreurs de Storage et retourne une structure normalisée
+ * @param error L'erreur d'origine
+ * @returns Informations structurées sur l'erreur
+ */
+function handleStorageError(error: unknown): StorageErrorInfo {
+  if (error instanceof StorageError) {
+    // Erreurs Firebase Storage spécifiques
+    switch (error.code) {
+      case 'storage/unauthorized':
+      case 'storage/app-check-token-is-invalid':
+      case 'storage/app-check-token-expired':
+        return {
+          type: StorageErrorType.UNAUTHORIZED,
+          message: "Vous n'êtes pas autorisé à accéder à ce fichier. Vérifiez vos droits d'accès.",
+          originalError: error
+        };
+      
+      case 'storage/object-not-found':
+        return {
+          type: StorageErrorType.NOT_FOUND,
+          message: "Le fichier demandé n'existe pas.",
+          originalError: error
+        };
+      
+      case 'storage/quota-exceeded':
+        return {
+          type: StorageErrorType.QUOTA_EXCEEDED,
+          message: "Quota de stockage dépassé. Veuillez supprimer des fichiers ou passer à un forfait supérieur.",
+          originalError: error
+        };
+      
+      default:
+        return {
+          type: StorageErrorType.UNKNOWN,
+          message: `Erreur Firebase Storage: ${error.message}`,
+          originalError: error
+        };
+    }
+  }
+  
+  return {
+    type: StorageErrorType.UNKNOWN,
+    message: error instanceof Error ? error.message : "Erreur inconnue lors de l'accès au stockage.",
+    originalError: error
+  };
 }
 
 /**
@@ -69,10 +159,10 @@ export async function checkStorageQuota(): Promise<{
   let totalSize = 0;
   
   try {
-    // Fonction récursive pour calculer la taille
-    async function calculateSize(path) {
-      const ref = path ? ref(storage, path) : storageRef;
-      const result = await listAll(ref);
+    // Fonction pour calculer la taille
+    const calculateSize = async (path: string): Promise<number> => {
+      const currentRef = path ? ref(storage, path) : storageRef;
+      const result = await listAll(currentRef);
       
       // Récupérer les métadonnées des fichiers
       const fileSizes = await Promise.all(
@@ -95,7 +185,7 @@ export async function checkStorageQuota(): Promise<{
       const subFolderTotal = subFolderSizes.reduce((acc, size) => acc + size, 0);
       
       return currentLevelSize + subFolderTotal;
-    }
+    };
     
     totalSize = await calculateSize('');
   } catch (error) {
@@ -135,18 +225,41 @@ export async function uploadEmployeeDocument(
   options?: UploadOptions
 ): Promise<string> {
   const user = auth.currentUser;
-  if (!user) throw new Error("Utilisateur non authentifié");
+  if (!user) {
+    throw new Error("Utilisateur non authentifié");
+  }
+  
+  // Valider le type de fichier
+  const isValidType = validateFileType(file, ACCEPTED_FILE_TYPES.pdf);
+  if (!isValidType) {
+    throw {
+      type: StorageErrorType.INVALID_FILE,
+      message: "Type de fichier invalide. Seuls les fichiers PDF sont acceptés."
+    };
+  }
+  
+  // Valider la taille du fichier
+  const maxSize = options?.maxSizeMB || FILE_SIZE_LIMITS.pdf;
+  const isValidSize = validateFileSize(file, maxSize);
+  if (!isValidSize) {
+    throw {
+      type: StorageErrorType.INVALID_FILE,
+      message: `Taille de fichier trop grande. La taille maximale est de ${maxSize} MB.`
+    };
+  }
   
   // Vérifier le quota de stockage
   const quota = await checkStorageQuota();
   if (quota.isOverLimit) {
-    throw new Error("Quota de stockage dépassé. Veuillez supprimer des documents ou passer à un forfait supérieur.");
+    throw {
+      type: StorageErrorType.QUOTA_EXCEEDED,
+      message: "Quota de stockage dépassé. Veuillez supprimer des documents ou passer à un forfait supérieur."
+    };
   }
   
   // Alerte si proche de la limite (mais on permet quand même le téléchargement)
   if (quota.isNearLimit) {
     console.warn("Attention: vous approchez de votre limite de stockage");
-    // On pourrait déclencher une notification ici
   }
   
   // Générer un ID unique si non fourni
@@ -160,13 +273,12 @@ export async function uploadEmployeeDocument(
   
   // Compression du fichier si nécessaire
   let fileToUpload = file;
-  let originalSize = file.size;
+  const originalSize = file.size;
   let compressedSize = null;
   
   if (options?.compress !== false && file.type === 'application/pdf' && file.size > 1024 * 1024) {
     try {
-      const maxSizeMB = options?.maxSizeMB || 1; // 1 MB par défaut
-      fileToUpload = await compressFile(file, maxSizeMB);
+      fileToUpload = await compressFile(file, options?.maxSizeMB || 1);
       compressedSize = fileToUpload.size;
       console.log(`Fichier compressé: ${originalSize} -> ${compressedSize} octets`);
     } catch (error) {
@@ -193,11 +305,16 @@ export async function uploadEmployeeDocument(
     }
   };
   
-  // Upload du fichier
-  await uploadBytes(storageRef, fileToUpload, metadata);
-  
-  // Récupérer l'URL de téléchargement
-  return await getDownloadURL(storageRef);
+  try {
+    // Upload du fichier
+    await uploadBytes(storageRef, fileToUpload, metadata);
+    
+    // Récupérer l'URL de téléchargement
+    return await getDownloadURL(storageRef);
+  } catch (error) {
+    const handledError = handleStorageError(error);
+    throw handledError;
+  }
 }
 
 /**
@@ -231,12 +348,19 @@ export async function uploadContract(file: File, employeeId: string, contractId:
  */
 export async function getDocumentUrl(employeeId: string, documentType: DocumentType, documentId: string): Promise<string> {
   const user = auth.currentUser;
-  if (!user) throw new Error("Utilisateur non authentifié");
+  if (!user) {
+    throw new Error("Utilisateur non authentifié");
+  }
   
   const path = `users/${user.uid}/employees/${employeeId}/${documentType}s/${documentId}.pdf`;
   const docRef = ref(storage, path);
   
-  return await getDownloadURL(docRef);
+  try {
+    return await getDownloadURL(docRef);
+  } catch (error) {
+    const handledError = handleStorageError(error);
+    throw handledError;
+  }
 }
 
 /**
@@ -247,100 +371,132 @@ export async function getDocumentUrl(employeeId: string, documentType: DocumentT
  */
 export async function deleteDocument(employeeId: string, documentType: DocumentType, documentId: string): Promise<void> {
   const user = auth.currentUser;
-  if (!user) throw new Error("Utilisateur non authentifié");
+  if (!user) {
+    throw new Error("Utilisateur non authentifié");
+  }
   
   const path = `users/${user.uid}/employees/${employeeId}/${documentType}s/${documentId}.pdf`;
   const docRef = ref(storage, path);
   
-  await deleteObject(docRef);
+  try {
+    await deleteObject(docRef);
+  } catch (error) {
+    const handledError = handleStorageError(error);
+    throw handledError;
+  }
 }
 
 /**
- * Récupérer tous les documents d'un employé par type
+ * Récupère tous les documents d'un employé par type
  * @param employeeId ID de l'employé
  * @param documentType Type de document
- * @returns Liste des documents (URLs et métadonnées)
+ * @returns Liste des documents avec leurs URL
  */
 export async function getEmployeeDocuments(
   employeeId: string, 
   documentType: DocumentType
 ): Promise<{ url: string; id: string; metadata?: Record<string, string> }[]> {
   const user = auth.currentUser;
-  if (!user) throw new Error("Utilisateur non authentifié");
+  if (!user) {
+    throw new Error("Utilisateur non authentifié");
+  }
   
-  const path = `users/${user.uid}/employees/${employeeId}/${documentType}s`;
-  const listRef = ref(storage, path);
+  const folderPath = `users/${user.uid}/employees/${employeeId}/${documentType}s`;
+  const folderRef = ref(storage, folderPath);
   
   try {
-    const res = await listAll(listRef);
+    const result = await listAll(folderRef);
     
-    // Récupération en parallèle des URLs et métadonnées
     const documents = await Promise.all(
-      res.items.map(async (itemRef) => {
-        const url = await getDownloadURL(itemRef);
-        const id = itemRef.name.replace('.pdf', '');
-        const metadata = await getMetadata(itemRef);
-        
-        return { 
-          url, 
-          id, 
-          metadata: metadata.customMetadata || {},
-          size: metadata.size,
-          contentType: metadata.contentType,
-          createdAt: new Date(metadata.timeCreated).getTime()
-        };
+      result.items.map(async (itemRef) => {
+        try {
+          const metadata = await getMetadata(itemRef);
+          const url = await getDownloadURL(itemRef);
+          
+          // Extraire l'ID du document (nom du fichier sans extension)
+          const fileName = itemRef.name;
+          const id = fileName.replace(/\.[^/.]+$/, ""); // Enlever l'extension
+          
+          return {
+            url,
+            id,
+            metadata: metadata.customMetadata || {}
+          };
+        } catch (error) {
+          console.warn(`Erreur lors de la récupération du document ${itemRef.name}:`, error);
+          return null;
+        }
       })
     );
     
-    // Tri par date de création (du plus récent au plus ancien)
-    return documents.sort((a, b) => b.createdAt - a.createdAt);
+    // Filtrer les documents qui n'ont pas pu être récupérés
+    return documents.filter(doc => doc !== null) as { url: string; id: string; metadata?: Record<string, string> }[];
   } catch (error) {
-    console.error("Erreur lors de la récupération des documents:", error);
-    return [];
+    const handledError = handleStorageError(error);
+    throw handledError;
   }
 }
 
 /**
- * Nettoyer les documents périmés
- * @param olderThan Nombre de jours (documents plus anciens seront supprimés)
+ * Nettoie les documents expirés
+ * @param olderThan Nombre de jours pour considérer un document comme expiré
  * @returns Nombre de documents supprimés
  */
-export async function cleanupExpiredDocuments(olderThan: number = 365): Promise<number> {
+export async function cleanupExpiredDocuments(olderThan: number = 30): Promise<number> {
   const user = auth.currentUser;
-  if (!user) throw new Error("Utilisateur non authentifié");
-  
-  const now = new Date().getTime();
-  const cutoffDate = now - (olderThan * 24 * 60 * 60 * 1000);
-  let deletedCount = 0;
-  
-  // Fonction récursive pour parcourir le stockage
-  async function cleanupDirectory(path: string) {
-    const dirRef = ref(storage, path);
-    const result = await listAll(dirRef);
-    
-    // Traiter les fichiers du répertoire actuel
-    for (const itemRef of result.items) {
-      try {
-        const metadata = await getMetadata(itemRef);
-        const creationTime = new Date(metadata.timeCreated).getTime();
-        
-        if (creationTime < cutoffDate) {
-          await deleteObject(itemRef);
-          deletedCount++;
-        }
-      } catch (error) {
-        console.error(`Erreur lors du nettoyage du fichier ${itemRef.fullPath}:`, error);
-      }
-    }
-    
-    // Traiter récursivement les sous-répertoires
-    for (const prefixRef of result.prefixes) {
-      await cleanupDirectory(prefixRef.fullPath);
-    }
+  if (!user) {
+    throw new Error("Utilisateur non authentifié");
   }
   
-  // Commencer le nettoyage à partir du répertoire de l'utilisateur
-  await cleanupDirectory(`users/${user.uid}`);
+  let deletedCount = 0;
   
-  return deletedCount;
+  try {
+    // Récupérer les documents temporaires
+    const tempFolderPath = `temp/${user.uid}`;
+    
+    // Fonction pour nettoyer un répertoire récursivement
+    const cleanupDirectory = async (path: string): Promise<number> => {
+      let count = 0;
+      const directoryRef = ref(storage, path);
+      const result = await listAll(directoryRef);
+      
+      // Calculer la date limite
+      const now = Date.now();
+      const expirationTime = now - (olderThan * 24 * 60 * 60 * 1000);
+      
+      // Traiter les fichiers
+      for (const item of result.items) {
+        try {
+          const metadata = await getMetadata(item);
+          const uploadTime = metadata.customMetadata?.uploadedAt 
+            ? parseInt(metadata.customMetadata.uploadedAt) 
+            : metadata.timeCreated 
+              ? new Date(metadata.timeCreated).getTime() 
+              : 0;
+          
+          if (uploadTime < expirationTime) {
+            await deleteObject(item);
+            count++;
+          }
+        } catch (error) {
+          console.warn(`Erreur lors du nettoyage du fichier ${item.name}:`, error);
+        }
+      }
+      
+      // Traiter les sous-dossiers récursivement
+      for (const prefix of result.prefixes) {
+        count += await cleanupDirectory(prefix.fullPath);
+      }
+      
+      return count;
+    };
+    
+    deletedCount = await cleanupDirectory(tempFolderPath);
+    
+    return deletedCount;
+  } catch (error) {
+    console.error("Erreur lors du nettoyage des documents expirés:", error);
+    const handledError = handleStorageError(error);
+    throw handledError;
+  }
 } 

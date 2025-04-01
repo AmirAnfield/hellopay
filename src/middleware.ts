@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getToken } from 'next-auth/jwt';
+import { cookies } from 'next/headers';
+import { getAuth } from 'firebase-admin/auth';
+import { admin } from '@/lib/firebase-admin';
 
-// Routes publiques qui ne nécessitent pas d'authentification
+// Routes accessibles sans authentification
 const publicRoutes = [
   '/',
   '/auth/login',
@@ -9,101 +11,79 @@ const publicRoutes = [
   '/auth/forgot-password',
   '/auth/reset-password',
   '/auth/verify',
-  '/auth/error',
-  '/api/auth',
+  '/api/auth/session',
+  '/api/auth/logout'
 ];
 
-// Routes à protéger (nécessitent une authentification)
-const protectedPrefixes = [
-  '/dashboard',
-  '/api/dashboard',
-  '/api/employees',
-  '/api/payslips',
-  '/api/reports',
-  '/api/settings',
-];
+// Vérifier si une route est publique
+const isPublicRoute = (path: string) => {
+  return publicRoutes.some(route => path === route || path.startsWith(`${route}/`));
+};
 
-// Routes qui nécessitent un rôle administrateur
-const adminRoutes = [
-  '/dashboard/admin',
-  '/api/admin',
-];
+// Vérifier si une route est une API
+const isApiRoute = (path: string) => {
+  return path.startsWith('/api/');
+};
 
-/**
- * Vérifie si une route correspond à un préfixe ou un chemin exact
- */
-function matchesPath(path: string, patterns: string[]): boolean {
-  return patterns.some(pattern => 
-    path === pattern || 
-    path.startsWith(`${pattern}/`) || 
-    (pattern.endsWith('*') && path.startsWith(pattern.slice(0, -1)))
-  );
-}
+// Vérifier si une route est une ressource statique
+const isStaticAsset = (path: string) => {
+  return path.startsWith('/_next/') || 
+         path.includes('/favicon.') || 
+         path.endsWith('.svg') || 
+         path.endsWith('.png') || 
+         path.endsWith('.jpg') || 
+         path.endsWith('.jpeg') || 
+         path.endsWith('.ico');
+};
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   
-  // Ignorer les requêtes de ressources statiques
-  if (
-    pathname.startsWith('/_next') || 
-    pathname.startsWith('/favicon.ico') ||
-    pathname.startsWith('/assets') ||
-    pathname.match(/\.(jpg|jpeg|png|gif|svg|css|js)$/)
-  ) {
+  // Ne pas appliquer le middleware aux ressources statiques
+  if (isStaticAsset(pathname)) {
     return NextResponse.next();
   }
   
-  // Pour les routes publiques, pas besoin de vérification
-  if (matchesPath(pathname, publicRoutes)) {
+  // Pour les routes publiques, pas besoin de vérifier l'authentification
+  if (isPublicRoute(pathname)) {
     return NextResponse.next();
   }
   
-  // Pour les routes protégées, vérifier l'authentification
-  if (matchesPath(pathname, protectedPrefixes)) {
-    const token = await getToken({
-      req: request,
-      secret: process.env.NEXTAUTH_SECRET,
-    });
-    
-    // Si pas de token, rediriger vers la page de connexion
-    if (!token) {
-      const url = new URL('/auth/login', request.url);
-      url.searchParams.set('callbackUrl', encodeURI(request.url));
-      console.log(`Redirection: Accès non autorisé à ${pathname} - redirection vers login`);
-      return NextResponse.redirect(url);
-    }
-    
-    // Pour les routes admin, vérifier le rôle
-    if (matchesPath(pathname, adminRoutes) && token.role !== 'admin') {
-      console.log(`Accès refusé: Tentative d'accès à ${pathname} avec rôle ${token.role}`);
-      return NextResponse.redirect(new URL('/dashboard', request.url));
-    }
-    
-    // DÉSACTIVÉ POUR LES TESTS UTILISATEURS: Vérification de l'email
-    // Si l'email n'est pas vérifié et que ce n'est pas une route d'onboarding
-    /*
-    if (!token.emailVerified && !pathname.includes('/auth/verify') && !pathname.includes('/dashboard/onboarding')) {
-      console.log(`Redirection: Email non vérifié pour ${token.email}`);
-      return NextResponse.redirect(new URL('/dashboard/onboarding', request.url));
-    }
-    */
+  // Récupérer le cookie de session
+  const sessionCookie = request.cookies.get('session')?.value;
+  
+  // Si pas de cookie de session, rediriger vers la page de connexion
+  if (!sessionCookie) {
+    const url = new URL('/auth/login', request.url);
+    url.searchParams.set('callbackUrl', encodeURIComponent(pathname));
+    return NextResponse.redirect(url);
   }
   
-  // Par défaut, laisser passer la requête
-  return NextResponse.next();
+  try {
+    // Vérifier le cookie de session avec Firebase Admin
+    await getAuth(admin).verifySessionCookie(sessionCookie, true);
+    
+    // Session valide, permettre l'accès
+    return NextResponse.next();
+  } catch (error) {
+    console.error('Erreur middleware:', error);
+    
+    // Session invalide, supprimer le cookie et rediriger vers la page de connexion
+    const response = NextResponse.redirect(
+      new URL(`/auth/login?callbackUrl=${encodeURIComponent(pathname)}`, request.url)
+    );
+    
+    // Effacer le cookie de session
+    response.cookies.delete('session');
+    
+    return response;
+  }
 }
 
-// Configuration pour indiquer sur quels chemins le middleware doit s'exécuter
+// Configurer les routes sur lesquelles le middleware s'applique
 export const config = {
   matcher: [
-    /*
-     * Correspond à tous les chemins sauf:
-     * 1. Tous les chemins qui commencent par /_next (ressources statiques Next.js)
-     * 2. Tous les chemins qui commencent par /static (ressources statiques personnalisées)
-     * 3. Tous les chemins avec une extension (.png, .jpg, etc.)
-     */
-    '/((?!_next|static|.*\\.).)*',
-    '/dashboard/:path*',
-    '/api/:path*',
+    // Ne pas appliquer aux routes API spécifiques nécessitant un accès public
+    '/((?!_next/static|_next/image|favicon.ico).*)',
   ],
 }; 

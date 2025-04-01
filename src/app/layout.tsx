@@ -1,19 +1,48 @@
-import "./globals.css";
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Inter as FontSans } from "next/font/google";
+import { cn } from "@/lib/utils";
+import { Providers } from "@/components/providers";
+import "@/styles/globals.css";
 import { ThemeScript } from "@/components/theme-provider";
 import NavBar from "@/components/NavBar";
-import { Providers } from "./providers";
-import { cn } from "@/lib/utils";
 import Script from 'next/script'
 
-const inter = Inter({ subsets: ["latin"] });
+// Définir la police de l'application
+const fontSans = FontSans({
+  subsets: ["latin"],
+  variable: "--font-sans",
+});
 
+// Métadonnées pour SEO
 export const metadata: Metadata = {
-  title: "HelloPay - Solution de gestion de paie",
-  description: "Plateforme de génération et gestion de bulletins de paie pour les PME",
+  title: {
+    default: "HelloPay - Système de gestion de paie",
+    template: "%s | HelloPay",
+  },
+  description:
+    "Gérez facilement vos bulletins de paie, décomptes d'heures et paiements de vos employés.",
+  keywords: [
+    "paie",
+    "gestion",
+    "bulletin",
+    "salaire",
+    "entreprise",
+    "employé",
+    "France",
+    "comptabilité",
+  ],
+  authors: [{ name: "HelloPay", url: "https://hellopay.fr" }],
+  creator: "HelloPay",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "white" },
+    { media: "(prefers-color-scheme: dark)", color: "#090909" },
+  ],
+  icons: {
+    icon: "/favicon.ico",
+  },
 };
 
+// Layout principal de l'application
 export default function RootLayout({
   children,
 }: {
@@ -24,10 +53,14 @@ export default function RootLayout({
       <head>
         <ThemeScript />
       </head>
-      <body className={cn(inter.className, "min-h-screen bg-background")}>
+      <body
+        className={cn(
+          "min-h-screen bg-background font-sans antialiased",
+          fontSans.variable
+        )}
+      >
         <Script 
           src="https://www.google.com/recaptcha/enterprise.js?render=6LdUnwUrAAAAAL3u-4zxXrmXOCLMBEVLjkkd2Y4_"
-          strategy="afterInteractive"
         />
         <Providers>
           <div className="flex min-h-screen flex-col">

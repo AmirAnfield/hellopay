@@ -1,0 +1,89 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Fonctions utilitaires
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function userExists(userId) {
+      return exists(/databases/$(database)/documents/users/$(userId));
+    }
+    
+    function hasUserRole(role) {
+      return isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == role;
+    }
+    
+    function verifyFields(required, optional) {
+      let allFields = required.concat(optional);
+      return request.resource.data.keys().hasOnly(allFields) &&
+             request.resource.data.keys().hasAll(required);
+    }
+    
+    // Règles pour les utilisateurs
+    match /users/{userId} {
+      // Les utilisateurs peuvent lire et modifier leur propre profil
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+      allow update: if isOwner(userId) || isAdmin();
+      allow delete: if isAdmin();
+      
+      // Règles pour les entreprises
+      match /companies/{companyId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow create: if isOwner(userId);
+        allow update: if isOwner(userId) && resource.data.ownerId == request.auth.uid;
+        allow delete: if isOwner(userId) && resource.data.ownerId == request.auth.uid;
+        
+        // Règles pour les employés
+        match /employees/{employeeId} {
+          allow read: if isOwner(userId) || isAdmin();
+          allow create: if isOwner(userId);
+          allow update: if isOwner(userId);
+          allow delete: if isOwner(userId);
+        }
+        
+        // Règles pour les bulletins de paie
+        match /payslips/{payslipId} {
+          allow read: if isOwner(userId) || isAdmin();
+          allow create: if isOwner(userId);
+          allow update: if isOwner(userId);
+          allow delete: if isOwner(userId);
+        }
+        
+        // Règles pour les départements
+        match /departments/{departmentId} {
+          allow read: if isOwner(userId) || isAdmin();
+          allow create: if isOwner(userId);
+          allow update: if isOwner(userId);
+          allow delete: if isOwner(userId);
+        }
+      }
+    }
+    
+    // Règles pour les données administratives
+    match /admin/{document=**} {
+      allow read, write: if isAdmin();
+    }
+    
+    // Règles générales pour les données publiques
+    match /public/{document=**} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+    
+    // Refuser tout autre accès par défaut
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+} 

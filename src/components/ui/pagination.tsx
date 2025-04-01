@@ -1,126 +1,126 @@
-import * as React from "react";
-import { ChevronLeft, ChevronRight, MoreHorizontal } from "lucide-react";
-import { Button } from "./button";
+'use client';
+
+import { Button } from '@/components/ui/button';
+import { ChevronLeft, ChevronRight, MoreHorizontal } from 'lucide-react';
 
 interface PaginationProps {
-  totalPages: number;
   currentPage: number;
+  totalPages: number;
   onPageChange: (page: number) => void;
-  showEdges?: boolean;
-  disabled?: boolean;
+  siblings?: number;
 }
 
 export function Pagination({
-  totalPages,
   currentPage,
+  totalPages,
   onPageChange,
-  showEdges = true,
-  disabled = false,
+  siblings = 1,
 }: PaginationProps) {
-  // Calcul des pages à afficher (toujours montrer la page courante et quelques pages autour)
-  const getPageNumbers = () => {
-    // Toujours afficher la première et la dernière page
-    const pages: (number | "ellipsis")[] = [];
-    const maxPagesToShow = 7; // Nombre maximal de boutons de page à afficher
-    
-    if (totalPages <= maxPagesToShow) {
-      // Si le nombre total de pages est inférieur à maxPagesToShow, afficher toutes les pages
-      for (let i = 1; i <= totalPages; i++) {
+  // Générer les liens de pagination
+  const generatePagination = () => {
+    // Si pas assez de pages, afficher tous les numéros
+    if (totalPages <= 5) {
+      return Array.from({ length: totalPages }, (_, i) => i + 1);
+    }
+
+    // Calcul des pages à afficher
+    const leftSiblings = Math.max(currentPage - siblings, 1);
+    const rightSiblings = Math.min(currentPage + siblings, totalPages);
+
+    // Afficher les ellipses
+    const showLeftDots = leftSiblings > 2;
+    const showRightDots = rightSiblings < totalPages - 1;
+
+    // Pages initiales
+    const pages: (number | 'dots')[] = [];
+
+    // Toujours afficher la première page
+    pages.push(1);
+
+    // Afficher des points à gauche si nécessaire
+    if (showLeftDots) {
+      pages.push('dots');
+    }
+
+    // Ajouter les pages autour de la page courante
+    for (let i = leftSiblings; i <= rightSiblings; i++) {
+      if (i !== 1 && i !== totalPages) {
         pages.push(i);
       }
-    } else {
-      // Toujours inclure la première page
-      pages.push(1);
-      
-      // Calculer les pages à afficher autour de la page courante
-      const leftSide = Math.floor(maxPagesToShow / 2);
-      const rightSide = maxPagesToShow - leftSide - 1;
-      
-      // Si la page courante est proche du début
-      if (currentPage <= leftSide + 1) {
-        for (let i = 2; i <= maxPagesToShow - 1; i++) {
-          pages.push(i);
-        }
-        pages.push("ellipsis");
-      } 
-      // Si la page courante est proche de la fin
-      else if (currentPage >= totalPages - rightSide) {
-        pages.push("ellipsis");
-        for (let i = totalPages - maxPagesToShow + 2; i < totalPages; i++) {
-          pages.push(i);
-        }
-      } 
-      // Si la page courante est au milieu
-      else {
-        pages.push("ellipsis");
-        for (let i = currentPage - 1; i <= currentPage + 1; i++) {
-          pages.push(i);
-        }
-        pages.push("ellipsis");
-      }
-      
-      // Toujours inclure la dernière page
+    }
+
+    // Afficher des points à droite si nécessaire
+    if (showRightDots) {
+      pages.push('dots');
+    }
+
+    // Toujours afficher la dernière page
+    if (totalPages > 1) {
       pages.push(totalPages);
     }
-    
+
     return pages;
   };
 
+  // Pas de pagination si une seule page
+  if (totalPages <= 1) {
+    return null;
+  }
+
+  const pages = generatePagination();
+
   return (
-    <nav className="flex justify-center" aria-label="Pagination">
-      <ul className="flex list-none gap-1 items-center">
-        {/* Bouton Précédent */}
-        {showEdges && (
-          <li>
+    <nav className="flex items-center justify-center space-x-1" aria-label="Pagination">
+      {/* Bouton "Précédent" */}
+      <Button
+        variant="outline"
+        size="icon"
+        onClick={() => onPageChange(Math.max(1, currentPage - 1))}
+        disabled={currentPage === 1}
+      >
+        <span className="sr-only">Page précédente</span>
+        <ChevronLeft className="h-4 w-4" />
+      </Button>
+
+      {/* Numéros de page */}
+      {pages.map((page, index) => {
+        // Points de suspension
+        if (page === 'dots') {
+          return (
             <Button
-              variant="outline"
+              key={`dots-${index}`}
+              variant="ghost"
               size="icon"
-              onClick={() => onPageChange(Math.max(1, currentPage - 1))}
-              disabled={disabled || currentPage <= 1}
-              aria-label="Page précédente"
+              disabled
             >
-              <ChevronLeft className="h-4 w-4" />
+              <MoreHorizontal className="h-4 w-4" />
             </Button>
-          </li>
-        )}
-        
-        {/* Numéros de page */}
-        {getPageNumbers().map((page, index) => (
-          <li key={index}>
-            {page === "ellipsis" ? (
-              <span className="px-1">
-                <MoreHorizontal className="h-4 w-4" />
-              </span>
-            ) : (
-              <Button
-                variant={page === currentPage ? "default" : "outline"}
-                size="sm"
-                onClick={() => page !== currentPage && onPageChange(page as number)}
-                disabled={disabled || page === currentPage}
-                aria-label={`Page ${page}`}
-                aria-current={page === currentPage ? "page" : undefined}
-              >
-                {page}
-              </Button>
-            )}
-          </li>
-        ))}
-        
-        {/* Bouton Suivant */}
-        {showEdges && (
-          <li>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
-              disabled={disabled || currentPage >= totalPages}
-              aria-label="Page suivante"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </li>
-        )}
-      </ul>
+          );
+        }
+
+        // Numéro de page
+        return (
+          <Button
+            key={page}
+            variant={currentPage === page ? 'default' : 'outline'}
+            size="icon"
+            onClick={() => onPageChange(page)}
+          >
+            <span>{page}</span>
+          </Button>
+        );
+      })}
+
+      {/* Bouton "Suivant" */}
+      <Button
+        variant="outline"
+        size="icon"
+        onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
+        disabled={currentPage === totalPages}
+      >
+        <span className="sr-only">Page suivante</span>
+        <ChevronRight className="h-4 w-4" />
+      </Button>
     </nav>
   );
 } 

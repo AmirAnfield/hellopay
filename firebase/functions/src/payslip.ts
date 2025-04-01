@@ -1,9 +1,9 @@
-import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
-import * as puppeteer from 'puppeteer';
+import { onCall } from 'firebase-functions/v2/https';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
+import * as puppeteer from 'puppeteer';
 
 // Types pour les paramètres de la fonction
 interface PayslipCalculationParams {
@@ -31,9 +31,6 @@ interface PayslipCalculationParams {
 interface PayslipGenerationParams {
   userId: string;
   payslipId: string;
-  companyId: string;
-  employeeId: string;
-  customTemplate?: boolean;
 }
 
 interface ContributionRate {
@@ -59,21 +56,19 @@ interface Contribution {
 /**
  * Fonction pour calculer un bulletin de paie
  */
-export const calculatePayslip = functions.https.onCall(async (data: PayslipCalculationParams, context: functions.https.CallableContext) => {
+export const calculatePayslip = onCall({
+  region: 'europe-west1'
+}, async (request) => {
+  const data = request.data as PayslipCalculationParams;
+  
   // Vérifier l'authentification
-  if (!context.auth) {
-    throw new functions.https.HttpsError(
-      'unauthenticated',
-      'Vous devez être authentifié pour effectuer cette opération.'
-    );
+  if (!request.auth) {
+    throw new Error('Vous devez être authentifié pour effectuer cette opération.');
   }
 
   // Vérifier que l'utilisateur a le droit de calculer ce bulletin
-  if (context.auth.uid !== data.userId) {
-    throw new functions.https.HttpsError(
-      'permission-denied',
-      'Vous n\'avez pas les droits pour effectuer cette opération.'
-    );
+  if (request.auth.uid !== data.userId) {
+    throw new Error('Vous n\'avez pas les droits pour effectuer cette opération.');
   }
 
   try {
@@ -84,10 +79,7 @@ export const calculatePayslip = functions.https.onCall(async (data: PayslipCalcu
       .get();
     
     if (!employeeSnapshot.exists) {
-      throw new functions.https.HttpsError(
-        'not-found',
-        'Employé non trouvé.'
-      );
+      throw new Error('Employé non trouvé.');
     }
     
     const employee = employeeSnapshot.data();
@@ -99,10 +91,7 @@ export const calculatePayslip = functions.https.onCall(async (data: PayslipCalcu
       .get();
     
     if (!companySnapshot.exists) {
-      throw new functions.https.HttpsError(
-        'not-found',
-        'Entreprise non trouvée.'
-      );
+      throw new Error('Entreprise non trouvée.');
     }
     
     const company = companySnapshot.data();
@@ -123,10 +112,7 @@ export const calculatePayslip = functions.https.onCall(async (data: PayslipCalcu
       .get();
 
     if (ratesSnapshot.empty) {
-      throw new functions.https.HttpsError(
-        'not-found',
-        `Aucun taux de cotisation trouvé pour l'année ${fiscalYear}.`
-      );
+      throw new Error(`Aucun taux de cotisation trouvé pour l'année ${fiscalYear}.`);
     }
 
     const ratesData = ratesSnapshot.docs[0].data();
@@ -249,184 +235,166 @@ export const calculatePayslip = functions.https.onCall(async (data: PayslipCalcu
       }))
     };
 
-    // Sauvegarder le bulletin dans Firestore
-    const payslipRef = admin.firestore()
-      .collection(`users/${data.userId}/companies/${data.companyId}/payslips`)
-      .doc();
-    
-    await payslipRef.set({
-      ...payslip,
-      id: payslipRef.id
-    });
-
-    return {
-      ...payslip,
-      id: payslipRef.id
-    };
-  } catch (error: Error | unknown) {
+    return payslip;
+  } catch (error) {
     console.error('Erreur lors du calcul du bulletin:', error);
-    throw new functions.https.HttpsError(
-      'internal',
-      `Erreur lors du calcul du bulletin: ${error instanceof Error ? error.message : 'Erreur inconnue'}`
-    );
+    throw new Error(`Erreur lors du calcul du bulletin: ${error instanceof Error ? error.message : String(error)}`);
   }
 });
 
 /**
  * Fonction pour générer le PDF d'un bulletin de paie
  */
-export const generatePayslipPdf = functions.region('europe-west1')
-  .runWith({
-    timeoutSeconds: 300, // 5 minutes
-    memory: '1GB',
-  })
-  .https.onCall(async (data: PayslipGenerationParams, context: functions.https.CallableContext) => {
-    // Vérifier l'authentification
-    if (!context.auth) {
-      throw new functions.https.HttpsError(
-        'unauthenticated',
-        'Vous devez être authentifié pour effectuer cette opération.'
-      );
+export const generatePayslipPdf = onCall({
+  region: 'europe-west1',
+  timeoutSeconds: 300,
+  memory: '1GiB',
+}, async (request) => {
+  const data = request.data as PayslipGenerationParams;
+  
+  // Vérifier l'authentification
+  if (!request.auth) {
+    throw new Error('Vous devez être authentifié pour effectuer cette opération.');
+  }
+
+  // Vérifier que l'utilisateur a le droit de générer ce bulletin
+  if (request.auth.uid !== data.userId) {
+    throw new Error('Vous n\'avez pas les droits pour effectuer cette opération.');
+  }
+
+  try {
+    // Récupérer les données du bulletin
+    const payslipSnapshot = await admin.firestore()
+      .collection(`users/${data.userId}/payslips`)
+      .doc(data.payslipId)
+      .get();
+
+    if (!payslipSnapshot.exists) {
+      throw new Error('Bulletin de paie non trouvé.');
     }
 
-    // Vérifier que l'utilisateur a le droit de générer ce bulletin
-    if (context.auth.uid !== data.userId) {
-      throw new functions.https.HttpsError(
-        'permission-denied',
-        'Vous n\'avez pas les droits pour effectuer cette opération.'
-      );
+    const payslip = payslipSnapshot.data();
+    if (!payslip) {
+      throw new Error('Données du bulletin indisponibles.');
     }
+
+    // Générer le contenu HTML du bulletin
+    const htmlContent = generatePayslipHtml(payslip);
+
+    // Créer un dossier temporaire pour stocker le PDF
+    const tempDir = os.tmpdir();
+    const pdfPath = path.join(tempDir, `${data.payslipId}.pdf`);
+
+    // Lancer un navigateur headless avec Puppeteer
+    const browser = await puppeteer.launch({
+      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      headless: true,
+    });
 
     try {
-      // Récupérer les données du bulletin
-      const payslipSnapshot = await admin.firestore()
-        .collection(`users/${data.userId}/payslips`)
-        .doc(data.payslipId)
-        .get();
+      const page = await browser.newPage();
 
-      if (!payslipSnapshot.exists) {
-        throw new functions.https.HttpsError(
-          'not-found',
-          'Bulletin de paie non trouvé.'
-        );
-      }
+      // Configuration de la page
+      await page.setViewport({ width: 1240, height: 1754 }); // Taille A4
+      await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
 
-      const payslip = payslipSnapshot.data();
-      if (!payslip) {
-        throw new functions.https.HttpsError(
-          'internal',
-          'Données du bulletin indisponibles.'
-        );
-      }
-
-      // Générer le contenu HTML du bulletin
-      const htmlContent = generatePayslipHtml(payslip);
-
-      // Créer un dossier temporaire pour stocker le PDF
-      const tempDir = os.tmpdir();
-      const pdfPath = path.join(tempDir, `${data.payslipId}.pdf`);
-
-      // Lancer un navigateur headless avec Puppeteer
-      const browser = await puppeteer.launch({
-        args: ['--no-sandbox', '--disable-setuid-sandbox'],
-        headless: true,
-      });
-
-      try {
-        const page = await browser.newPage();
-
-        // Configuration de la page
-        await page.setViewport({ width: 1240, height: 1754 }); // Taille A4
-        await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
-
-        // Générer le PDF
-        await page.pdf({
-          path: pdfPath,
-          format: 'A4',
-          printBackground: true,
-          margin: {
-            top: '1cm',
-            right: '1cm',
-            bottom: '1cm',
-            left: '1cm'
-          }
-        });
-      } finally {
-        // Fermer le navigateur quoi qu'il arrive
-        await browser.close();
-      }
-
-      // Lire le fichier PDF
-      const pdfBuffer = fs.readFileSync(pdfPath);
-
-      // Créer le chemin dans Storage
-      const storagePath = `users/${data.userId}/payslips/${data.payslipId}.pdf`;
-
-      // Télécharger le PDF vers Firebase Storage
-      const bucket = admin.storage().bucket();
-      const file = bucket.file(storagePath);
-
-      await file.save(pdfBuffer, {
-        metadata: {
-          contentType: 'application/pdf',
-          metadata: {
-            payslipId: data.payslipId,
-            userId: data.userId,
-            generatedAt: new Date().toISOString(),
-          }
+      // Générer le PDF
+      await page.pdf({
+        path: pdfPath,
+        format: 'A4',
+        printBackground: true,
+        margin: {
+          top: '1cm',
+          right: '1cm',
+          bottom: '1cm',
+          left: '1cm'
         }
       });
+    } finally {
+      // Fermer le navigateur quoi qu'il arrive
+      await browser.close();
+    }
 
-      // Générer une URL signée avec une durée de vie limitée (7 jours)
-      const signedUrls = await file.getSignedUrl({
-        action: 'read',
-        expires: Date.now() + 7 * 24 * 60 * 60 * 1000, // 7 jours
+    // Lire le fichier PDF
+    const pdfBuffer = fs.readFileSync(pdfPath);
+
+    // Créer le chemin dans Storage
+    const storagePath = `users/${data.userId}/payslips/${data.payslipId}.pdf`;
+
+    // Télécharger le PDF vers Firebase Storage
+    const bucket = admin.storage().bucket();
+    const file = bucket.file(storagePath);
+
+    await file.save(pdfBuffer, {
+      metadata: {
+        contentType: 'application/pdf',
+        metadata: {
+          payslipId: data.payslipId,
+          userId: data.userId,
+          generatedAt: new Date().toISOString(),
+        }
+      }
+    });
+
+    // Générer une URL signée avec une durée de vie limitée (7 jours)
+    const signedUrls = await file.getSignedUrl({
+      action: 'read',
+      expires: Date.now() + 7 * 24 * 60 * 60 * 1000, // 7 jours
+    });
+
+    // Nettoyer le fichier temporaire
+    fs.unlinkSync(pdfPath);
+
+    // Mettre à jour le document avec l'URL du PDF
+    await admin.firestore()
+      .collection(`users/${data.userId}/payslips`)
+      .doc(data.payslipId)
+      .update({
+        pdfUrl: signedUrls[0],
+        pdfGeneratedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
-      // Nettoyer le fichier temporaire
-      fs.unlinkSync(pdfPath);
+    // Renvoyer l'URL signée
+    return { pdfUrl: signedUrls[0] };
 
-      // Mettre à jour le document avec l'URL du PDF
-      await admin.firestore()
-        .collection(`users/${data.userId}/payslips`)
-        .doc(data.payslipId)
-        .update({
-          pdfUrl: signedUrls[0],
-          pdfGeneratedAt: admin.firestore.FieldValue.serverTimestamp(),
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
-
-      // Renvoyer l'URL signée
-      return { pdfUrl: signedUrls[0] };
-
-    } catch (error) {
-      functions.logger.error('Erreur lors de la génération du PDF:', error);
-      throw new functions.https.HttpsError(
-        'internal',
-        `Erreur lors de la génération du PDF: ${error instanceof Error ? error.message : String(error)}`
-      );
-    }
-  });
+  } catch (error) {
+    console.error('Erreur lors de la génération du PDF:', error);
+    throw new Error(`Erreur lors de la génération du PDF: ${error instanceof Error ? error.message : String(error)}`);
+  }
+});
 
 /**
- * Fonction pour calculer les cotisations
+ * Calcule les cotisations pour un salaire brut donné
  */
 function calculateContributions(grossSalary: number, rates: ContributionRate[]): Contribution[] {
   const contributions: Contribution[] = [];
-  
+
+  // Calculer chaque contribution selon son taux
   for (const rate of rates) {
+    let base = 0;
+
     // Déterminer la base de calcul
-    let base = grossSalary;
-    if (rate.base === 'reduced') {
-      base = grossSalary * 0.9812; // Exemple: base réduite à 98.12% du brut
-    } else if (rate.base === 'custom' && rate.baseValue) {
-      base = rate.baseValue;
+    switch (rate.base) {
+      case 'gross':
+        base = grossSalary;
+        break;
+      case 'reduced':
+        // Par exemple, base réduite pour certaines cotisations plafonnées
+        base = Math.min(grossSalary, 3428); // Plafond mensuel de la sécurité sociale 2023
+        break;
+      case 'custom':
+        base = rate.baseValue || 0;
+        break;
+      default:
+        base = grossSalary;
     }
-    
+
     // Calculer les montants
-    const employeeAmount = base * (rate.employeeRate / 100);
-    const employerAmount = base * (rate.employerRate / 100);
-    
+    const employeeAmount = Math.round((base * rate.employeeRate / 100) * 100) / 100; // Arrondi à 2 décimales
+    const employerAmount = Math.round((base * rate.employerRate / 100) * 100) / 100;
+
+    // Ajouter la contribution à la liste
     contributions.push({
       code: rate.code,
       name: rate.name,
@@ -436,24 +404,18 @@ function calculateContributions(grossSalary: number, rates: ContributionRate[]):
       category: rate.category
     });
   }
-  
-  // Trier les contributions par catégorie et ordre
+
+  // Trier les contributions par catégorie et par nom
   return contributions.sort((a, b) => {
-    const rateA = rates.find(r => r.code === a.code);
-    const rateB = rates.find(r => r.code === b.code);
-    
-    if (!rateA || !rateB) return 0;
-    
-    if (rateA.category !== rateB.category) {
-      return rateA.category.localeCompare(rateB.category);
+    if (a.category === b.category) {
+      return a.name.localeCompare(b.name);
     }
-    
-    return rateA.order - rateB.order;
+    return a.category.localeCompare(b.category);
   });
 }
 
 /**
- * Fonction pour générer le HTML du bulletin
+ * Génère le HTML pour le bulletin de paie
  */
 function generatePayslipHtml(payslip: Record<string, unknown>): string {
   // Formater les dates
