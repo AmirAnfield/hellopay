@@ -1,4 +1,3 @@
-import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuth } from 'firebase-admin/auth';
 import { admin } from '@/lib/firebase-admin';
@@ -31,9 +30,16 @@ export async function POST(request: NextRequest) {
       expiresIn: SESSION_EXPIRATION_TIME
     });
 
-    // Configurer le cookie
-    const cookieStore = cookies();
-    cookieStore.set('session', sessionCookie, {
+    // Créer la réponse
+    const response = NextResponse.json(
+      { success: true, uid, email, emailVerified: email_verified },
+      { status: 200 }
+    );
+
+    // Configurer le cookie dans la réponse
+    response.cookies.set({
+      name: 'session',
+      value: sessionCookie,
       maxAge: SESSION_EXPIRATION_TIME / 1000, // convertir en secondes
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
@@ -41,10 +47,7 @@ export async function POST(request: NextRequest) {
       sameSite: 'lax'
     });
 
-    return NextResponse.json(
-      { success: true, uid, email, emailVerified: email_verified },
-      { status: 200 }
-    );
+    return response;
   } catch (error) {
     console.error('Erreur de création de session:', error);
     return NextResponse.json(
@@ -57,10 +60,9 @@ export async function POST(request: NextRequest) {
 /**
  * GET /api/auth/session - Vérifier une session utilisateur
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const cookieStore = cookies();
-    const sessionCookie = cookieStore.get('session')?.value;
+    const sessionCookie = request.cookies.get('session')?.value;
 
     if (!sessionCookie) {
       return NextResponse.json(
@@ -84,13 +86,15 @@ export async function GET() {
   } catch (error) {
     console.error('Erreur de vérification de session:', error);
     
-    // Supprimer le cookie invalide
-    const cookieStore = cookies();
-    cookieStore.delete('session');
-    
-    return NextResponse.json(
+    // Créer la réponse
+    const response = NextResponse.json(
       { authenticated: false, error: 'Session invalide ou expirée' },
       { status: 401 }
     );
+    
+    // Supprimer le cookie invalide
+    response.cookies.delete('session');
+    
+    return response;
   }
 } 

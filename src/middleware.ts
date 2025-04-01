@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import { getAuth } from 'firebase-admin/auth';
 import { admin } from '@/lib/firebase-admin';
 
@@ -18,11 +17,6 @@ const publicRoutes = [
 // Vérifier si une route est publique
 const isPublicRoute = (path: string) => {
   return publicRoutes.some(route => path === route || path.startsWith(`${route}/`));
-};
-
-// Vérifier si une route est une API
-const isApiRoute = (path: string) => {
-  return path.startsWith('/api/');
 };
 
 // Vérifier si une route est une ressource statique

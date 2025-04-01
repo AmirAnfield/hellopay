@@ -1,4 +1,3 @@
-import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 
 /**
@@ -6,11 +5,13 @@ import { NextResponse } from 'next/server';
  */
 export async function POST() {
   try {
-    // Supprimer le cookie de session
-    const cookieStore = cookies();
-    cookieStore.delete('session');
+    // Créer la réponse
+    const response = NextResponse.json({ success: true }, { status: 200 });
     
-    return NextResponse.json({ success: true }, { status: 200 });
+    // Supprimer le cookie de session
+    response.cookies.delete('session');
+    
+    return response;
   } catch (error) {
     console.error('Erreur lors de la déconnexion:', error);
     return NextResponse.json(

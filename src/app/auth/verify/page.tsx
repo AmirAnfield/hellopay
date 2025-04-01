@@ -2,26 +2,25 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import EmailVerificationPage from './email-verification';
 
 export default function VerifyPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const token = searchParams?.get('token');
   
+  // Si pas de token, afficher la page de vérification d'email
+  if (!token) {
+    return <EmailVerificationPage />;
+  }
+  
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [message, setMessage] = useState('Vérification de votre adresse email...');
   
   useEffect(() => {
-    if (!token) {
-      setStatus('error');
-      setMessage('Token de vérification manquant ou invalide.');
-      return;
-    }
-    
     const verifyEmail = async () => {
       try {
         const response = await fetch('/api/auth/verify', {

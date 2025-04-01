@@ -43,10 +43,11 @@ export const firebaseErrorMessages: Record<string, string> = {
  * @param error L'erreur Firebase
  * @returns Un message d'erreur adapté pour l'utilisateur
  */
-export const getFirebaseErrorMessage = (error: unknown): string | null => {
+export const getFirebaseErrorMessage = (error: unknown): string => {
   // Si l'erreur est une FirebaseError
   if (error instanceof FirebaseError) {
-    return firebaseErrorMessages[error.code] || error.message;
+    // Récupérer le message préenregistré ou utiliser le code d'erreur par défaut
+    return firebaseErrorMessages[error.code] || `Une erreur s'est produite: ${error.message}`;
   }
   
   // Si l'erreur est une instance d'Error
@@ -69,76 +70,5 @@ export const getFirebaseErrorMessage = (error: unknown): string | null => {
   }
   
   // Aucune erreur identifiable
-  return null;
-};
-
-/**
- * Récupérer un message d'erreur convivial à partir d'une erreur Firebase
- */
-export function getFirebaseErrorMessage(error: unknown): string {
-  if (!(error instanceof FirebaseError)) {
-    return "Une erreur inattendue s'est produite";
-  }
-
-  // Récupérer le code d'erreur
-  const errorCode = error.code;
-
-  // Mapper les codes d'erreur Firebase vers des messages conviviaux
-  switch (errorCode) {
-    // Erreurs d'authentification
-    case 'auth/invalid-email':
-      return "L'adresse email est invalide";
-    case 'auth/user-disabled':
-      return "Ce compte utilisateur a été désactivé";
-    case 'auth/user-not-found':
-      return "Aucun compte n'existe avec cette adresse email";
-    case 'auth/wrong-password':
-      return "Le mot de passe est incorrect";
-    case 'auth/email-already-in-use':
-      return "Cette adresse email est déjà utilisée par un autre compte";
-    case 'auth/weak-password':
-      return "Le mot de passe est trop faible";
-    case 'auth/operation-not-allowed':
-      return "Cette opération n'est pas autorisée";
-    case 'auth/requires-recent-login':
-      return "Veuillez vous reconnecter pour effectuer cette opération";
-    case 'auth/invalid-credential':
-      return "Identifiants invalides";
-    case 'auth/too-many-requests':
-      return "Trop de tentatives de connexion échouées. Veuillez réessayer plus tard";
-    case 'auth/network-request-failed':
-      return "Une erreur réseau s'est produite";
-
-    // Erreurs Firestore
-    case 'permission-denied':
-      return "Vous n'avez pas les permissions nécessaires pour cette opération";
-    case 'not-found':
-      return "Le document demandé n'existe pas";
-    case 'already-exists':
-      return "Ce document existe déjà";
-    case 'resource-exhausted':
-      return "Limite de quota atteinte. Veuillez réessayer plus tard";
-    case 'failed-precondition':
-      return "Une condition préalable à l'opération n'est pas satisfaite";
-    case 'unavailable':
-      return "Le service est actuellement indisponible. Veuillez réessayer plus tard";
-
-    // Erreurs de fonctions
-    case 'functions/invalid-argument':
-      return "Arguments invalides fournis à la fonction";
-    case 'functions/deadline-exceeded':
-      return "La fonction a pris trop de temps pour s'exécuter";
-    case 'functions/not-found':
-      return "La fonction demandée n'existe pas";
-    case 'functions/permission-denied':
-      return "Vous n'avez pas les permissions nécessaires pour appeler cette fonction";
-    case 'functions/resource-exhausted':
-      return "Ressources insuffisantes pour exécuter la fonction";
-    case 'functions/unavailable':
-      return "Le service de fonctions est actuellement indisponible";
-
-    // Erreur par défaut
-    default:
-      return `Une erreur s'est produite: ${error.message}`;
-  }
-} 
+  return "Une erreur inattendue s'est produite";
+}; 
