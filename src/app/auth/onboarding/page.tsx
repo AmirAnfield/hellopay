@@ -2,7 +2,8 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
+import { auth } from '@/lib/firebase'
+import { createCompany } from '@/services/company-service'
 import { 
   ArrowRight, 
   Building2, 
@@ -81,40 +82,24 @@ export default function Onboarding() {
     setLoading(true)
     
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      
-      if (!session) {
+      // Vérifier si l'utilisateur est connecté
+      if (!auth.currentUser) {
         router.push('/auth/login')
         return
       }
       
       // Enregistrer les données de l'entreprise
-      const { error: companyError } = await supabase
-        .from('companies')
-        .insert({
-          name: company.name,
-          siret: company.siret,
-          address: company.address,
-          city: company.city,
-          postal_code: company.postalCode,
-          country: company.country,
-          user_id: session.user.id
-        })
+      const companyData = {
+        name: company.name,
+        siret: company.siret,
+        address: company.address,
+        city: company.city,
+        postalCode: company.postalCode,
+        country: company.country
+      };
       
-      if (companyError) throw companyError
-      
-      // Mettre à jour le profil de l'utilisateur
-      const { error: profileError } = await supabase
-        .from('users')
-        .update({
-          name: profile.name,
-          role: profile.role,
-          phone: profile.phone,
-          onboarding_completed: true
-        })
-        .eq('id', session.user.id)
-      
-      if (profileError) throw profileError
+      // Utiliser le service createCompany
+      const companyId = await createCompany(companyData);
       
       // Rediriger vers le dashboard
       router.push('/dashboard')

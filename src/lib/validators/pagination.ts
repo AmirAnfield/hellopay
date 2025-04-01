@@ -84,7 +84,7 @@ export const listContractsQuerySchema = paginationSchema.extend({
 export type ListContractsParams = z.infer<typeof listContractsQuerySchema>;
 
 /**
- * Fonction utilitaire pour transformer les paramètres de pagination en options Prisma
+ * Fonction utilitaire pour transformer les paramètres de pagination en options pour les requêtes de base de données
  */
 export function getPaginationOptions<T extends PaginationParams>(params: T) {
   const { page, limit, sortBy, sortOrder } = params;

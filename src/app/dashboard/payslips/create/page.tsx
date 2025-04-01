@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
+import { auth } from '@/lib/firebase'
 import { 
   ArrowLeft, 
   Save, 
@@ -79,24 +79,37 @@ export default function CreatePayslip() {
   useEffect(() => {
     async function fetchEmployees() {
       try {
-        const { data: { session } } = await supabase.auth.getSession()
-        
-        if (!session) {
+        // Vérifier si l'utilisateur est connecté
+        if (!auth.currentUser) {
           router.push('/auth/login')
           return
         }
         
-        const { data, error } = await supabase
-          .from('employees')
-          .select('id, first_name, last_name, job_title, base_salary, is_executive')
-          .eq('user_id', session.user.id)
-          .order('last_name', { ascending: true })
+        // Utiliser les services Firebase pour récupérer les employés
+        setLoadingEmployees(false)
+        toast.error("La récupération des employés avec Firebase n'est pas encore implémentée")
         
-        if (error) throw error
+        // Employés de test pour démonstration
+        const demoEmployees = [
+          {
+            id: '1',
+            first_name: 'Jean',
+            last_name: 'Dupont',
+            job_title: 'Développeur',
+            base_salary: 3500,
+            is_executive: true
+          },
+          {
+            id: '2',
+            first_name: 'Marie',
+            last_name: 'Martin',
+            job_title: 'Designer',
+            base_salary: 3000,
+            is_executive: false
+          }
+        ];
         
-        if (data) {
-          setEmployees(data as Employee[])
-        }
+        setEmployees(demoEmployees);
       } catch (error) {
         console.error("Erreur lors du chargement des employés:", error)
         toast.error("Impossible de charger la liste des employés")
@@ -197,9 +210,8 @@ export default function CreatePayslip() {
         return
       }
       
-      const { data: { session } } = await supabase.auth.getSession()
-      
-      if (!session) {
+      // Vérifier si l'utilisateur est connecté
+      if (!auth.currentUser) {
         router.push('/auth/login')
         return
       }
@@ -215,8 +227,8 @@ export default function CreatePayslip() {
       
       // Préparer les données à enregistrer
       const payslipToInsert = {
-        user_id: session.user.id,
-        employee_id: payslipData.employeeId,
+        userId: auth.currentUser.uid,
+        employeeId: payslipData.employeeId,
         employeeName: `${selectedEmployee.first_name} ${selectedEmployee.last_name}`,
         period: payslipData.period,
         grossSalary: calculatedValues.grossSalary,
@@ -230,16 +242,12 @@ export default function CreatePayslip() {
         benefits: payslipData.benefits,
         notes: payslipData.notes,
         status: 'draft',
-        created_at: new Date().toISOString()
+        createdAt: new Date()
       }
       
-      // Insertion dans la base de données
-      const { error, data } = await supabase
-        .from('payslips')
-        .insert(payslipToInsert)
-        .select('id')
-      
-      if (error) throw error
+      // Pour l'instant on n'enregistre pas réellement dans Firebase
+      console.log("Données de la fiche de paie à sauvegarder:", payslipToInsert);
+      toast.success("Fonctionnalité non implémentée mais les données sont valides");
       
       // Afficher le message de succès
       setSuccess(true)

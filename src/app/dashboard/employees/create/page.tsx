@@ -2,13 +2,18 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
+import { auth } from '@/lib/firebase'
 import { 
   ArrowLeft, 
   User, 
-  Building, 
-  Calendar, 
-  Banknote, 
+  Building2, 
+  Mail, 
+  Phone, 
+  MapPin,
+  Calendar,
+  CreditCard,
+  BadgeCheck,
+  Briefcase,
   Save, 
   X,
   Loader2,
@@ -21,6 +26,7 @@ import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
+import { createEmployee } from '@/services/employee-service'
 
 export default function CreateEmployee() {
   const router = useRouter()
@@ -71,47 +77,40 @@ export default function CreateEmployee() {
       // Validation basique
       if (!employee.firstName || !employee.lastName || !employee.jobTitle) {
         toast.error('Veuillez remplir tous les champs obligatoires')
+        setLoading(false)
         return
       }
       
-      const { data: { session } } = await supabase.auth.getSession()
-      
-      if (!session) {
+      // Vérifier si l'utilisateur est connecté
+      if (!auth.currentUser) {
         router.push('/auth/login')
+        setLoading(false)
         return
       }
       
-      // Formater les données pour l'insertion dans la base
+      // Préparer les données pour Firebase
       const employeeData = {
-        user_id: session.user.id,
-        first_name: employee.firstName,
-        last_name: employee.lastName,
+        firstName: employee.firstName,
+        lastName: employee.lastName,
         email: employee.email,
         phone: employee.phone,
         address: employee.address,
         city: employee.city,
-        postal_code: employee.postalCode,
-        birth_date: employee.dateOfBirth,
-        social_security_number: employee.socialSecurityNumber,
-        
-        job_title: employee.jobTitle,
+        postalCode: employee.postalCode,
+        birthDate: employee.dateOfBirth ? new Date(employee.dateOfBirth) : undefined,
+        socialSecurityNumber: employee.socialSecurityNumber,
+        position: employee.jobTitle,
         department: employee.department,
-        start_date: employee.startDate,
-        contract_type: employee.contractType,
-        is_executive: employee.executiveStatus,
-        
-        base_salary: parseFloat(employee.baseSalary) || 0,
-        hours_per_month: parseFloat(employee.hoursPerMonth) || 151.67,
-        bonus_amount: parseFloat(employee.bonusAmount) || 0,
-        benefits_description: employee.benefitsDescription
+        startDate: employee.startDate ? new Date(employee.startDate) : new Date(),
+        contractType: employee.contractType,
+        status: 'active'
       }
       
-      // Insérer l'employé dans la base de données
-      const { error } = await supabase
-        .from('employees')
-        .insert(employeeData)
+      // Pour l'instant, on utilise une companyId fixe pour le test
+      // À remplacer par une sélection d'entreprise dans l'interface
+      const companyId = "default-company-id"; // À remplacer par la vraie valeur
       
-      if (error) throw error
+      const employeeId = await createEmployee(companyId, employeeData);
       
       // Afficher le message de succès
       setSuccess(true)
@@ -205,11 +204,11 @@ export default function CreateEmployee() {
                 Informations personnelles
               </TabsTrigger>
               <TabsTrigger value="professional" className="flex items-center gap-2">
-                <Building className="h-4 w-4" />
+                <Building2 className="h-4 w-4" />
                 Informations professionnelles
               </TabsTrigger>
               <TabsTrigger value="salary" className="flex items-center gap-2">
-                <Banknote className="h-4 w-4" />
+                <CreditCard className="h-4 w-4" />
                 Rémunération
               </TabsTrigger>
             </TabsList>

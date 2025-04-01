@@ -1,26 +1,19 @@
-import { Metadata } from "next";
-import EditEmployeeClient from "./edit-client";
+"use client";
 
-export const metadata: Metadata = {
-  title: "Modifier l'employé | HelloPay",
-  description: "Modifier les informations d'un employé",
-};
+import { useParams } from "next/navigation";
+import EmployeeForm from "@/components/employee/EmployeeForm";
 
-interface EditEmployeePageProps {
-  params: {
-    id: string;
-  };
-}
+// Les métadonnées ne peuvent pas être exportées dans un composant client
+// Elles doivent être définies dans un fichier layout.tsx du côté serveur
 
-export default function EditEmployeePage({ params }: EditEmployeePageProps) {
+export default function EditEmployeeClientPage() {
+  const params = useParams();
+  // L'ID de l'employé est extrait des paramètres d'URL
+  const id = Array.isArray(params.id) ? params.id[0] : params.id;
+  
   return (
-    <div className="max-w-7xl mx-auto px-4 md:px-6 space-y-6">
-      <h1 className="text-3xl font-bold tracking-tight">Modifier un employé</h1>
-      <p className="text-muted-foreground">
-        Modifiez les informations de l&apos;employé ci-dessous.
-      </p>
-      
-      <EditEmployeeClient employeeId={params.id} />
+    <div className="container py-10 max-w-7xl mx-auto px-4 md:px-6">
+      <EmployeeForm employeeId={id} />
     </div>
   );
 } 

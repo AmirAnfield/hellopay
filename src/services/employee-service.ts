@@ -1,6 +1,7 @@
 import { auth } from '@/lib/firebase';
 import { getDocument, getDocuments, setDocument, deleteDocument } from './firestore-service';
 import { getCompany } from './company-service';
+import { Employee as FirebaseEmployeeType } from '@/types/firebase';
 
 // Type pour les employés
 export interface Employee {
@@ -108,56 +109,39 @@ export async function getEmployee(companyId: string, employeeId: string): Promis
 /**
  * Créer un nouvel employé
  */
-export async function createEmployee(employeeData: EmployeeInput): Promise<string> {
+export async function createEmployee(companyId: string, employeeData: Partial<Employee>): Promise<string> {
   if (!auth.currentUser) {
     throw new Error("Utilisateur non authentifié");
   }
-  
-  // Vérifier que l'entreprise existe et appartient à l'utilisateur
-  const company = await getCompany(employeeData.companyId);
-  if (!company) {
-    throw new Error("Entreprise non trouvée");
+
+  try {
+    // Préparation des données de l'employé
+    const data = {
+      firstName: employeeData.firstName || '',
+      lastName: employeeData.lastName || '',
+      email: employeeData.email || '',
+      address: employeeData.address || '',
+      postalCode: employeeData.postalCode || '',
+      city: employeeData.city || '',
+      country: employeeData.country || 'France',
+      position: employeeData.position || '',
+      contractType: employeeData.contractType || 'CDI',
+      companyId,
+      status: 'active' as const
+    };
+
+    // Utiliser le chemin complet pour la collection des employés de cette entreprise
+    const collectionPath = `users/${auth.currentUser.uid}/companies/${companyId}/employees`;
+    
+    // Créer l'employé dans Firestore
+    const employeeId = await setDocument(collectionPath, data);
+    
+    console.log("Employé créé avec succès:", employeeId);
+    return employeeId;
+  } catch (error) {
+    console.error("Erreur lors de la création de l'employé:", error);
+    throw new Error("Impossible de créer l'employé. Veuillez vérifier les informations et réessayer.");
   }
-  
-  // Validation du numéro de sécurité sociale (15 chiffres)
-  if (!/^\d{15}$/.test(employeeData.socialSecurityNumber)) {
-    throw new Error("Le numéro de sécurité sociale doit comporter exactement 15 chiffres");
-  }
-  
-  // Vérifier si un employé avec ce numéro de sécurité sociale existe déjà
-  const existingEmployees = await getDocuments<Employee>(
-    `users/${auth.currentUser.uid}/companies/${employeeData.companyId}/employees`, 
-    {
-      where: [{ field: 'socialSecurityNumber', operator: '==', value: employeeData.socialSecurityNumber }]
-    }
-  );
-  
-  if (existingEmployees.length > 0) {
-    throw new Error(`Un employé avec le numéro de sécurité sociale ${employeeData.socialSecurityNumber} existe déjà`);
-  }
-  
-  // Créer un ID unique pour le nouvel employé
-  const employeeId = `employee_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-  
-  // Formater les dates si nécessaire
-  const formattedData = {
-    ...employeeData,
-    birthDate: employeeData.birthDate ? new Date(employeeData.birthDate) : undefined,
-    startDate: new Date(employeeData.startDate),
-    endDate: employeeData.endDate ? new Date(employeeData.endDate) : undefined,
-    trialPeriodEndDate: employeeData.trialPeriodEndDate ? new Date(employeeData.trialPeriodEndDate) : undefined,
-    paidLeaveBalance: employeeData.paidLeaveBalance || 0
-  };
-  
-  // Créer l'employé dans Firestore
-  await setDocument(
-    `users/${auth.currentUser.uid}/companies/${employeeData.companyId}/employees`, 
-    employeeId, 
-    formattedData,
-    false
-  );
-  
-  return employeeId;
 }
 
 /**
@@ -233,17 +217,6 @@ export async function deleteEmployee(companyId: string, employeeId: string): Pro
     throw new Error("Entreprise non trouvée");
   }
   
-  // Récupérer les bulletins de paie liés à cet employé
-  const payslips = await getDocuments(
-    `users/${auth.currentUser.uid}/companies/${companyId}/employees/${employeeId}/payslips`, 
-    {}
-  );
-  
-  // Si des bulletins sont liés, ne pas supprimer l'employé
-  if (payslips.length > 0) {
-    throw new Error(`Impossible de supprimer cet employé: ${payslips.length} bulletin(s) de paie y sont rattachés`);
-  }
-  
-  // Supprimer l'employé
+  // Supprimer l'employé directement sans vérifier les bulletins de paie
   await deleteDocument(`users/${auth.currentUser.uid}/companies/${companyId}/employees`, employeeId);
 } 

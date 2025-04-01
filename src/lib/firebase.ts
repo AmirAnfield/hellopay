@@ -51,19 +51,20 @@ let appCheck = null;
 if (typeof window !== 'undefined') {
   // Activer le mode debug en développement
   if (process.env.NODE_ENV === 'development') {
-    // @ts-expect-error - Propriété pour le debug token d'AppCheck
-    self.FIREBASE_APPCHECK_DEBUG_TOKEN = process.env.NEXT_PUBLIC_FIREBASE_APPCHECK_DEBUG_TOKEN === 'true';
-  }
-  
-  try {
-    // Initialiser AppCheck avec reCAPTCHA v3
-    appCheck = initializeAppCheck(app, {
-      provider: new ReCaptchaV3Provider(recaptchaSiteKey),
-      isTokenAutoRefreshEnabled: true
-    });
-    console.log('Firebase App Check initialisé avec reCAPTCHA v3');
-  } catch (error) {
-    console.error('Échec de l\'initialisation d\'App Check:', error);
+    console.log('Mode développement: App Check désactivé pour localhost');
+    // Ne pas initialiser App Check en développement
+  } else {
+    // Initialiser uniquement en production
+    try {
+      // Initialiser AppCheck avec reCAPTCHA v3
+      appCheck = initializeAppCheck(app, {
+        provider: new ReCaptchaV3Provider(recaptchaSiteKey),
+        isTokenAutoRefreshEnabled: true
+      });
+      console.log('Firebase App Check initialisé avec reCAPTCHA v3');
+    } catch (error) {
+      console.error('Échec de l\'initialisation d\'App Check:', error);
+    }
   }
 }
 

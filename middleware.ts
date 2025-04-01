@@ -11,6 +11,7 @@ const publicPaths = [
   '/auth/forgot-password',
   '/auth/reset-password',
   '/auth/verify',
+  '/auth/verify-email',
   '/auth/verify/success',
   '/auth/verify/pending',
   '/api/auth/register',
@@ -34,7 +35,19 @@ const protectedPaths = [
   '/api/payslips',
   '/api/employees',
   '/api/companies',
-  '/api/contracts'
+  '/api/contracts',
+  '/certificates'
+];
+
+// Chemins exemptés de la vérification d'email
+const emailVerificationExemptPaths = [
+  '/auth/verify-email',
+  '/auth/verify/pending',
+  '/auth/verify/send',
+  '/profile/settings',
+  '/api/auth/verify/send',
+  '/api/auth/send-verification',
+  '/api/auth/logout'
 ];
 
 export async function middleware(request: NextRequest) {
@@ -51,6 +64,11 @@ export async function middleware(request: NextRequest) {
   // Vérifier si le chemin est protégé
   const isProtectedPath = protectedPaths.some(protectedPath => 
     path.startsWith(protectedPath)
+  );
+
+  // Vérifier si le chemin est exempté de la vérification d'email
+  const isEmailVerificationExempt = emailVerificationExemptPaths.some(exemptPath => 
+    path.startsWith(exemptPath)
   );
 
   // Si c'est un chemin public, on laisse passer
@@ -74,24 +92,10 @@ export async function middleware(request: NextRequest) {
       // Vérifier le cookie de session avec Firebase Admin
       const decodedClaims = await auth.verifySessionCookie(sessionCookie);
       
-      // Vérifier si l'utilisateur a vérifié son email pour les chemins protégés
-      if (isProtectedPath && !decodedClaims.email_verified) {
-        // Exclure certains chemins de la vérification d'email
-        const emailVerificationExemptPaths = [
-          '/auth/verify/pending',
-          '/auth/verify/send',
-          '/profile/settings',
-          '/api/auth/verify/send',
-          '/api/auth/send-verification'
-        ];
-        
-        const isExempt = emailVerificationExemptPaths.some(exemptPath => 
-          path.startsWith(exemptPath)
-        );
-        
-        if (!isExempt) {
-          return NextResponse.redirect(new URL('/auth/verify/pending', request.url));
-        }
+      // Vérifier si l'utilisateur a vérifié son email
+      if (!decodedClaims.email_verified && !isEmailVerificationExempt) {
+        // Rediriger vers la page de vérification d'email
+        return NextResponse.redirect(new URL('/auth/verify-email', request.url));
       }
       
       // Vérifier les rôles pour les chemins admin

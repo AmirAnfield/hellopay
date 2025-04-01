@@ -27,7 +27,7 @@ export interface Payslip {
 export type PayslipStatus = 'draft' | 'final' | 'paid' | 'canceled';
 
 /**
- * Type pour le modèle de données Prisma/base de données
+ * Type pour le modèle de données de la base de données
  */
 export interface PayslipModel extends Payslip {
   createdAt: Date;

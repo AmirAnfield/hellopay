@@ -1,9 +1,6 @@
 'use client';
 
 import React from 'react';
-import { Search } from "@/components/dashboard/search";
-import { UserNav } from "@/components/dashboard/user-nav";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { SideNav } from "@/components/dashboard/side-nav";
 import { Toaster } from "sonner";
 import { PropsWithChildren } from "react";
@@ -30,23 +27,6 @@ export default function DashboardLayout({
                 icon: "home",
               },
               {
-                title: "Bulletins de paie",
-                href: "/dashboard/payslips",
-                icon: "receipt",
-                links: [
-                  {
-                    title: "Créer un bulletin",
-                    href: "/dashboard/payslips/create",
-                    icon: "plus",
-                  },
-                  {
-                    title: "Historique",
-                    href: "/dashboard/payslips",
-                    icon: "history",
-                  },
-                ],
-              },
-              {
                 title: "Entreprises",
                 href: "/dashboard/companies",
                 icon: "building",
@@ -55,18 +35,6 @@ export default function DashboardLayout({
                 title: "Employés",
                 href: "/dashboard/employees",
                 icon: "users",
-                links: [
-                  {
-                    title: "Liste des employés",
-                    href: "/dashboard/employees",
-                    icon: "list",
-                  },
-                  {
-                    title: "Ajouter un employé",
-                    href: "/dashboard/employees/create",
-                    icon: "plus",
-                  },
-                ],
               },
               {
                 title: "Documents",
@@ -94,6 +62,16 @@ export default function DashboardLayout({
                 title: "Diagnostics",
                 href: "/dashboard/diagnostics",
                 icon: "list",
+              },
+              {
+                title: "Test du workflow",
+                href: "/workflow-test",
+                icon: "list",
+              },
+              {
+                title: "Test Firebase",
+                href: "/test-firebase",
+                icon: "file",
               },
             ]}
           />

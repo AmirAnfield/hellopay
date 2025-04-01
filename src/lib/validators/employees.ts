@@ -11,7 +11,7 @@ export const employeeSchema = z.object({
   city: z.string().min(2, "La ville doit comporter au moins 2 caractères"),
   postalCode: z.string().min(2, "Le code postal doit comporter au moins 2 caractères"),
   country: z.string().default("France"),
-  socialSecurityNumber: z.string().regex(/^\d{15}$/, "Le numéro de sécurité sociale doit comporter 15 chiffres"),
+  socialSecurityNumber: z.string().regex(/^\d{15}$/, "Le numéro de sécurité sociale doit comporter exactement 15 chiffres"),
   position: z.string().min(2, "Le poste doit comporter au moins 2 caractères"),
   contractType: z.string().min(2, "Le type de contrat doit être spécifié"),
   startDate: z.coerce.date(),
@@ -68,7 +68,7 @@ export const createEmployeePersonalSchema = z.object({
     { message: "La date de naissance doit être une date valide" }
   ),
   socialSecurityNumber: z.string()
-    .regex(/^[0-9]{13,15}$/, { message: "Le numéro de sécurité sociale doit contenir entre 13 et 15 chiffres" })
+    .regex(/^\d{15}$/, { message: "Le numéro de sécurité sociale doit comporter exactement 15 chiffres" })
     .optional(),
 });
 

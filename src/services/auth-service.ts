@@ -118,7 +118,27 @@ export const logoutUser = async (): Promise<void> => {
  * Envoyer un email de réinitialisation de mot de passe
  */
 export const resetPassword = async (email: string): Promise<void> => {
-  await sendPasswordResetEmail(auth, email);
+  try {
+    await sendPasswordResetEmail(auth, email);
+  } catch (error: unknown) {
+    // Gérer les erreurs spécifiques de Firebase Auth
+    if (error && typeof error === 'object' && 'code' in error) {
+      const errorCode = (error as { code: string }).code;
+      switch (errorCode) {
+        case 'auth/user-not-found':
+          throw new Error("Aucun compte n'est associé à cette adresse email");
+        case 'auth/invalid-email':
+          throw new Error("L'adresse email n'est pas valide");
+        case 'auth/too-many-requests':
+          throw new Error("Trop de demandes. Veuillez réessayer plus tard");
+        default:
+          console.error("Erreur lors de la réinitialisation du mot de passe:", error);
+          throw new Error("Une erreur est survenue lors de l'envoi de l'email de réinitialisation");
+      }
+    } else {
+      throw new Error("Une erreur inconnue est survenue");
+    }
+  }
 };
 
 /**

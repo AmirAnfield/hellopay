@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
@@ -33,7 +33,8 @@ const loginSchema = z.object({
 type LoginValues = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
-  const router = useRouter();
+  const searchParams = useSearchParams();
+  const callbackUrl = searchParams.get('callbackUrl') || '/dashboard';
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const { loginUser } = useAuth();
@@ -63,14 +64,16 @@ export default function LoginPage() {
         description: "Vous êtes maintenant connecté à votre compte.",
       });
 
-      // Rediriger vers le tableau de bord
-      router.push("/dashboard");
-      router.refresh();
+      // Redirection directe vers le tableau de bord ou l'URL de callback
+      console.log("Redirection vers:", callbackUrl);
+      
+      // Utiliser window.location.href pour une redirection forcée après l'authentification
+      window.location.href = callbackUrl;
     } catch (error: any) {
       console.error("Erreur de connexion:", error);
       
       // Messages d'erreur personnalisés selon le code d'erreur Firebase
-      let errorMessage = getFirebaseErrorMessage(error);
+      const errorMessage = getFirebaseErrorMessage(error);
       
       toast({
         variant: "destructive",

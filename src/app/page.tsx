@@ -37,6 +37,11 @@ export default function HomePage() {
                   Découvrir la démo
                 </Link>
               </Button>
+              <Button variant="secondary" size="lg" asChild>
+                <Link href="/workflow-test">
+                  Tester le workflow
+                </Link>
+              </Button>
             </div>
             <div className="mx-auto grid max-w-5xl items-center gap-6 py-12 lg:grid-cols-2 lg:gap-12">
               <div className="mx-auto aspect-video overflow-hidden rounded-xl bg-slate-100 object-cover object-center dark:bg-slate-800 sm:w-full lg:order-last">

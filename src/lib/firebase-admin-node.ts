@@ -5,18 +5,57 @@ import * as admin from 'firebase-admin';
 import { getApps } from 'firebase-admin/app';
 
 // Configuration de Firebase Admin pour l'environnement serveur
-const serviceAccount = JSON.parse(
-  process.env.FIREBASE_SERVICE_ACCOUNT_KEY || '{}'
-);
+let serviceAccount;
+try {
+  // Utiliser un compte de service minimal pour le développement si aucun n'est fourni
+  const serviceAccountEnv = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+  if (serviceAccountEnv) {
+    serviceAccount = JSON.parse(serviceAccountEnv);
+  } else {
+    // Compte de service minimal pour le développement
+    serviceAccount = {
+      type: 'service_account',
+      project_id: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'hellopay-a852d',
+      private_key_id: 'development',
+      private_key: '-----BEGIN PRIVATE KEY-----\nMIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQCqzNt1NKt+VQoo\nzrDj4PGMFB3OT4nc1xqYLvGvEIh7JXIQvEmqc64NCa3KKTCNsCX2mTGRnvHYoMAx\ncxY0mnLoFE4hDdJSGLFXrG8GxWy+SL1/EIX7xDD8KB8rduJgYykZsaJHpWeYE2vz\nR7WmI27kZUU2qjJ5CL+QmBWOvZvepCVJCrDk/NkdJg1BHk8+m10VJf9MG2U47c8V\nLgDklDdtWZKy4yORnm8X0wUwz3fDP8UiMALZZreFNdh3Sgr1qUskNsrA6WHXLZrl\nqwu6v6W5x7e4oDXzInQUeZksQYmwyNA3RKq8U2AJwBF5yZM2a1dwWcQCxDmzXNwk\n8e/H4FzxAgMBAAECggEAFzPNPnNZMUj3jPkf31XhZ+euDMzLFkaClg6rBPFMNUUH\nWWIQtJj/aXZMt4zxvQgWAraV9mFhtBQUqDFYWp/7yWYRRu05hfXUnOZ8CbYQEuDa\nR7dK/e9KqYnKsXPv38J+XKeETZpZT1sZ7DxR/gyNxCJJmS8TW6+GOhqI+nvVGC/Y\nlUm+ZQjcCp7qbP72dgfmYl0WUY+m79RPxVB5uGFWjuR3UC8CZCZb2yjKE9NwuJQM\nvYQct3cXc8L9D/Qzx0K5vPnfV0BNXJaYkzNO58XkPOZnXULWJzEOk/XuKKEeA8+S\n63UXl7yqNjUzLRaEd5FADybYaMADH9ljNQBL+P9lAQKBgQDnHbcTgcFfkSYu+xFA\n1IlNQxa7LKXfifOiJ46D+Jh3hZdXl00zfCK6DmqfskVQdaiXGRpwRs7l4J15jhnv\nCLjwTpEufs8Y2vfA3Hx91gctcK5zLOBgYBK4KsUQBLbpJqYKwabPQzQLZRZVyU5w\n8Mz1NHSu1XdkTu7/0KCY9xrN4QKBgQC9PB4iP7jVTQ3Cxv+ODrIRyJ++G4Wrpzjm\njvTY/1bH4TZi8QQgVGtxdrCxfbXdwUfAQR7MZzrxgYjgMpM1fTuBw4/7fFN++6uX\nx0Rne4m1hNRiKEn5/bLJwAQKGUtDu0zNhJDnrJOvO6ffN+Hf+l3O4Y4tqA3RZ8a8\nINqrD9eMsQKBgERYzrlz9jHTI3YSRoTnJRrTt/TwLvKIKgc0jxcACQJ8F8bwbXWF\nNLpuEbYTjnCZB/XE5nPFUXmyzT2R0Lz4UijmI8+1YJlCQOzk8qCZhfKI59IUzwOh\n2XvJGdlRGcyTfHMPLcPwW8SLLE63tJzXf029YBbdgSUNSVDAVx8UzXlhAoGAYSoK\nSrUpXJEjBgKBKWBnM/h3fKQk9aaKMwQVQXnOv2doyRAsI7k4PSJArPRbTpYT5Ioi\nYMjQSwDKM0gWbcWQWPvSHOPs5NU4/o8cw1G+vBXaX4OhtGkxV4SrSJkS+jDcrRsF\nKD3Hr8FuXbgj7w9e5wmrHVNBM1/lS92tRcHgIrECgYAq0DNRQAe8EH/MLCrymJki\nRVeHzfztRmrAvhPnz9RpEinNYIrblkBRzQvMfgMV2/iIa3aOh33mUABQ4xFnrxLY\ne7nOyZn3Aj8oM0eKpCRgC9NMJb/KzH9VW7hRDmjgVBhEjAjxg5SVbtTbf+S/AVZa\nIw+AFFzKKpMpOZyDDe+ftA==\n-----END PRIVATE KEY-----\n',
+      client_email: 'firebase-adminsdk-dev@hellopay-a852d.iam.gserviceaccount.com',
+      client_id: 'development',
+      auth_uri: 'https://accounts.google.com/o/oauth2/auth',
+      token_uri: 'https://oauth2.googleapis.com/token',
+      auth_provider_x509_cert_url: 'https://www.googleapis.com/oauth2/v1/certs',
+      client_x509_cert_url: 'https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-dev%40hellopay-a852d.iam.gserviceaccount.com',
+      universe_domain: 'googleapis.com'
+    };
+  }
+} catch (e) {
+  console.error('Erreur de parsing du service account:', e);
+  // Compte de service minimal
+  serviceAccount = {
+    type: 'service_account',
+    project_id: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'hellopay-a852d'
+  };
+}
+
+// Vérification minimum des propriétés requises dans serviceAccount
+const projectId = serviceAccount.project_id || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
 
 // Initialiser l'app Firebase Admin si elle n'est pas déjà initialisée
 if (!getApps().length) {
   try {
-    admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount),
-      databaseURL: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL,
-    });
-    console.log('Firebase Admin initialisé avec succès');
+    // En développement, utilisez une configuration minimale
+    if (process.env.NODE_ENV === 'development') {
+      admin.initializeApp({
+        projectId: projectId
+      });
+      console.log('Firebase Admin initialisé en mode développement avec une configuration minimale');
+    } else {
+      // En production, utilisez le compte de service complet
+      admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount),
+        databaseURL: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL,
+      });
+      console.log('Firebase Admin initialisé avec succès en mode production');
+    }
   } catch (error) {
     console.error('Erreur lors de l\'initialisation de Firebase Admin:', error);
   }

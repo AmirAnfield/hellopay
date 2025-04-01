@@ -23,7 +23,7 @@ export interface Company {
 }
 
 /**
- * Type pour le modèle de données Prisma/base de données
+ * Type pour le modèle de données de la base de données
  */
 export interface CompanyModel extends Company {
   createdAt: Date;

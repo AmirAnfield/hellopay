@@ -1,48 +1,54 @@
 "use client";
 
-import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { useFirestoreCollection } from "@/hooks/useFirestoreCollection";
+import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { logoutUser } from "@/services/auth-service";
 import { Company } from "@/services/company-service";
 import Link from "next/link";
 import { PlusCircle, Building, Users, FileText } from "lucide-react";
-import { toast } from "sonner";
-import { useRouter } from "next/navigation";
+
+// Hook personnalisé pour récupérer les entreprises du localStorage
+function useLocalStorageCompanies<T>() {
+  const [data, setData] = useState<T[]>([]);
+  const [loading, setLoading] = useState(true);
+  
+  useEffect(() => {
+    const fetchData = async () => {
+      // Simuler un délai de chargement
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Récupérer les entreprises depuis le localStorage
+      if (typeof window !== 'undefined') {
+        try {
+          const companiesFromStorage = localStorage.getItem('companies');
+          if (companiesFromStorage) {
+            const parsedCompanies = JSON.parse(companiesFromStorage);
+            setData(parsedCompanies as T[]);
+          }
+        } catch (e) {
+          console.warn("Erreur lors de la récupération des entreprises du localStorage:", e);
+        }
+      }
+      
+      setLoading(false);
+    };
+    
+    fetchData();
+  }, []);
+  
+  return {
+    data,
+    loading
+  };
+}
 
 export default function DashboardPage() {
-  const router = useRouter();
   const { user, loading: authLoading } = useAuth();
-  const [loggingOut, setLoggingOut] = useState(false);
   
-  // Récupérer les entreprises de l'utilisateur
-  const { data: companies, loading: companiesLoading } = useFirestoreCollection<Company>(
-    user ? `users/${user.uid}/companies` : '',
-    { orderBy: [{ field: 'name' }] }
-  );
-  
-  // Fonction pour se déconnecter
-  const handleLogout = async () => {
-    try {
-      setLoggingOut(true);
-      await logoutUser();
-      
-      // Supprimer le cookie de session côté serveur
-      await fetch('/api/auth/session', {
-        method: 'DELETE',
-      });
-      
-      toast.success("Déconnexion réussie");
-      router.push("/auth/login");
-    } catch {
-      toast.error("Erreur lors de la déconnexion");
-    } finally {
-      setLoggingOut(false);
-    }
-  };
+  // Utiliser notre hook personnalisé qui retourne un tableau vide
+  const { data: companies, loading: companiesLoading } = useLocalStorageCompanies<Company>();
   
   // Afficher un état de chargement
   if (authLoading) {
@@ -65,14 +71,9 @@ export default function DashboardPage() {
   
   return (
     <div className="container mx-auto p-4">
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-3xl font-bold">Tableau de bord</h1>
-          <p className="text-gray-500">Bienvenue, {user.displayName || user.email}</p>
-        </div>
-        <Button onClick={handleLogout} variant="outline" disabled={loggingOut}>
-          {loggingOut ? "Déconnexion..." : "Se déconnecter"}
-        </Button>
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold">Tableau de bord</h1>
+        <p className="text-gray-500">Bienvenue, {user.displayName || user.email}</p>
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
@@ -148,7 +149,7 @@ export default function DashboardPage() {
                   <CardDescription>SIRET: {company.siret}</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-sm">{company.address}, {company.postalCode} {company.city}</p>
+                  <p className="text-sm">{company.address || ''}, {company.postalCode || ''} {company.city || ''}</p>
                 </CardContent>
                 <CardFooter>
                   <Link href={`/dashboard/companies/${company.id}`} className="w-full">

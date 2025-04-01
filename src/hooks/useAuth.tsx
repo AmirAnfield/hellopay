@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
-import { User, onAuthStateChanged } from "firebase/auth";
+import { User, onAuthStateChanged, UserCredential } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { auth } from "@/lib/firebase";
@@ -14,8 +14,8 @@ interface AuthContextType {
   error: string | null;
   isEmailVerified: boolean;
   registerUser: (email: string, password: string, userData: authService.UserData) => Promise<void>;
-  loginUser: (email: string, password: string) => Promise<void>;
-  loginWithGoogle: () => Promise<void>;
+  loginUser: (email: string, password: string) => Promise<UserCredential>;
+  loginWithGoogle: () => Promise<UserCredential>;
   logoutUser: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
@@ -99,6 +99,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
       
       setUser(userCredential.user);
       toast.success("Connexion réussie");
+      
+      // Force redirection avec setTimeout pour s'assurer que tout est bien traité
+      setTimeout(() => {
+        window.location.href = '/dashboard';
+      }, 500);
+      
+      return userCredential;
     } catch (error: any) {
       setError(error.message);
       toast.error(`Erreur de connexion: ${error.message}`);
@@ -124,6 +131,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
       
       setUser(userCredential.user);
       toast.success("Connexion avec Google réussie");
+      
+      // Force redirection avec setTimeout pour s'assurer que tout est bien traité
+      setTimeout(() => {
+        window.location.href = '/dashboard';
+      }, 500);
+      
+      return userCredential;
     } catch (error: any) {
       setError(error.message);
       toast.error(`Erreur de connexion avec Google: ${error.message}`);

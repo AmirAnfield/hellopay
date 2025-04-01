@@ -10,7 +10,7 @@ import { Label } from '../ui/label';
 import { EyeIcon, EyeOffIcon, Loader2 } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { signIn } from 'next-auth/react';
+import { signIn } from '@/lib/auth';
 
 const loginSchema = z.object({
   email: z.string().email('Email invalide').min(1, 'L\'email est requis'),
@@ -38,14 +38,14 @@ export default function LoginForm({ onSuccess, onRegisterClick }: LoginFormProps
     const errorParam = searchParams?.get('error');
     if (errorParam) {
       switch (errorParam) {
-        case 'CredentialsSignin':
+        case 'auth/invalid-credential':
           setError('Identifiants incorrects. Veuillez vérifier votre email et mot de passe.');
           break;
-        case 'SessionRequired':
-          setError('Vous devez être connecté pour accéder à cette page.');
+        case 'auth/user-disabled':
+          setError('Ce compte a été désactivé.');
           break;
-        case 'AccessDenied':
-          setError('Accès refusé. Vous n\'avez pas les permissions nécessaires.');
+        case 'auth/too-many-requests':
+          setError('Trop de tentatives. Veuillez réessayer plus tard.');
           break;
         default:
           setError('Une erreur d\'authentification est survenue.');
@@ -71,28 +71,10 @@ export default function LoginForm({ onSuccess, onRegisterClick }: LoginFormProps
     setError(null);
 
     try {
-      // Connexion via NextAuth
-      const signInResult = await signIn("credentials", {
-        redirect: false,
-        email: data.email,
-        password: data.password,
-      });
+      // Connexion via Firebase Auth
+      await signIn(data.email, data.password, data.rememberMe);
 
-      if (signInResult?.error) {
-        // Gestion détaillée des erreurs
-        switch (signInResult.error) {
-          case 'Identifiants manquants':
-          case 'Identifiants incorrects':
-          case 'Mot de passe incorrect':
-            setError(signInResult.error);
-            break;
-          default:
-            setError('Erreur lors de la connexion. Veuillez réessayer.');
-        }
-        return;
-      }
-
-      // Succès : redirection
+      // Succès : notification et redirection
       toast({
         title: "Connexion réussie",
         description: "Vous êtes maintenant connecté",
@@ -105,11 +87,12 @@ export default function LoginForm({ onSuccess, onRegisterClick }: LoginFormProps
       router.push(callbackUrl);
       router.refresh();
     } catch (error) {
-      setError(error instanceof Error ? error.message : "Une erreur est survenue lors de la connexion");
+      const errorMessage = error instanceof Error ? error.message : "Une erreur est survenue lors de la connexion";
+      setError(errorMessage);
       toast({
         variant: "destructive",
         title: "Erreur de connexion",
-        description: error instanceof Error ? error.message : "Une erreur est survenue lors de la connexion",
+        description: errorMessage,
       });
     } finally {
       setIsLoading(false);

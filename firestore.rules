@@ -52,8 +52,8 @@ service cloud.firestore {
           allow delete: if isOwner(userId);
         }
         
-        // Règles pour les bulletins de paie
-        match /payslips/{payslipId} {
+        // Règles pour les certificats/attestations
+        match /certificates/{certificateId} {
           allow read: if isOwner(userId) || isAdmin();
           allow create: if isOwner(userId);
           allow update: if isOwner(userId);
@@ -68,6 +68,20 @@ service cloud.firestore {
           allow delete: if isOwner(userId);
         }
       }
+    }
+    
+    // Règles pour les certificats
+    match /users/{userId}/certificates/{certificateId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow create: if request.auth != null && request.auth.uid == userId
+        && request.resource.data.userId == userId
+        && request.resource.data.type in ['attestation-travail']
+        && request.resource.data.status in ['draft', 'generated', 'signed'];
+      allow update: if request.auth != null && request.auth.uid == userId
+        && request.resource.data.userId == userId
+        && resource.data.userId == userId
+        && request.resource.data.type == resource.data.type;
+      allow delete: if request.auth != null && request.auth.uid == userId;
     }
     
     // Règles pour les données administratives

@@ -1,48 +1,86 @@
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/lib/auth';
+import { auth } from './firebase';
+import { onAuthStateChanged, User } from 'firebase/auth';
 
 /**
- * Récupère l'utilisateur connecté depuis la session
- * @returns L'objet utilisateur ou null s'il n'est pas connecté
+ * Récupère l'utilisateur actuellement connecté de manière synchrone
+ * @returns L'utilisateur actuellement connecté ou null
  */
-export async function getCurrentUser() {
-  const session = await getServerSession(authOptions);
+export function getCurrentUserSync() {
+  return auth.currentUser;
+}
+
+/**
+ * Récupère l'utilisateur connecté de manière asynchrone
+ * @returns Promise avec l'utilisateur ou null
+ */
+export function getCurrentUser(): Promise<User | null> {
+  return new Promise((resolve, reject) => {
+    // Obtenir l'utilisateur actuel immédiatement s'il est déjà connecté
+    const unsubscribe = onAuthStateChanged(
+      auth,
+      (user) => {
+        unsubscribe(); // Se désabonner immédiatement
+        resolve(user);
+      },
+      reject
+    );
+  });
+}
+
+/**
+ * Vérifie si l'utilisateur est connecté de manière asynchrone
+ * @returns Promise<boolean> indiquant si un utilisateur est connecté
+ */
+export async function isAuthenticated(): Promise<boolean> {
+  const user = await getCurrentUser();
+  return !!user;
+}
+
+/**
+ * Obtient l'ID de l'utilisateur actuel
+ * @returns ID de l'utilisateur ou null si aucun utilisateur n'est connecté
+ */
+export async function getCurrentUserId(): Promise<string | null> {
+  const user = await getCurrentUser();
+  return user ? user.uid : null;
+}
+
+/**
+ * Vérifie si l'email de l'utilisateur est vérifié
+ * @returns true si l'email est vérifié, false sinon ou si non connecté
+ */
+export async function isEmailVerified(): Promise<boolean> {
+  const user = await getCurrentUser();
+  return !!user?.emailVerified;
+}
+
+/**
+ * Vérifie si un utilisateur a le rôle admin
+ * Nécessite des claims personnalisés dans Firebase Auth
+ * @returns Promise<boolean> indiquant si l'utilisateur est admin
+ */
+export async function isAdmin(): Promise<boolean> {
+  const user = await getCurrentUser();
   
-  if (!session?.user) {
-    return null;
+  if (!user) return false;
+  
+  try {
+    // Récupérer les claims personnalisés
+    const idTokenResult = await user.getIdTokenResult();
+    return !!idTokenResult.claims.admin;
+  } catch (error) {
+    console.error('Erreur lors de la vérification des droits admin:', error);
+    return false;
   }
-  
-  return {
-    ...session.user,
-    id: session.user.id || '',
-  };
 }
 
 /**
- * Vérifie si l'utilisateur est administrateur
- * @returns true si l'utilisateur est admin, false sinon
+ * Vérifie si deux ID utilisateurs sont identiques
+ * @param userId1 Premier ID
+ * @param userId2 Second ID
+ * @returns true si les IDs sont identiques et non vides
  */
-export async function isAdmin() {
-  const user = await getCurrentUser();
-  return user?.role === 'admin';
-}
-
-/**
- * Récupère l'ID de l'utilisateur connecté
- * @returns L'ID de l'utilisateur ou null s'il n'est pas connecté
- */
-export async function getCurrentUserId() {
-  const user = await getCurrentUser();
-  return user?.id || null;
-}
-
-/**
- * Vérifie si deux utilisateurs sont identiques (même ID)
- * @param userId1 Premier ID d'utilisateur
- * @param userId2 Second ID d'utilisateur
- * @returns true si les deux IDs correspondent, false sinon
- */
-export function isSameUser(userId1: string, userId2: string) {
+export function isSameUser(userId1: string, userId2: string): boolean {
   if (!userId1 || !userId2) return false;
   return userId1 === userId2;
-} 
+}

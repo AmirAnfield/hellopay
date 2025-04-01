@@ -23,6 +23,9 @@ import { Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { getFirebaseErrorMessage } from "@/lib/utils/firebase-errors";
 import { FirebaseError } from "firebase/app";
+import { createUserWithEmailAndPassword, sendEmailVerification } from "firebase/auth";
+import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { db } from "@/lib/firebase/firebaseConfig";
 
 // Schéma de validation
 const registerSchema = z.object({
@@ -45,6 +48,7 @@ export default function RegisterPage() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const { registerUser } = useAuth();
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const {
     register,
@@ -63,32 +67,38 @@ export default function RegisterPage() {
     },
   });
 
-  const onSubmit = async (data: RegisterValues) => {
-    setIsLoading(true);
-
+  const handleSignup = async (values: z.infer<typeof registerSchema>) => {
     try {
-      // Utiliser Firebase Auth pour l'inscription
-      await registerUser(data.email, data.password, data.name);
+      setIsLoading(true);
+      const { email, password } = values;
 
-      toast({
-        title: "Inscription réussie",
-        description: "Votre compte a été créé avec succès. Un email de vérification a été envoyé.",
+      // Créer l'utilisateur
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      
+      // L'utilisateur vient d'être créé, on initialise son profil sans données préexistantes
+      // Cela garantit qu'un nouvel utilisateur commence avec un tableau de bord vide
+      const userDoc = doc(db, 'users', userCredential.user.uid);
+      await setDoc(userDoc, {
+        email: email,
+        createdAt: serverTimestamp(),
+        role: 'user',
+        isOnboarded: false,
+        hasCompletedProfile: false
       });
+      
+      // Envoyer l'email de vérification
+      await sendEmailVerification(userCredential.user);
 
-      // Rediriger vers le tableau de bord
-      router.push("/dashboard");
-      router.refresh();
+      // Redirection et notification
+      router.push('/auth/verify-email');
+      toast({
+        title: "Inscription réussie !",
+        description: "Un email de vérification a été envoyé à votre adresse.",
+      });
     } catch (error) {
-      console.error("Erreur d'inscription:", error);
-      
-      // Messages d'erreur personnalisés selon le code d'erreur Firebase
-      let errorMessage = getFirebaseErrorMessage(error);
-      
-      toast({
-        variant: "destructive",
-        title: "Erreur d'inscription",
-        description: errorMessage,
-      });
+      console.error("Erreur lors de l'inscription:", error);
+      const errorMessage = getFirebaseErrorMessage(error as FirebaseError);
+      setErrorMessage(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -104,7 +114,7 @@ export default function RegisterPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <form onSubmit={handleSubmit(handleSignup)} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="name">Nom complet</Label>
               <Input

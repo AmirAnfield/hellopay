@@ -19,9 +19,11 @@ import {
   Timestamp,
   onSnapshot,
   CollectionReference,
-  QueryConstraint
+  QueryConstraint,
+  addDoc
 } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
+import { getFirestore } from 'firebase/firestore';
 
 /**
  * Interface pour les options de requête
@@ -149,27 +151,48 @@ export async function getDocuments<T = DocumentData>(
 
 /**
  * Créer ou mettre à jour un document
+ * @param collectionPath Chemin de la collection
+ * @param data Données à enregistrer
+ * @param id Identifiant du document (optionnel, généré automatiquement si non fourni)
+ * @param merge Fusionner avec les données existantes (true) ou remplacer (false)
+ * @returns ID du document créé ou mis à jour
  */
-export async function setDocument<T = DocumentData>(
+export async function setDocument<T extends FirestoreDocument>(
   collectionPath: string,
-  docId: string,
-  data: WithFieldValue<T>,
-  merge: boolean = true
-): Promise<void> {
+  data: Omit<T, 'id'>,
+  id?: string,
+  merge: boolean = false
+): Promise<string> {
+  if (!auth.currentUser) {
+    throw new Error("Utilisateur non authentifié");
+  }
+  
   try {
-    const docRef = doc(db, collectionPath, docId);
+    const db = getFirestore();
+    const collectionRef = collection(db, collectionPath);
     
-    // Ajouter les timestamps automatiquement
-    const enhancedData = {
-      ...data as object,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
+    // Préparer les données avec les timestamps
+    const dataWithTimestamps = {
+      ...data,
+      createdAt: data.createdAt || serverTimestamp(),
+      updatedAt: serverTimestamp()
     };
     
-    await setDoc(docRef, enhancedData, { merge });
-    logFirestoreOperation('SET', collectionPath, docId);
+    let docRef;
+    
+    if (id) {
+      // Mise à jour d'un document existant
+      docRef = doc(db, collectionPath, id);
+      await setDoc(docRef, dataWithTimestamps, { merge });
+    } else {
+      // Création d'un nouveau document avec ID auto-généré
+      docRef = await addDoc(collectionRef, dataWithTimestamps);
+    }
+    
+    // Retourner l'ID du document
+    return docRef.id;
   } catch (error) {
-    logFirestoreOperation('SET', collectionPath, docId, error);
+    console.error(`Erreur lors de l'enregistrement du document:`, error);
     throw error;
   }
 }

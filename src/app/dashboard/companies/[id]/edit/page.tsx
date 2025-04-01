@@ -1,19 +1,12 @@
-import { Metadata } from "next";
+"use client";
+
+import { useParams } from "next/navigation";
 import CompanyForm from "@/components/dashboard/CompanyForm";
 
-export const metadata: Metadata = {
-  title: "Modifier l'entreprise | HelloPay",
-  description: "Modifier les informations d'une entreprise",
-};
-
-interface EditCompanyPageProps {
-  params: Promise<{
-    id: string;
-  }>;
-}
-
-export default async function EditCompanyPage({ params }: EditCompanyPageProps) {
-  const { id } = await params;
+export default function EditCompanyClientPage() {
+  const params = useParams();
+  // L'ID de l'entreprise est extrait des paramètres d'URL
+  const id = Array.isArray(params.id) ? params.id[0] : params.id;
   
   return (
     <div className="container py-10 max-w-7xl mx-auto px-4 md:px-6">

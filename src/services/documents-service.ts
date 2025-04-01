@@ -10,6 +10,9 @@ import {
 import { where, QueryConstraint } from 'firebase/firestore';
 import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { app } from '@/lib/firebase';
+import { uploadCertificate } from './storage-service';
+import { Employee } from './employee-service';
+import { Company } from './company-service';
 
 // Initialiser le Storage
 const storage = getStorage(app);
@@ -18,7 +21,7 @@ const storage = getStorage(app);
 const COLLECTION_NAME = 'documents';
 
 // Types de documents
-export type DocumentType = 'payslip' | 'contract' | 'certificate' | 'other';
+export type DocumentType = 'contract' | 'certificate' | 'other';
 
 // Interface du document
 export interface Document extends FirestoreDocument {
@@ -293,4 +296,165 @@ export async function searchDocuments(
     console.error('Erreur lors de la recherche de documents:', error);
     throw error;
   }
+}
+
+/**
+ * Génère le contenu HTML d'une attestation de travail
+ * @param employee Données de l'employé
+ * @param company Données de l'entreprise
+ * @returns Contenu HTML de l'attestation
+ */
+export function generateWorkCertificateHTML(employee: Employee, company: Company): string {
+  const today = new Date();
+  const formattedDate = today.toLocaleDateString('fr-FR', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric'
+  });
+  
+  const employmentDate = employee.startDate instanceof Date 
+    ? employee.startDate.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
+    : new Date(employee.startDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+
+  // Construction de l'HTML du certificat
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <title>Attestation de travail</title>
+      <style>
+        body {
+          font-family: 'Arial', sans-serif;
+          margin: 2cm;
+          line-height: 1.5;
+        }
+        .header {
+          text-align: center;
+          margin-bottom: 2cm;
+        }
+        .logo {
+          max-width: 200px;
+          margin-bottom: 1cm;
+        }
+        .company-name {
+          font-size: 18pt;
+          font-weight: bold;
+          margin-bottom: 5mm;
+        }
+        .company-details {
+          font-size: 10pt;
+          margin-bottom: 1cm;
+        }
+        .document-title {
+          font-size: 16pt;
+          font-weight: bold;
+          text-align: center;
+          margin: 1cm 0;
+        }
+        .content {
+          font-size: 11pt;
+          text-align: justify;
+        }
+        .signature {
+          margin-top: 2cm;
+          text-align: right;
+        }
+        .footer {
+          margin-top: 2cm;
+          font-size: 9pt;
+          text-align: center;
+          color: #666;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        ${company.logoUrl ? `<img src="${company.logoUrl}" class="logo" alt="Logo entreprise" />` : ''}
+        <div class="company-name">${company.name}</div>
+        <div class="company-details">
+          ${company.address}, ${company.postalCode} ${company.city}<br>
+          SIRET: ${company.siret}
+        </div>
+      </div>
+      
+      <div class="document-title">ATTESTATION DE TRAVAIL</div>
+      
+      <div class="content">
+        <p>Je soussigné(e), représentant légal de l'entreprise ${company.name}, atteste par la présente que :</p>
+        
+        <p style="margin-left: 1cm;">
+          <strong>${employee.firstName} ${employee.lastName}</strong><br>
+          ${employee.socialSecurityNumber ? `N° de sécurité sociale : ${employee.socialSecurityNumber}<br>` : ''}
+          ${employee.address}, ${employee.postalCode} ${employee.city}
+        </p>
+        
+        <p>Est employé(e) au sein de notre entreprise depuis le <strong>${employmentDate}</strong> en qualité de <strong>${employee.position}</strong> dans le cadre d'un contrat de travail à durée ${employee.contractType === 'CDI' ? 'indéterminée' : 'déterminée'}.</p>
+        
+        <p>Cette attestation est délivrée à l'intéressé(e) pour faire valoir ce que de droit.</p>
+      </div>
+      
+      <div class="signature">
+        <p>Fait à ${company.city}, le ${formattedDate}</p>
+        <p style="margin-top: 2cm;">Signature et cachet de l'entreprise</p>
+      </div>
+      
+      <div class="footer">
+        <p>Document généré automatiquement par HelloPay - Ne pas modifier</p>
+      </div>
+    </body>
+    </html>
+  `;
+}
+
+/**
+ * Génère un PDF d'attestation de travail
+ * @param certificateId ID du certificat
+ * @param employeeId ID de l'employé
+ * @param companyId ID de l'entreprise
+ * @returns La promesse d'URL de téléchargement
+ */
+export async function generateWorkCertificatePDF(certificateId: string, employeeId: string, companyId: string): Promise<string> {
+  // Cette fonction simulera l'utilisation de Puppeteer ou React-PDF
+  // En production, elle utiliserait une API/Cloud Function qui génère le PDF
+  
+  // Récupération des données
+  const htmlContent = await new Promise<string>((resolve) => {
+    // Simulation d'opération asynchrone qui récupère les données et génère le HTML
+    setTimeout(() => {
+      // En production, ces données proviendraient de Firestore
+      const mockEmployee = {
+        firstName: 'Prénom',
+        lastName: 'Nom',
+        startDate: new Date('2020-01-01'),
+        position: 'Développeur Web',
+        contractType: 'CDI',
+        address: '1 rue de la Paix',
+        postalCode: '75000',
+        city: 'Paris',
+        socialSecurityNumber: '1234567890123'
+      };
+      
+      const mockCompany = {
+        name: 'Entreprise SAS',
+        address: '10 rue des Entrepreneurs',
+        postalCode: '75001',
+        city: 'Paris',
+        siret: '12345678901234',
+        logoUrl: null
+      };
+      
+      const html = generateWorkCertificateHTML(mockEmployee, mockCompany);
+      resolve(html);
+    }, 1000);
+  });
+  
+  // Création d'un blob PDF factice (en production, ce serait un vrai PDF)
+  const blob = new Blob([htmlContent], { type: 'application/pdf' });
+  const file = new File([blob], `attestation_travail_${employeeId}.pdf`, { type: 'application/pdf' });
+  
+  // Upload du fichier PDF
+  const downloadUrl = await uploadCertificate(file, employeeId, certificateId, companyId);
+  
+  return downloadUrl;
 } 

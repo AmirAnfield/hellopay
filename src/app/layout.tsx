@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter as FontSans } from "next/font/google";
 import { cn } from "@/lib/utils";
 import { Providers } from "@/components/providers";
@@ -12,6 +12,14 @@ const fontSans = FontSans({
   subsets: ["latin"],
   variable: "--font-sans",
 });
+
+// Configuration du viewport
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "white" },
+    { media: "(prefers-color-scheme: dark)", color: "#090909" },
+  ],
+};
 
 // Métadonnées pour SEO
 export const metadata: Metadata = {
@@ -33,10 +41,6 @@ export const metadata: Metadata = {
   ],
   authors: [{ name: "HelloPay", url: "https://hellopay.fr" }],
   creator: "HelloPay",
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "white" },
-    { media: "(prefers-color-scheme: dark)", color: "#090909" },
-  ],
   icons: {
     icon: "/favicon.ico",
   },

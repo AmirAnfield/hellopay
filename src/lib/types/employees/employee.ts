@@ -38,13 +38,13 @@ export interface Employee {
 export type ContractType = 'CDI' | 'CDD' | 'Alternance' | 'Stage' | 'Intérim' | 'Autre';
 
 /**
- * Type pour le modèle de données Prisma/base de données
+ * Type pour le modèle de données de la base de données
  */
 export interface EmployeeModel extends Employee {
   createdAt: Date;
   updatedAt: Date;
   companyId: string;
-  // Champs supplémentaires spécifiques à Prisma
+  // Champs supplémentaires spécifiques à la base de données
   hourlyRate: number;
   monthlyHours: number;
   baseSalary: number;

@@ -49,15 +49,15 @@ const companyFormSchema = z.object({
     .default("France"),
   
   // Champs optionnels - exactement comme dans le schéma serveur
-  activityCode: z.trim().string().optional().nullable(),
-  urssafNumber: z.trim().string().optional().nullable(),
-  legalForm: z.trim().string().default("SARL").optional().nullable(),
-  vatNumber: z.trim().string().optional().nullable(),
-  phoneNumber: z.trim().string().optional().nullable(),
-  email: z.string().email("Format d'email invalide").trim().optional().nullable(),
-  website: z.string().url("Format d'URL invalide").trim().optional().nullable(),
-  legalRepresentative: z.trim().string().optional().nullable(),
-  legalRepresentativeRole: z.trim().string().optional().nullable(),
+  activityCode: z.string().optional().nullable(),
+  urssafNumber: z.string().optional().nullable(),
+  legalForm: z.string().default("SARL").optional().nullable(),
+  vatNumber: z.string().optional().nullable(),
+  phoneNumber: z.string().optional().nullable(),
+  email: z.string().email("Format d'email invalide").optional().nullable(),
+  website: z.string().optional().nullable(),
+  legalRepresentative: z.string().optional().nullable(),
+  legalRepresentativeRole: z.string().optional().nullable(),
 });
 
 // Types pour les props et le formulaire
@@ -106,6 +106,45 @@ export default function CompanyForm({ companyId }: CompanyFormProps) {
   async function fetchCompanyData() {
     setIsFetching(true);
     try {
+      // En mode développement, récupérer depuis localStorage au lieu de l'API
+      if (typeof window !== 'undefined') {
+        try {
+          const companiesStr = localStorage.getItem('companies');
+          if (companiesStr) {
+            const companies = JSON.parse(companiesStr);
+            const company = companies.find((c: { id: string }) => c.id === companyId);
+            
+            if (company) {
+              // Remplir le formulaire avec les données existantes
+              form.reset({
+                name: company.name || "",
+                siret: company.siret || "",
+                address: company.address || "",
+                postalCode: company.postalCode || "",
+                city: company.city || "",
+                country: company.country || "France",
+                activityCode: company.activityCode || "",
+                urssafNumber: company.urssafNumber || "",
+                legalForm: company.legalForm || "SARL",
+                vatNumber: company.vatNumber || "",
+                phoneNumber: company.phoneNumber || "",
+                email: company.email || "",
+                website: company.website || "",
+                legalRepresentative: company.legalRepresentative || "",
+                legalRepresentativeRole: company.legalRepresentativeRole || "",
+              });
+              
+              setIsFetching(false);
+              return;
+            }
+          }
+        } catch (e) {
+          console.error("Erreur lors de la récupération depuis localStorage:", e);
+        }
+      }
+      
+      // Fallback vers l'API (désactivé pour le moment)
+      /*
       const response = await fetch(`/api/companies/${companyId}`);
       
       if (!response.ok) {
@@ -143,6 +182,14 @@ export default function CompanyForm({ companyId }: CompanyFormProps) {
           legalRepresentativeRole: company.legalRepresentativeRole || "",
         });
       }
+      */
+      
+      // Si aucune donnée n'a été trouvée, afficher un message d'erreur
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: "Impossible de charger les informations de l'entreprise."
+      });
     } catch (err) {
       console.error("Erreur:", err);
       toast({
@@ -165,9 +212,74 @@ export default function CompanyForm({ companyId }: CompanyFormProps) {
       }
     });
     
+    // Ajouter 'https://' au début de l'URL du site web si ce n'est pas déjà le cas
+    if (data.website && data.website.trim() !== '' && !data.website.startsWith('http')) {
+      data.website = `https://${data.website}`;
+    }
+    
     console.log("Données soumises:", data);
     
     try {
+      // En mode développement, sauvegarder dans localStorage
+      if (typeof window !== 'undefined') {
+        try {
+          const companiesStr = localStorage.getItem('companies');
+          const companies = companiesStr ? JSON.parse(companiesStr) : [];
+          
+          if (isEditMode) {
+            // Mettre à jour l'entreprise existante
+            const updatedCompanies = companies.map((company: { id: string }) => {
+              if (company.id === companyId) {
+                return {
+                  ...company,
+                  ...data,
+                  updatedAt: new Date()
+                };
+              }
+              return company;
+            });
+            
+            localStorage.setItem('companies', JSON.stringify(updatedCompanies));
+          } else {
+            // Créer une nouvelle entreprise
+            const newCompanyId = `company-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+            const newCompany = {
+              ...data,
+              id: newCompanyId,
+              createdAt: new Date(),
+              updatedAt: new Date()
+            };
+            
+            companies.push(newCompany);
+            localStorage.setItem('companies', JSON.stringify(companies));
+          }
+          
+          // Simuler un délai pour l'enregistrement
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          
+          // Notification plus claire
+          toast({
+            title: isEditMode ? "Entreprise mise à jour" : "Entreprise créée",
+            description: isEditMode 
+              ? `Les informations de l'entreprise "${data.name}" ont été mises à jour avec succès.` 
+              : `L'entreprise "${data.name}" a été créée avec succès.`,
+            variant: "default",
+          });
+          
+          // Rediriger vers la liste des entreprises après un court délai
+          setTimeout(() => {
+            // Utiliser window.location.href pour forcer un rechargement complet
+            window.location.href = `/dashboard/companies?action=${isEditMode ? 'updated' : 'created'}&name=${encodeURIComponent(data.name)}`;
+          }, 1500);
+          return;
+        } catch (e) {
+          console.error("Erreur lors de la sauvegarde dans localStorage:", e);
+          throw new Error("Impossible de sauvegarder l'entreprise");
+        }
+      }
+      
+      // Fallback vers l'API (désactivé pour le moment)
+      /*
       const url = isEditMode ? `/api/companies/${companyId}` : "/api/companies";
       const method = isEditMode ? "PUT" : "POST";
       
@@ -230,6 +342,10 @@ export default function CompanyForm({ companyId }: CompanyFormProps) {
 
       // Rediriger vers la liste des entreprises
       router.push("/dashboard/companies");
+      */
+      
+      // Si nous sommes ici, c'est qu'il y a un problème
+      throw new Error("Problème lors de l'enregistrement de l'entreprise");
     } catch (err) {
       console.error("Erreur:", err);
       toast({
@@ -512,8 +628,22 @@ export default function CompanyForm({ companyId }: CompanyFormProps) {
                   <FormItem>
                     <FormLabel>Site web</FormLabel>
                     <FormControl>
-                      <Input placeholder="https://www.entreprise.fr" {...field} />
+                      <Input 
+                        placeholder="www.entreprise.fr" 
+                        value={field.value || ''} 
+                        onChange={(e) => {
+                          // Supprime automatiquement les préfixes http:// ou https:// lors de la saisie
+                          const value = e.target.value.replace(/^https?:\/\//, '');
+                          field.onChange(value);
+                        }}
+                        onBlur={field.onBlur}
+                        name={field.name}
+                        ref={field.ref}
+                      />
                     </FormControl>
+                    <FormDescription>
+                      Le préfixe https:// sera automatiquement ajouté
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}

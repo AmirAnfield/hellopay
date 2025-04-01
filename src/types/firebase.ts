@@ -59,9 +59,6 @@ export interface Employee extends FirestoreDocument {
   contractType: string;
   position: string;
   departmentId?: string;
-  salaryBase?: number;
-  salaryFrequency?: 'monthly' | 'hourly' | 'yearly';
-  workingHours?: number;
   status: 'active' | 'inactive' | 'pending';
   iban?: string;
   bic?: string;
@@ -70,9 +67,6 @@ export interface Employee extends FirestoreDocument {
   nationality?: string;
   startDate?: Timestamp;
   endDate?: Timestamp;
-  hourlyRate?: number;
-  monthlyHours?: number;
-  isExecutive?: boolean;
   photoUrl?: string;
   phone?: string;
   department?: string;
@@ -87,66 +81,6 @@ export interface Employee extends FirestoreDocument {
       uploadedAt: Date | string;
     }>;
   };
-}
-
-// Bulletin de paie
-export interface Payslip extends FirestoreDocument {
-  employeeId: string;
-  companyId: string;
-  month: number;
-  year: number;
-  grossAmount: number;
-  netAmount: number;
-  taxAmount: number;
-  otherDeductions?: number;
-  pdfUrl?: string;
-  status: 'draft' | 'final' | 'generated' | 'sent' | 'paid';
-  paymentDate?: Timestamp;
-  periodStart: Timestamp;
-  periodEnd: Timestamp;
-  lineItems?: PayslipLineItem[];
-  userId?: string;
-  hourlyRate?: number;
-  hoursWorked?: number;
-  employerCost?: number;
-  contributionsDetails?: string;
-  locked?: boolean;
-  paidLeaveAcquired?: number;
-  paidLeaveTaken?: number;
-  paidLeaveRemaining?: number;
-  cumulativeGrossSalary?: number;
-  cumulativeNetSalary?: number;
-  cumulativePeriodStart?: Timestamp;
-  cumulativePeriodEnd?: Timestamp;
-  employerName?: string;
-  employerAddress?: string;
-  employerSiret?: string;
-  employerUrssaf?: string;
-  employeeName?: string;
-  employeeAddress?: string;
-  employeePosition?: string;
-  employeeSocialSecurityNumber?: string;
-  isExecutive?: boolean;
-  validatedAt?: Timestamp;
-  validatedBy?: string;
-}
-
-// Ligne de bulletin
-export interface PayslipLineItem {
-  label: string;
-  amount: number;
-  type: 'earning' | 'deduction' | 'tax' | 'employer_contribution' | 'addition';
-  quantity?: number;
-  rate?: number;
-  baseAmount?: number;
-}
-
-// Département/service dans une entreprise
-export interface Department extends FirestoreDocument {
-  name: string;
-  companyId: string;
-  managerId?: string;
-  description?: string;
 }
 
 // Utilisateur avec rôles
@@ -173,6 +107,23 @@ export interface User extends FirestoreDocument {
   privacyAccepted?: boolean;
 }
 
+// Attestation
+export interface Certificate extends FirestoreDocument {
+  employeeId: string;
+  companyId: string;
+  userId: string;  // créateur
+  
+  type: 'attestation-travail';  // pour l'instant, un seul type
+  
+  status: 'draft' | 'generated' | 'signed';
+  
+  // Contenu brut de l'attestation si besoin
+  content: string;
+  
+  // URL du PDF stocké dans Firebase Storage
+  pdfUrl?: string;
+}
+
 // Type pour la validation des données
 export type ValidationSchema<T> = {
   [K in keyof T]?: {
@@ -185,13 +136,4 @@ export type ValidationSchema<T> = {
     max?: number;
     custom?: (value: unknown) => boolean;
   };
-};
-
-// Modèle de bulletin de paie
-export interface PayslipTemplate extends FirestoreDocument {
-  companyId: string;
-  name: string;
-  html: string;
-  css?: string;
-  isDefault: boolean;
-} 
+}; 

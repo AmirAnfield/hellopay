@@ -1,135 +1,199 @@
-import { PrismaAdapter } from "@next-auth/prisma-adapter";
-import { NextAuthOptions } from "next-auth";
-import CredentialsProvider from "next-auth/providers/credentials";
-import bcrypt from "bcrypt";
-import prisma from "./prisma";
-import { DefaultSession } from "next-auth";
+import { auth } from './firebase';
+import { 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword, 
+  signOut as firebaseSignOut,
+  sendPasswordResetEmail,
+  verifyPasswordResetCode,
+  confirmPasswordReset,
+  sendEmailVerification,
+  updateProfile,
+  EmailAuthProvider,
+  reauthenticateWithCredential,
+  updatePassword,
+  setPersistence,
+  browserSessionPersistence,
+  browserLocalPersistence
+} from 'firebase/auth';
 
-export const authOptions: NextAuthOptions = {
-  adapter: PrismaAdapter(prisma),
-  providers: [
-    CredentialsProvider({
-      name: "credentials",
-      credentials: {
-        email: { label: "Email", type: "email" },
-        password: { label: "Mot de passe", type: "password" }
-      },
-      async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) {
-          throw new Error("Identifiants manquants");
-        }
-
-        const user = await prisma.user.findUnique({
-          where: {
-            email: credentials.email
-          }
-        });
-
-        if (!user || !user.passwordHash) {
-          throw new Error("Identifiants incorrects");
-        }
-
-        const isPasswordValid = await bcrypt.compare(
-          credentials.password,
-          user.passwordHash
-        );
-
-        if (!isPasswordValid) {
-          throw new Error("Mot de passe incorrect");
-        }
-
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          role: user.role,
-          emailVerified: user.emailVerified
-        };
-      }
-    })
-  ],
-  pages: {
-    signIn: '/auth/login',
-    error: '/auth/error',
-  },
-  debug: process.env.NODE_ENV === 'development',
-  session: {
-    strategy: "jwt",
-    maxAge: 30 * 24 * 60 * 60, // 30 jours
-  },
-  cookies: {
-    sessionToken: {
-      name: `next-auth.session-token`,
-      options: {
-        httpOnly: true,
-        sameSite: "lax",
-        path: "/",
-        secure: process.env.NODE_ENV === "production"
-      }
+/**
+ * Connecte un utilisateur avec son email et mot de passe
+ * @param email - L'email de l'utilisateur
+ * @param password - Le mot de passe de l'utilisateur
+ * @param rememberMe - Définit si la session doit persister après fermeture du navigateur
+ * @returns Les informations de l'utilisateur connecté
+ */
+export async function signIn(email: string, password: string, rememberMe: boolean = false) {
+  try {
+    // Définir le type de persistance selon le choix de l'utilisateur
+    await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence);
+    
+    // Connexion à Firebase Auth
+    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    return userCredential.user;
+  } catch (error: any) {
+    console.error('Erreur de connexion:', error);
+    
+    // Traduire les codes d'erreur Firebase en messages plus conviviaux
+    if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+      throw new Error('Identifiants incorrects');
+    } else if (error.code === 'auth/too-many-requests') {
+      throw new Error('Trop de tentatives échouées. Veuillez réessayer plus tard.');
+    } else if (error.code === 'auth/user-disabled') {
+      throw new Error('Ce compte a été désactivé');
+    } else {
+      throw new Error('Erreur de connexion. Veuillez réessayer.');
     }
-  },
-  secret: process.env.NEXTAUTH_SECRET,
-  callbacks: {
-    async jwt({ token, user, trigger, session }) {
-      // Lors de la connexion initiale
-      if (user) {
-        token.role = user.role;
-        token.id = user.id;
-        token.email = user.email;
-        token.emailVerified = user.emailVerified;
-      }
-
-      // Lors d'une mise à jour de session
-      if (trigger === "update" && session) {
-        if (session.user?.role) token.role = session.user.role;
-        if (session.user?.emailVerified) token.emailVerified = session.user.emailVerified;
-      }
-
-      return token;
-    },
-    async session({ session, token }) {
-      if (session.user && token) {
-        session.user.role = token.role as string;
-        session.user.id = token.id as string;
-        session.user.emailVerified = token.emailVerified as Date | null;
-      }
-      return session;
-    },
-    async redirect({ url, baseUrl }) {
-      // Gérer les redirections de manière plus robuste
-      if (url.startsWith("/")) return `${baseUrl}${url}`;
-      if (url.startsWith(baseUrl)) return url;
-      return baseUrl;
-    },
-    async signIn() {
-      // Pour le MVP 0.23, nous considérons tous les utilisateurs comme vérifiés
-      // Dans une version production, on pourrait ajouter une vérification comme:
-      // return user.emailVerified !== null;
-      return true;
-    }
-  }
-};
-
-// Pour des types TypeScript plus précis
-declare module "next-auth" {
-  interface User {
-    role?: string;
-    emailVerified?: Date | null;
-  }
-  
-  interface Session {
-    user: {
-      id: string;
-      role: string;
-      emailVerified: Date | null;
-    } & DefaultSession["user"];
   }
 }
 
-declare module "next-auth/jwt" {
-  interface JWT {
-    role?: string;
-    id?: string;
-    emailVerified?: Date | null;
+/**
+ * Déconnecte l'utilisateur actuel
+ */
+export async function signOut() {
+  try {
+    await firebaseSignOut(auth);
+  } catch (error) {
+    console.error('Erreur lors de la déconnexion:', error);
+    throw error;
   }
-} 
+}
+
+/**
+ * Inscription d'un nouvel utilisateur
+ * @param email - L'email du nouvel utilisateur
+ * @param password - Le mot de passe du nouvel utilisateur
+ * @param displayName - Le nom à afficher (optionnel)
+ * @returns Les informations de l'utilisateur créé
+ */
+export async function signUp(email: string, password: string, displayName?: string) {
+  try {
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    
+    // Mettre à jour le profil si un nom d'affichage est fourni
+    if (displayName && userCredential.user) {
+      await updateProfile(userCredential.user, { displayName });
+    }
+    
+    // Envoyer un email de vérification
+    if (userCredential.user) {
+      await sendEmailVerification(userCredential.user);
+    }
+    
+    return userCredential.user;
+  } catch (error: any) {
+    console.error('Erreur d\'inscription:', error);
+    
+    if (error.code === 'auth/email-already-in-use') {
+      throw new Error('Cet email est déjà utilisé');
+    } else if (error.code === 'auth/invalid-email') {
+      throw new Error('Email invalide');
+    } else if (error.code === 'auth/weak-password') {
+      throw new Error('Le mot de passe est trop faible');
+    } else {
+      throw new Error('Erreur lors de l\'inscription');
+    }
+  }
+}
+
+/**
+ * Envoi d'un email de réinitialisation de mot de passe
+ * @param email - L'email de l'utilisateur
+ */
+export async function resetPassword(email: string) {
+  try {
+    await sendPasswordResetEmail(auth, email);
+  } catch (error: any) {
+    console.error('Erreur lors de l\'envoi de l\'email de réinitialisation:', error);
+    
+    if (error.code === 'auth/user-not-found') {
+      throw new Error('Aucun compte associé à cet email');
+    } else if (error.code === 'auth/invalid-email') {
+      throw new Error('Email invalide');
+    } else {
+      throw new Error('Erreur lors de l\'envoi de l\'email');
+    }
+  }
+}
+
+/**
+ * Confirme la réinitialisation du mot de passe avec le code reçu par email
+ * @param code - Le code de réinitialisation
+ * @param newPassword - Le nouveau mot de passe
+ */
+export async function confirmResetPassword(code: string, newPassword: string) {
+  try {
+    await verifyPasswordResetCode(auth, code);
+    await confirmPasswordReset(auth, code, newPassword);
+  } catch (error: any) {
+    console.error('Erreur lors de la réinitialisation du mot de passe:', error);
+    
+    if (error.code === 'auth/invalid-action-code') {
+      throw new Error('Le code de réinitialisation est invalide ou a expiré');
+    } else if (error.code === 'auth/weak-password') {
+      throw new Error('Le mot de passe est trop faible');
+    } else {
+      throw new Error('Erreur lors de la réinitialisation du mot de passe');
+    }
+  }
+}
+
+/**
+ * Modifie le mot de passe de l'utilisateur connecté
+ * @param currentPassword - Mot de passe actuel
+ * @param newPassword - Nouveau mot de passe
+ */
+export async function changePassword(currentPassword: string, newPassword: string) {
+  try {
+    const user = auth.currentUser;
+    
+    if (!user || !user.email) {
+      throw new Error('Utilisateur non connecté');
+    }
+    
+    // Réauthentifier l'utilisateur avant de changer le mot de passe
+    const credential = EmailAuthProvider.credential(user.email, currentPassword);
+    await reauthenticateWithCredential(user, credential);
+    
+    // Mettre à jour le mot de passe
+    await updatePassword(user, newPassword);
+  } catch (error: any) {
+    console.error('Erreur lors du changement de mot de passe:', error);
+    
+    if (error.code === 'auth/wrong-password') {
+      throw new Error('Mot de passe actuel incorrect');
+    } else if (error.code === 'auth/weak-password') {
+      throw new Error('Le nouveau mot de passe est trop faible');
+    } else {
+      throw new Error('Erreur lors du changement de mot de passe');
+    }
+  }
+}
+
+/**
+ * Obtient l'utilisateur actuellement connecté
+ * @returns L'utilisateur connecté ou null
+ */
+export function getCurrentUser() {
+  return auth.currentUser;
+}
+
+/**
+ * Vérifie si un utilisateur est connecté
+ * @returns true si un utilisateur est connecté, false sinon
+ */
+export function isAuthenticated() {
+  return !!auth.currentUser;
+}
+
+/**
+ * Vérifie si l'email de l'utilisateur est vérifié
+ * @returns true si l'email est vérifié, false sinon
+ */
+export function isEmailVerified() {
+  const user = auth.currentUser;
+  return !!user?.emailVerified;
+}
+
+// Export de l'instance auth pour utilisation directe si nécessaire
+export { auth };

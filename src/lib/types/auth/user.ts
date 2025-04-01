@@ -26,7 +26,7 @@ export interface User {
 }
 
 /**
- * Type pour le modèle de données Prisma/base de données
+ * Type pour le modèle de données de la base de données
  */
 export interface UserModel extends User {
   password?: string; // Hachage du mot de passe, pas présent dans la version front-end

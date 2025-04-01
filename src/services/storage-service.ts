@@ -48,7 +48,7 @@ export const STORAGE_LIMITS = {
 };
 
 // Types de documents supportés
-export type DocumentType = 'payslip' | 'contract' | 'certificate';
+export type DocumentType = 'contract' | 'certificate';
 
 // Types de fichiers acceptés et leurs limites
 export const ACCEPTED_FILE_TYPES = {
@@ -318,17 +318,6 @@ export async function uploadEmployeeDocument(
 }
 
 /**
- * Téléchargement d'un bulletin de paie
- * @param file Fichier PDF du bulletin
- * @param employeeId ID de l'employé
- * @param payslipId ID du bulletin
- * @returns URL de téléchargement
- */
-export async function uploadPayslip(file: File, employeeId: string, payslipId: string): Promise<string> {
-  return uploadEmployeeDocument(file, employeeId, 'payslip', payslipId);
-}
-
-/**
  * Téléchargement d'un contrat
  * @param file Fichier PDF du contrat
  * @param employeeId ID de l'employé
@@ -337,6 +326,59 @@ export async function uploadPayslip(file: File, employeeId: string, payslipId: s
  */
 export async function uploadContract(file: File, employeeId: string, contractId: string): Promise<string> {
   return uploadEmployeeDocument(file, employeeId, 'contract', contractId);
+}
+
+/**
+ * Téléchargement d'un certificat pour un employé dans Firebase Storage
+ * @param file Fichier PDF à télécharger
+ * @param employeeId ID de l'employé
+ * @param certificateId ID du certificat
+ * @returns URL du fichier téléchargé
+ */
+export async function uploadCertificate(
+  file: File, 
+  employeeId: string, 
+  certificateId: string,
+  companyId: string
+): Promise<string> {
+  const user = auth.currentUser;
+  if (!user) throw new Error("Utilisateur non authentifié");
+  
+  // Validation du type de fichier (PDF uniquement)
+  if (!validateFileType(file, ACCEPTED_FILE_TYPES.pdf)) {
+    throw new Error("Seuls les fichiers PDF sont acceptés pour les certificats");
+  }
+  
+  // Validation de la taille du fichier
+  if (!validateFileSize(file, FILE_SIZE_LIMITS.pdf)) {
+    throw new Error(`Le fichier ne doit pas dépasser ${FILE_SIZE_LIMITS.pdf} Mo`);
+  }
+  
+  // Chemin du certificat dans le Storage
+  const certificatePath = `users/${user.uid}/companies/${companyId}/employees/${employeeId}/certificates/${certificateId}.pdf`;
+  
+  try {
+    // Upload du fichier
+    const fileRef = ref(storage, certificatePath);
+    const metadata = {
+      contentType: 'application/pdf',
+      customMetadata: {
+        'createdBy': user.uid,
+        'createdAt': Date.now().toString(),
+        'type': 'certificate',
+        'employeeId': employeeId,
+        'companyId': companyId
+      }
+    };
+    
+    await uploadBytes(fileRef, file, metadata);
+    const downloadURL = await getDownloadURL(fileRef);
+    
+    return downloadURL;
+  } catch (error) {
+    const handledError = handleStorageError(error);
+    throw new Error(`Erreur lors du téléchargement du certificat: ${handledError.message}`);
+  }
 }
 
 /**

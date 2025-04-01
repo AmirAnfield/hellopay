@@ -11,6 +11,7 @@ interface LoadingButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
   variant?: "default" | "destructive" | "outline" | "secondary" | "ghost" | "link";
   size?: "default" | "sm" | "lg" | "icon";
   children: React.ReactNode;
+  onClick?: (event: React.MouseEvent<HTMLButtonElement>) => void;
 }
 
 export function LoadingButton({
@@ -21,14 +22,27 @@ export function LoadingButton({
   variant = "default",
   size = "default",
   className,
+  onClick,
   ...props
 }: LoadingButtonProps) {
+  // Fonction qui gère le clic et empêche toute navigation par défaut
+  const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    // Empêcher tout comportement par défaut inattendu
+    e.preventDefault();
+    
+    // Appeler la fonction onClick passée en prop si elle existe
+    if (onClick) {
+      onClick(e);
+    }
+  };
+
   return (
     <Button
       disabled={isLoading || disabled}
       variant={variant}
       size={size}
       className={cn(className)}
+      onClick={handleClick}
       {...props}
     >
       {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
