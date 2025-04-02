@@ -51,6 +51,11 @@ export default function DashboardLayout({
                     href: "/dashboard/documents/certificates",
                     icon: "badge",
                   },
+                  {
+                    title: "Bulletins de paie",
+                    href: "/dashboard/payslips",
+                    icon: "receipt",
+                  },
                 ],
               },
               {

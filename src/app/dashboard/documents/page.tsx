@@ -27,8 +27,8 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuTrigger,
   DropdownMenuSeparator,
+  DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { LoadingButton } from "@/components/shared/LoadingButton";
@@ -65,7 +65,7 @@ interface Document {
   date: Date;
   employeeName: string;
   companyName: string;
-  status: 'generated' | 'pending' | 'validated' | 'draft';
+  status: 'generated' | 'pending' | 'validated' | 'draft' | 'signed' | 'archived';
   pdfUrl?: string;
   config?: {
     showSalary: boolean;
@@ -75,6 +75,19 @@ interface Document {
     position: string;
     contractType: string;
     noEndDate: boolean;
+  };
+  contractConfig?: {
+    employeeId: string;
+    companyId: string;
+    type: 'CDI' | 'CDD';
+    startDate: string;
+    endDate?: string;
+    trialPeriodEndDate?: string;
+    isFullTime: boolean;
+    monthlyHours: number;
+    baseSalary: number;
+    conventions?: string[];
+    specificClauses?: string[];
   };
 }
 
@@ -120,6 +133,14 @@ export default function DocumentsPage() {
   const [startDate, setStartDate] = useState("");
   const [contractType, setContractType] = useState("CDI");
   const [noEndDate, setNoEndDate] = useState(true);
+
+  // Configuration des contrats
+  const [isFullTime, setIsFullTime] = useState(true);
+  const [monthlyHours, setMonthlyHours] = useState(151.67); // 35h hebdo par défaut
+  const [endDate, setEndDate] = useState("");
+  const [trialPeriodEndDate, setTrialPeriodEndDate] = useState("");
+  const [conventions, setConventions] = useState<string[]>([]);
+  const [specificClauses, setSpecificClauses] = useState<string[]>([]);
 
   // Vérifier les paramètres d'URL pour ouvrir le dialogue si demandé
   useEffect(() => {
@@ -174,7 +195,7 @@ export default function DocumentsPage() {
         date: new Date(doc.date ? String(doc.date) : Date.now()),
         employeeName: String(doc.employeeName || ''),
         companyName: String(doc.companyName || ''),
-        status: (doc.status || 'draft') as 'generated' | 'pending' | 'validated' | 'draft',
+        status: (doc.status || 'draft') as 'generated' | 'pending' | 'validated' | 'draft' | 'signed' | 'archived',
         pdfUrl: doc.pdfUrl ? String(doc.pdfUrl) : undefined,
         config: doc.config as Document['config']
       }));
@@ -227,33 +248,75 @@ export default function DocumentsPage() {
     setDetailsOpen(true);
   };
 
+  // Réinitialiser le formulaire
+  const resetForm = () => {
+    setSelectedEmployee("");
+    setShowSalary(false);
+    setSalaryType('monthly');
+    setSalaryAmount(0);
+    setPosition("");
+    setStartDate("");
+    setContractType("CDI");
+    setNoEndDate(true);
+    setDocumentType('attestation');
+    // Champs spécifiques aux contrats
+    setIsFullTime(true);
+    setMonthlyHours(151.67);
+    setEndDate("");
+    setTrialPeriodEndDate("");
+    setConventions([]);
+    setSpecificClauses([]);
+  };
+
   // Générer un nouveau document PDF et ouvrir dans un nouvel onglet
   const generatePdf = (doc: Document) => {
     // Construire l'URL avec tous les paramètres nécessaires
     const params = new URLSearchParams();
+    
+    // Paramètres communs
     params.append('id', doc.id);
     params.append('type', doc.type);
     params.append('employeeName', doc.employeeName);
     params.append('companyName', doc.companyName);
     
-    if (doc.config) {
+    // Paramètres spécifiques selon le type de document
+    if (doc.type === 'attestation' && doc.config) {
       params.append('position', doc.config.position);
       params.append('startDate', doc.config.startDate);
       params.append('contractType', doc.config.contractType);
-      params.append('showSalary', String(doc.config.showSalary));
-      params.append('salaryType', doc.config.salaryType);
-      params.append('salaryAmount', String(doc.config.salaryAmount));
-      params.append('noEndDate', String(doc.config.noEndDate));
+      params.append('noEndDate', doc.config.noEndDate.toString());
+      
+      if (doc.config.showSalary) {
+        params.append('showSalary', 'true');
+        params.append('salaryType', doc.config.salaryType);
+        params.append('salaryAmount', doc.config.salaryAmount.toString());
+      } else {
+        params.append('showSalary', 'false');
+      }
+    } 
+    else if (doc.type === 'contrat' && doc.contractConfig) {
+      params.append('position', doc.config?.position || '');
+      params.append('startDate', doc.contractConfig.startDate);
+      params.append('contractType', doc.contractConfig.type);
+      params.append('salaryAmount', doc.contractConfig.baseSalary.toString());
+      
+      if (doc.contractConfig.endDate) {
+        params.append('endDate', doc.contractConfig.endDate);
+      }
+      
+      if (doc.contractConfig.trialPeriodEndDate) {
+        params.append('trialPeriodEndDate', doc.contractConfig.trialPeriodEndDate);
+      }
+      
+      params.append('isFullTime', doc.contractConfig.isFullTime.toString());
+      params.append('monthlyHours', doc.contractConfig.monthlyHours.toString());
     }
     
-    // URL de l'API avec tous les paramètres
-    const apiUrl = `/api/generate-pdf?${params.toString()}`;
-    
-    // Ouvrir dans un nouvel onglet
-    window.open(apiUrl, '_blank');
+    // Ouvrir le PDF dans un nouvel onglet
+    window.open(`/api/generate-pdf?${params.toString()}`, '_blank');
   };
 
-  // Générer une nouvelle attestation
+  // Générer une nouvelle attestation ou contrat
   const handleGenerateDocument = async (e: React.MouseEvent<HTMLButtonElement>) => {
     // Empêcher toute navigation par défaut
     if (e) e.preventDefault();
@@ -267,19 +330,40 @@ export default function DocumentsPage() {
       return;
     }
     
+    // Vérifier si l'employé a une date d'entrée définie
+    const employee = employees.find(emp => emp.id === selectedEmployee);
+    if (employee && !employee.startDate) {
+      toast({
+        variant: "warning",
+        title: "Attention",
+        description: "L'employé n'a pas de date d'entrée définie. Cela peut causer des problèmes pour les bulletins de paie."
+      });
+      
+      // Demander confirmation avant de continuer
+      if (!confirm("L'employé n'a pas de date d'entrée. Voulez-vous continuer quand même ou mettre à jour le profil de l'employé d'abord?")) {
+        // Rediriger vers la page de modification de l'employé
+        window.location.href = `/dashboard/employees/${selectedEmployee}/edit`;
+        return;
+      }
+    }
+    
     setIsGenerating(true);
     
     try {
       // Simuler la génération
       await new Promise(resolve => setTimeout(resolve, 1500));
       
-      const employee = employees.find(e => e.id === selectedEmployee);
+      const employee = employees.find(emp => emp.id === selectedEmployee);
       
       if (!employee) throw new Error("Employé non trouvé");
       
+      const company = companies.find(c => c.id === employee.companyId);
+      
+      if (!company) throw new Error("Entreprise non trouvée");
+      
       let title = '';
       if (documentType === 'attestation') title = 'Attestation de travail';
-      else if (documentType === 'contrat') title = 'Contrat de travail';
+      else if (documentType === 'contrat') title = `Contrat de travail - ${contractType}`;
       else title = 'Document';
       
       // Créer un nouveau document
@@ -291,8 +375,12 @@ export default function DocumentsPage() {
         employeeName: `${employee.firstName} ${employee.lastName}`,
         companyName: employee.company,
         status: 'generated',
-        pdfUrl: `/api/generate-pdf?id=doc-${Date.now()}&type=${documentType}`, // URL vers notre API
-        config: documentType === 'attestation' ? {
+        pdfUrl: `/api/generate-pdf?id=doc-${Date.now()}&type=${documentType}` // URL vers notre API
+      };
+      
+      // Ajouter la configuration spécifique selon le type de document
+      if (documentType === 'attestation') {
+        newDoc.config = {
           showSalary,
           salaryType,
           salaryAmount,
@@ -300,8 +388,22 @@ export default function DocumentsPage() {
           position,
           contractType,
           noEndDate
-        } : undefined
-      };
+        };
+      } else if (documentType === 'contrat') {
+        newDoc.contractConfig = {
+          employeeId: employee.id,
+          companyId: employee.companyId,
+          type: contractType as 'CDI' | 'CDD',
+          startDate,
+          endDate: endDate || undefined,
+          trialPeriodEndDate: trialPeriodEndDate || undefined,
+          isFullTime,
+          monthlyHours,
+          baseSalary: salaryAmount,
+          conventions,
+          specificClauses
+        };
+      }
       
       // Mettre à jour l'état local
       const updatedDocs = [newDoc, ...documents];
@@ -337,19 +439,6 @@ export default function DocumentsPage() {
     } finally {
       setIsGenerating(false);
     }
-  };
-
-  // Réinitialiser le formulaire
-  const resetForm = () => {
-    setSelectedEmployee("");
-    setShowSalary(false);
-    setSalaryType('monthly');
-    setSalaryAmount(0);
-    setPosition("");
-    setStartDate("");
-    setContractType("CDI");
-    setNoEndDate(true);
-    setDocumentType('attestation');
   };
 
   // Afficher un badge selon le statut du document
@@ -448,7 +537,7 @@ export default function DocumentsPage() {
 
       {/* Formulaire de création de document */}
       <Dialog open={openDialog} onOpenChange={setOpenDialog}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {documentType === 'attestation' ? 'Créer une attestation de travail' :
@@ -492,36 +581,59 @@ export default function DocumentsPage() {
 
             <Separator />
 
-            {documentType === 'attestation' && (
-              <>
-                <div className="space-y-2">
-                  <Label htmlFor="position">Poste occupé</Label>
-                  <Input 
-                    id="position" 
-                    value={position} 
+            {/* Contenu du dialogue selon le type de document */}
+            {documentType === 'attestation' ? (
+              <div className="grid gap-4 py-4">
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="employee" className="text-right">
+                    Employé
+                  </Label>
+                  <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
+                    <SelectTrigger className="col-span-3">
+                      <SelectValue placeholder="Sélectionner un employé" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {employees.map((employee) => (
+                        <SelectItem key={employee.id} value={employee.id}>
+                          {employee.firstName} {employee.lastName}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="position" className="text-right">
+                    Poste
+                  </Label>
+                  <Input
+                    id="position"
+                    className="col-span-3"
+                    value={position}
                     onChange={(e) => setPosition(e.target.value)}
-                    placeholder="Intitulé du poste"
                   />
                 </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="startDate">Date d&apos;entrée</Label>
-                  <Input 
-                    id="startDate" 
-                    type="date" 
-                    value={startDate} 
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="date" className="text-right">
+                    Date d&apos;entrée
+                  </Label>
+                  <Input
+                    id="date"
+                    type="date"
+                    className="col-span-3"
+                    value={startDate}
                     onChange={(e) => setStartDate(e.target.value)}
                   />
                 </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="contractType">Type de contrat</Label>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="contractType" className="text-right">
+                    Type de contrat
+                  </Label>
                   <Select
                     value={contractType}
                     onValueChange={setContractType}
                   >
-                    <SelectTrigger id="contractType">
-                      <SelectValue placeholder="Sélectionner le type de contrat" />
+                    <SelectTrigger className="col-span-3">
+                      <SelectValue placeholder="Type de contrat" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="CDI">CDI</SelectItem>
@@ -529,87 +641,226 @@ export default function DocumentsPage() {
                     </SelectContent>
                   </Select>
                 </div>
-
-                <div className="flex items-center space-x-2">
-                  <Checkbox 
-                    id="noEndDate" 
-                    checked={noEndDate}
-                    onCheckedChange={(checked) => setNoEndDate(checked as boolean)}
-                  />
-                  <label
-                    htmlFor="noEndDate"
-                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                  >
-                    Contrat en cours (sans date de fin)
-                  </label>
-                </div>
-
-                <Separator />
-
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="showSalary">Afficher le salaire</Label>
-                    <div className="text-[0.8rem] text-muted-foreground">
-                      Indiquer le salaire de l&apos;employé sur l&apos;attestation
-                    </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="showSalary" className="text-right">
+                    Afficher salaire
+                  </Label>
+                  <div className="col-span-3 flex items-center space-x-2">
+                    <Switch
+                      id="showSalary"
+                      checked={showSalary}
+                      onCheckedChange={setShowSalary}
+                    />
+                    <Label htmlFor="showSalary">
+                      {showSalary ? "Oui" : "Non"}
+                    </Label>
                   </div>
-                  <Switch
-                    id="showSalary"
-                    checked={showSalary}
-                    onCheckedChange={setShowSalary}
-                  />
                 </div>
-
+                
                 {showSalary && (
                   <>
-                    <div className="space-y-3">
-                      <Label>Type de salaire à afficher</Label>
-                      <RadioGroup 
-                        value={salaryType} 
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <Label htmlFor="salaryType" className="text-right">
+                        Type de salaire
+                      </Label>
+                      <Select
+                        value={salaryType}
                         onValueChange={(value) => setSalaryType(value as 'monthly' | 'annual')}
-                        className="flex flex-col space-y-1"
                       >
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="monthly" id="monthly" />
-                          <Label htmlFor="monthly">Salaire mensuel brut</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="annual" id="annual" />
-                          <Label htmlFor="annual">Salaire annuel brut</Label>
-                        </div>
-                      </RadioGroup>
+                        <SelectTrigger className="col-span-3">
+                          <SelectValue placeholder="Type de salaire" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="monthly">Mensuel</SelectItem>
+                          <SelectItem value="annual">Annuel</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="salaryAmount">
-                        Montant du salaire ({salaryType === 'monthly' ? 'mensuel' : 'annuel'}) en €
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <Label htmlFor="salaryAmount" className="text-right">
+                        Montant brut
                       </Label>
                       <Input
                         id="salaryAmount"
                         type="number"
-                        value={salaryAmount || ''}
-                        onChange={(e) => setSalaryAmount(Number(e.target.value))}
-                        placeholder="Montant en euros"
+                        className="col-span-3"
+                        value={salaryAmount}
+                        onChange={(e) => setSalaryAmount(parseFloat(e.target.value))}
                       />
                     </div>
                   </>
                 )}
-              </>
-            )}
-
-            {documentType === 'contrat' && (
-              <div className="flex items-center justify-center h-32 border rounded-md bg-muted/20">
-                <p className="text-muted-foreground text-sm">
-                  Configurez ici les détails spécifiques au contrat de travail
-                </p>
+                
+                {contractType === 'CDD' && (
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="noEndDate" className="text-right">
+                      Sans date de fin
+                    </Label>
+                    <div className="col-span-3 flex items-center space-x-2">
+                      <Switch
+                        id="noEndDate"
+                        checked={noEndDate}
+                        onCheckedChange={setNoEndDate}
+                      />
+                      <Label htmlFor="noEndDate">
+                        {noEndDate ? "Oui" : "Non"}
+                      </Label>
+                    </div>
+                  </div>
+                )}
               </div>
-            )}
-
-            {documentType === 'autre' && (
-              <div className="flex items-center justify-center h-32 border rounded-md bg-muted/20">
-                <p className="text-muted-foreground text-sm">
-                  Configurez ici les détails pour ce type de document
-                </p>
+            ) : documentType === 'contrat' ? (
+              <div className="grid gap-4 py-4">
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="employee" className="text-right">
+                    Employé
+                  </Label>
+                  <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
+                    <SelectTrigger className="col-span-3">
+                      <SelectValue placeholder="Sélectionner un employé" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {employees.map((employee) => (
+                        <SelectItem key={employee.id} value={employee.id}>
+                          {employee.firstName} {employee.lastName}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="position" className="text-right">
+                    Poste
+                  </Label>
+                  <Input
+                    id="position"
+                    className="col-span-3"
+                    value={position}
+                    onChange={(e) => setPosition(e.target.value)}
+                  />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="startDate" className="text-right">
+                    Date d&apos;entrée
+                  </Label>
+                  <Input
+                    id="startDate"
+                    type="date"
+                    className="col-span-3"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                  />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="contractType" className="text-right">
+                    Type de contrat
+                  </Label>
+                  <Select
+                    value={contractType}
+                    onValueChange={setContractType}
+                  >
+                    <SelectTrigger className="col-span-3">
+                      <SelectValue placeholder="Type de contrat" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="CDI">CDI</SelectItem>
+                      <SelectItem value="CDD">CDD</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                {contractType === 'CDD' && (
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="endDate" className="text-right">
+                      Date de fin
+                    </Label>
+                    <Input
+                      id="endDate"
+                      type="date"
+                      className="col-span-3"
+                      value={endDate}
+                      onChange={(e) => setEndDate(e.target.value)}
+                    />
+                  </div>
+                )}
+                
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="trialPeriodEndDate" className="text-right">
+                    Fin période d&apos;essai
+                  </Label>
+                  <Input
+                    id="trialPeriodEndDate"
+                    type="date"
+                    className="col-span-3"
+                    value={trialPeriodEndDate}
+                    onChange={(e) => setTrialPeriodEndDate(e.target.value)}
+                  />
+                </div>
+                
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="isFullTime" className="text-right">
+                    Temps plein
+                  </Label>
+                  <div className="col-span-3 flex items-center space-x-2">
+                    <Switch
+                      id="isFullTime"
+                      checked={isFullTime}
+                      onCheckedChange={setIsFullTime}
+                    />
+                    <Label htmlFor="isFullTime">
+                      {isFullTime ? "Oui" : "Non"}
+                    </Label>
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="monthlyHours" className="text-right">
+                    Heures mensuelles
+                  </Label>
+                  <Input
+                    id="monthlyHours"
+                    type="number"
+                    className="col-span-3"
+                    value={monthlyHours}
+                    onChange={(e) => setMonthlyHours(parseFloat(e.target.value))}
+                  />
+                </div>
+                
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="salaryAmount" className="text-right">
+                    Salaire brut mensuel
+                  </Label>
+                  <Input
+                    id="salaryAmount"
+                    type="number"
+                    className="col-span-3"
+                    value={salaryAmount}
+                    onChange={(e) => setSalaryAmount(parseFloat(e.target.value))}
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="grid gap-4 py-4">
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="employee" className="text-right">
+                    Employé
+                  </Label>
+                  <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
+                    <SelectTrigger className="col-span-3">
+                      <SelectValue placeholder="Sélectionner un employé" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {employees.map((employee) => (
+                        <SelectItem key={employee.id} value={employee.id}>
+                          {employee.firstName} {employee.lastName}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="py-2 text-center text-sm text-muted-foreground">
+                  Cette fonctionnalité est en développement...
+                </div>
               </div>
             )}
           </div>

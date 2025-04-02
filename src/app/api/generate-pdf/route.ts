@@ -1,25 +1,46 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { jsPDF } from 'jspdf';
 
-export async function GET(request: Request) {
+// Fonction utilitaire pour formater les dates
+function formatDate(dateString: string | null): string {
+  if (!dateString) return "Non spécifiée";
+  
   try {
-    // Récupérer les paramètres de l'URL
-    const url = new URL(request.url);
-    const id = url.searchParams.get('id') || 'unknown';
-    const type = url.searchParams.get('type') || 'document';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('fr-FR');
+  } catch (e) {
+    return dateString;
+  }
+}
+
+export async function GET(request: NextRequest) {
+  try {
+    // Récupérer les paramètres de la requête
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id') || 'unknown';
+    const type = searchParams.get('type') || 'document';
     
-    // Récupérer les données du document depuis localStorage côté client
-    // Dans une API réelle, nous récupérerions ces données depuis une base de données
-    // Pour cette démo, on reçoit les données via les paramètres d'URL
-    const employeeName = url.searchParams.get('employeeName') || '[Nom de l\'employé]';
-    const companyName = url.searchParams.get('companyName') || 'HelloPay';
-    const position = url.searchParams.get('position') || '[Poste]';
-    const startDate = url.searchParams.get('startDate') || '[Date]';
-    const contractType = url.searchParams.get('contractType') || 'CDI';
-    const showSalary = url.searchParams.get('showSalary') === 'true';
-    const salaryType = url.searchParams.get('salaryType') as 'monthly' | 'annual' || 'monthly';
-    const salaryAmount = Number(url.searchParams.get('salaryAmount')) || 0;
-    const noEndDate = url.searchParams.get('noEndDate') === 'true';
+    // Paramètres communs
+    const employeeName = searchParams.get('employeeName') || '[Nom de l\'employé]';
+    const companyName = searchParams.get('companyName') || 'HelloPay';
+    const position = searchParams.get('position') || '[Poste]';
+    const startDate = searchParams.get('startDate');
+    
+    // Paramètres pour les attestations
+    const showSalary = searchParams.get('showSalary') === 'true';
+    const salaryType = searchParams.get('salaryType') as 'monthly' | 'annual' || 'monthly';
+    const salaryAmount = Number(searchParams.get('salaryAmount')) || 0;
+    const contractType = searchParams.get('contractType') || 'CDI';
+    const noEndDate = searchParams.get('noEndDate') === 'true';
+    
+    // Paramètres supplémentaires pour les contrats
+    const endDate = searchParams.get('endDate');
+    const isFullTime = searchParams.get('isFullTime') === 'true';
+    const monthlyHours = searchParams.get('monthlyHours') ? 
+      Number(searchParams.get('monthlyHours')) : 151.67;
+    const trialPeriodEndDate = searchParams.get('trialPeriodEndDate');
+    
+    console.log(`Génération de PDF pour ${type} - ID: ${id}`);
     
     // Créer un nouveau document PDF
     const doc = new jsPDF();
@@ -72,28 +93,88 @@ export async function GET(request: Request) {
       doc.text("Signature et cachet de l'employeur", 150, 180);
     } 
     else if (type === 'contrat') {
-      // Contenu pour un contrat
+      // Titre
       doc.setFontSize(18);
       doc.setFont('helvetica', 'bold');
-      doc.text('CONTRAT DE TRAVAIL', 105, 20, { align: 'center' });
+      doc.text(`CONTRAT DE TRAVAIL - ${contractType}`, 105, 20, { align: 'center' });
       
-      // Ajoutez ici le contenu du contrat...
-      doc.setFontSize(12);
+      // En-tête 
+      doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
-      doc.text(`Contrat de travail - ${contractType}`, 20, 40);
-      doc.text("Entre les soussignés:", 20, 60);
-      doc.text(`La société ${companyName}`, 20, 70);
-      doc.text("Et", 20, 90);
-      doc.text(employeeName, 20, 100);
-      doc.text(`Il a été convenu un contrat de travail à durée ${contractType === 'CDI' ? 'indéterminée' : 'déterminée'} pour le poste de ${position}.`, 20, 120);
-      doc.text(`Date de début: ${formatDate(startDate)}`, 20, 140);
+      doc.text(`Établi le ${currentDate}`, 200, 30, { align: 'right' });
       
-      if (showSalary) {
-        const salaryText = salaryType === 'monthly' 
-          ? `Rémunération mensuelle brute: ${salaryAmount.toLocaleString()} euros` 
-          : `Rémunération annuelle brute: ${salaryAmount.toLocaleString()} euros`;
-        doc.text(salaryText, 20, 160);
+      // Informations entreprise
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.text("ENTRE LES SOUSSIGNÉS", 20, 40);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`${companyName}`, 20, 50);
+      doc.text("123 Avenue de la République, 75011 Paris", 20, 55);
+      doc.text("SIRET: 123 456 789 00012", 20, 60);
+      doc.text("Représentée par Jean Dupont, en qualité de Directeur", 20, 65);
+      doc.text("Ci-après dénommée \"l'employeur\"", 20, 70);
+      
+      doc.text("ET", 105, 80, { align: 'center' });
+      
+      // Informations employé
+      doc.text(`${employeeName}`, 20, 90);
+      doc.text("Demeurant à [Adresse de l'employé]", 20, 95);
+      doc.text("Ci-après dénommé(e) \"le salarié\"", 20, 100);
+      
+      // Clauses du contrat
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.text("IL A ÉTÉ CONVENU CE QUI SUIT :", 20, 115);
+      
+      // Article 1: Engagement
+      doc.setFont('helvetica', 'bold');
+      doc.text("Article 1 - Engagement", 20, 125);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Le salarié est engagé en qualité de ${position} à compter du ${formatDate(startDate)}, `, 20, 130);
+      doc.text(`sous réserve des résultats de la visite médicale d'embauche.`, 20, 135);
+      
+      // Article 2: Durée du contrat
+      doc.setFont('helvetica', 'bold');
+      doc.text("Article 2 - Durée du contrat", 20, 145);
+      doc.setFont('helvetica', 'normal');
+      if (contractType === 'CDI') {
+        doc.text("Le présent contrat est conclu pour une durée indéterminée.", 20, 150);
+      } else {
+        doc.text(`Le présent contrat est conclu pour une durée déterminée ${endDate ? `jusqu'au ${formatDate(endDate)}` : 'selon accord'}.`, 20, 150);
+        doc.text("Il prendra fin à cette date sans qu'il soit nécessaire de donner un préavis.", 20, 155);
       }
+      
+      // Article 3: Période d'essai
+      doc.setFont('helvetica', 'bold');
+      doc.text("Article 3 - Période d'essai", 20, 165);
+      doc.setFont('helvetica', 'normal');
+      if (trialPeriodEndDate) {
+        doc.text(`Le présent contrat est soumis à une période d'essai qui prendra fin le ${formatDate(trialPeriodEndDate)}.`, 20, 170);
+      } else {
+        doc.text("Le présent contrat est soumis à une période d'essai conformément à la convention collective.", 20, 170);
+      }
+      doc.text("Durant cette période, chacune des parties pourra rompre le contrat sans indemnité.", 20, 175);
+      
+      // Article 4: Durée du travail
+      doc.setFont('helvetica', 'bold');
+      doc.text("Article 4 - Durée du travail", 20, 185);
+      doc.setFont('helvetica', 'normal');
+      if (isFullTime) {
+        doc.text(`Le salarié est engagé à temps plein pour une durée mensuelle de ${monthlyHours} heures.`, 20, 190);
+      } else {
+        doc.text(`Le salarié est engagé à temps partiel pour une durée mensuelle de ${monthlyHours} heures.`, 20, 190);
+      }
+      
+      // Article 5: Rémunération
+      doc.setFont('helvetica', 'bold');
+      doc.text("Article 5 - Rémunération", 20, 200);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`La rémunération mensuelle brute du salarié est fixée à ${salaryAmount.toLocaleString()} euros.`, 20, 205);
+      
+      // Signature
+      doc.text("Fait en deux exemplaires à Paris, le " + currentDate, 20, 235);
+      doc.text("Signature du salarié", 20, 250);
+      doc.text("Signature de l'employeur", 120, 250);
     }
     else {
       // Document générique
@@ -122,28 +203,11 @@ export async function GET(request: Request) {
         'Content-Disposition': `inline; filename="${type}_${id}.pdf"`
       },
     });
-    
   } catch (error) {
-    console.error("Erreur lors de la génération du PDF:", error);
+    console.error('Erreur lors de la génération du PDF:', error);
     return NextResponse.json(
-      { error: "Erreur lors de la génération du PDF" },
+      { error: 'Erreur lors de la génération du PDF' },
       { status: 500 }
     );
-  }
-}
-
-// Fonction utilitaire pour formater les dates
-function formatDate(dateString: string): string {
-  if (!dateString || dateString === '[Date]') return dateString;
-  
-  try {
-    const date = new Date(dateString);
-    return new Intl.DateTimeFormat('fr-FR', {
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric'
-    }).format(date);
-  } catch {
-    return dateString;
   }
 } 
