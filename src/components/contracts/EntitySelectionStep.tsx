@@ -15,11 +15,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/components/ui/use-toast";
-import { PlusCircle, Search, Building, User } from "lucide-react";
+import { PlusCircle, Building, User } from "lucide-react";
 import { ContractData } from "./ContractData";
 import { v4 as uuidv4 } from "uuid";
 import { db } from "@/lib/firebase";
-import { collection, getDocs, addDoc, query, where, serverTimestamp } from "firebase/firestore";
+import { collection, getDocs, addDoc, serverTimestamp } from "firebase/firestore";
 
 interface Company {
   id: string;
@@ -173,13 +173,6 @@ export function EntitySelectionStep({
     (emp) => emp.companyId === selectedCompanyId
   );
   
-  // Debug pour voir les données
-  useEffect(() => {
-    console.log("Employés chargés:", employees);
-    console.log("Entreprise sélectionnée:", selectedCompanyId);
-    console.log("Employés filtrés:", filteredEmployees);
-  }, [employees, filteredEmployees, selectedCompanyId]);
-
   // Mise à jour des données de contrat lorsque l'entreprise change
   useEffect(() => {
     if (selectedCompanyId) {
@@ -404,55 +397,6 @@ export function EntitySelectionStep({
       return !!selectedCompanyId && (!!selectedEmployeeId || isCounterparty);
     } else {
       return isCounterparty && !!counterparty.name;
-    }
-  };
-
-  // Fonction de test pour créer des données fictives
-  const createTestData = async () => {
-    try {
-      // Créer une entreprise test
-      const testCompanyData = {
-        name: "Entreprise Test",
-        siret: "12345678901234",
-        address: "123 rue de Test",
-        postalCode: "75000",
-        city: "Paris",
-        country: "France",
-        createdAt: serverTimestamp()
-      };
-      
-      console.log("Tentative de création d'entreprise test:", testCompanyData);
-      const companyRef = await addDoc(collection(db, 'companies'), testCompanyData);
-      console.log("Entreprise test créée avec ID:", companyRef.id);
-      
-      // Créer un employé test lié à cette entreprise
-      const testEmployeeData = {
-        firstName: "Prénom",
-        lastName: "Nom",
-        position: "Testeur",
-        email: "test@example.com",
-        companyId: companyRef.id,
-        createdAt: serverTimestamp()
-      };
-      
-      console.log("Tentative de création d'employé test:", testEmployeeData);
-      const employeeRef = await addDoc(collection(db, 'employees'), testEmployeeData);
-      console.log("Employé test créé avec ID:", employeeRef.id);
-      
-      // Rafraîchir les données
-      fetchData();
-      
-      toast({
-        title: "Données de test créées",
-        description: "Une entreprise et un employé de test ont été créés."
-      });
-    } catch (error) {
-      console.error("Erreur lors de la création des données de test:", error);
-      toast({
-        title: "Erreur",
-        description: "Impossible de créer les données de test.",
-        variant: "destructive"
-      });
     }
   };
 
@@ -840,16 +784,6 @@ export function EntitySelectionStep({
           disabled={!canProceed()}
         >
           Suivant
-        </Button>
-      </div>
-
-      {/* Bouton de test pour créer des données de test */}
-      <div className="flex justify-center mt-8 pt-4 border-t">
-        <Button 
-          variant="outline" 
-          onClick={createTestData}
-        >
-          Créer des données de test
         </Button>
       </div>
     </div>
