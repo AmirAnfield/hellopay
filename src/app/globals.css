@@ -4,48 +4,85 @@
 
 @layer base {
   :root {
+    /* Mode clair */
     --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --foreground: 220 3% 15%;
+    
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 220 3% 15%;
+    
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 221.2 83.2% 53.3%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 221.2 83.2% 53.3%;
+    --popover-foreground: 220 3% 15%;
+    
+    --primary: 222 47% 31%;
+    --primary-foreground: 0 0% 100%;
+    
+    --secondary: 210 20% 96%;
+    --secondary-foreground: 220 3% 15%;
+    
+    --muted: 210 20% 96%;
+    --muted-foreground: 220 5% 46%;
+    
+    --accent: 210 20% 96%;
+    --accent-foreground: 220 3% 15%;
+    
+    --destructive: 0 84% 50%;
+    --destructive-foreground: 0 0% 100%;
+    
+    --success: 142 72% 29%;
+    --success-foreground: 0 0% 100%;
+    
+    --warning: 35 100% 50%;
+    --warning-foreground: 220 3% 15%;
+    
+    --info: 214 100% 48%;
+    --info-foreground: 0 0% 100%;
+    
+    --border: 214 20% 91%;
+    --input: 214 20% 91%;
+    --ring: 222 47% 31%;
+    
     --radius: 0.5rem;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 224.3 76.3% 48%;
+    /* Mode sombre - avec la palette fournie */
+    --background: 220 5% 13%; /* 1E1F22 - Couleur la plus sombre pour le fond */
+    --foreground: 220 5% 83%; /* D0D1D5 - Couleur claire pour le texte */
+    
+    --card: 210 5% 16%; /* 2C2D30 - Couleur intermédiaire pour les cartes */
+    --card-foreground: 220 5% 83%; /* D0D1D5 - Texte clair */
+    
+    --popover: 210 5% 16%; /* 2C2D30 - Même couleur que les cartes pour cohérence */
+    --popover-foreground: 220 5% 83%; /* D0D1D5 */
+    
+    --primary: 217 91% 60%; /* Bleu principal - gardé pour contraste et identité visuelle */
+    --primary-foreground: 220 5% 13%; /* Texte sombre sur bouton principal */
+    
+    --secondary: 220 5% 25%; /* Version plus claire de 3B3F41 pour éléments secondaires */
+    --secondary-foreground: 220 5% 83%; /* D0D1D5 */
+    
+    --muted: 220 5% 20%; /* Entre 2C2D30 et 3B3F41 */
+    --muted-foreground: 220 5% 70%; /* Version atténuée de D0D1D5 */
+    
+    --accent: 220 5% 25%; /* Cohérent avec secondary */
+    --accent-foreground: 220 5% 83%; /* D0D1D5 */
+    
+    --destructive: 0 84% 50%; /* Rouge pour les actions destructives */
+    --destructive-foreground: 0 0% 100%; /* Blanc */
+    
+    --success: 142 72% 29%; /* Vert pour les actions réussies */
+    --success-foreground: 0 0% 100%; /* Blanc */
+    
+    --warning: 35 90% 50%; /* Jaune pour les avertissements */
+    --warning-foreground: 220 5% 13%; /* Texte sombre pour contraste */
+    
+    --info: 214 90% 48%; /* Bleu information */
+    --info-foreground: 0 0% 100%; /* Blanc */
+    
+    --border: 220 5% 22%; /* Entre 1E1F22 et 2C2D30 */
+    --input: 220 5% 22%; /* Cohérent avec border */
+    --ring: 217 91% 60%; /* Même que primary */
   }
 }
 
@@ -55,19 +92,38 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
   }
+}
+
+/* Transitions douces */
+.transition-all {
+  transition-property: all;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 200ms;
+}
+
+/* Focus amélioré pour tous les éléments interactifs */
+:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
 }
 
 /* Styles pour les formulaires */
 input:focus, select:focus, textarea:focus {
   outline: none;
-  ring-color: #3b82f6;
+  ring-color: hsl(var(--ring));
   ring-width: 2px;
 }
 
 /* Transition douce pour les boutons et éléments interactifs */
 button, a, input, select, textarea, .hover-effect {
-  transition: all 0.2s ease-in-out;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Styles élégants pour les boutons */
+.btn-elevated {
+  @apply shadow-soft hover:shadow-elevation-2 transition-all;
 }
 
 /* Styles généraux pour les tableaux */
@@ -79,6 +135,10 @@ table {
 th {
   text-align: left;
   font-weight: 500;
+}
+
+tbody tr {
+  @apply border-b border-border/40;
 }
 
 tbody tr:hover {
@@ -117,9 +177,68 @@ tbody tr:hover {
   animation: spin 1s linear infinite;
 }
 
+/* Animation de fade-in */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.fade-in {
+  animation: fadeIn 0.3s ease-in;
+}
+
+/* Animation de slide-in */
+@keyframes slideInFromRight {
+  from {
+    transform: translateX(1rem);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.slide-in-right {
+  animation: slideInFromRight 0.3s ease-out;
+}
+
+/* Animation pour le carrousel de témoignages */
+@keyframes testimonialScroll {
+  0% {
+    transform: translateX(0);
+  }
+  40% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(-100%);
+  }
+  90% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+
+.animate-testimonials {
+  animation: testimonialScroll 15s infinite ease-in-out;
+}
+
+/* Styles pour les cards */
+.card-hover {
+  @apply transition-all border border-border bg-card shadow-soft hover:shadow-elevation-2;
+}
+
+/* Styles spécifiques pour les fiches de paie */
 @layer components {
   .payslip-section {
-    @apply mb-4 p-4 border rounded-md;
+    @apply mb-4 p-4 border rounded-md shadow-soft;
   }
 
   .payslip-header {
@@ -167,7 +286,7 @@ tbody tr:hover {
   }
 
   .summary-box {
-    @apply border rounded-md p-3 text-center;
+    @apply border rounded-md p-3 text-center shadow-soft;
   }
 
   .summary-title {
@@ -195,4 +314,12 @@ tbody tr:hover {
   .payslip-container {
     @apply p-0 m-0 max-w-full;
   }
+}
+
+/* Ajout d'une transition douce entre les thèmes */
+.theme-transition,
+.theme-transition * {
+  transition-property: background-color, border-color, color, fill, stroke !important;
+  transition-duration: 300ms !important;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1) !important;
 } 

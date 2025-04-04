@@ -22,7 +22,7 @@ export default function DashboardLayout({
           <SideNav 
             links={[
               {
-                title: "Tableau de bord",
+                title: "Hub",
                 href: "/dashboard",
                 icon: "home",
               },
@@ -64,19 +64,9 @@ export default function DashboardLayout({
                 icon: "settings",
               },
               {
-                title: "Diagnostics",
-                href: "/dashboard/diagnostics",
-                icon: "list",
-              },
-              {
-                title: "Test du workflow",
-                href: "/workflow-test",
-                icon: "list",
-              },
-              {
-                title: "Test Firebase",
-                href: "/test-firebase",
-                icon: "file",
+                title: "Archives",
+                href: "/dashboard/archives",
+                icon: "archive",
               },
             ]}
           />

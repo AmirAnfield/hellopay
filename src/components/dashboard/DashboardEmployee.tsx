@@ -32,6 +32,8 @@ import {
 } from "@/components/shared/PageContainer";
 import { DeleteConfirmationDialog } from "@/components/shared/ConfirmationDialog";
 import { TableLoader } from "@/components/shared/SkeletonLoader";
+import { collection, getDocs, getDoc, doc, deleteDoc, query, where } from "firebase/firestore";
+import { firestore, auth } from "@/lib/firebase/config";
 
 // Type pour représenter un bulletin de paie
 interface Payslip {
@@ -90,27 +92,52 @@ export default function DashboardEmployee({ companyId }: DashboardEmployeeProps)
   const currentCompanyId = companyId || searchParams.get('companyId') || undefined;
 
   useEffect(() => {
-    fetchEmployees();
-
-    // Si un ID d'entreprise est fourni, récupérer les détails de l'entreprise
-    if (currentCompanyId) {
-      fetchCompanyDetails(currentCompanyId);
-    }
-  }, [currentCompanyId]);
+    const checkAuthAndFetchData = () => {
+      if (!auth.currentUser) {
+        const unsubscribe = auth.onAuthStateChanged((user) => {
+          if (user) {
+            fetchEmployees(user.uid);
+            // Si un ID d'entreprise est fourni, récupérer les détails de l'entreprise
+            if (currentCompanyId) {
+              fetchCompanyDetails(user.uid, currentCompanyId);
+            }
+          } else {
+            setIsLoading(false);
+            setError("Vous devez être connecté pour accéder à cette fonctionnalité.");
+            toast({
+              variant: "destructive",
+              title: "Erreur d'authentification",
+              description: "Vous devez être connecté pour accéder à cette fonctionnalité."
+            });
+          }
+          unsubscribe();
+        });
+      } else {
+        fetchEmployees(auth.currentUser.uid);
+        // Si un ID d'entreprise est fourni, récupérer les détails de l'entreprise
+        if (currentCompanyId) {
+          fetchCompanyDetails(auth.currentUser.uid, currentCompanyId);
+        }
+      }
+    };
+    
+    checkAuthAndFetchData();
+  }, [currentCompanyId, toast]);
 
   // Fonction pour récupérer les détails d'une entreprise
-  async function fetchCompanyDetails(id: string) {
+  async function fetchCompanyDetails(userId: string, companyId: string) {
     try {
-      const response = await fetch(`/api/companies/${id}`);
-      if (!response.ok) {
-        throw new Error("Erreur lors de la récupération des détails de l'entreprise");
-      }
-      const data = await response.json();
-      if (data.company) {
+      const companyRef = doc(firestore, `users/${userId}/companies`, companyId);
+      const companySnap = await getDoc(companyRef);
+      
+      if (companySnap.exists()) {
+        const companyData = companySnap.data();
         setCompany({
-          id: data.company.id,
-          name: data.company.name
+          id: companySnap.id,
+          name: companyData.name || companyData.raisonSociale || "Sans nom"
         });
+      } else {
+        console.error("Entreprise non trouvée");
       }
     } catch (err) {
       console.error("Erreur:", err);
@@ -118,19 +145,97 @@ export default function DashboardEmployee({ companyId }: DashboardEmployeeProps)
   }
 
   // Fonction pour récupérer les employés
-  async function fetchEmployees() {
+  async function fetchEmployees(userId: string) {
     setIsLoading(true);
     try {
-      const url = currentCompanyId 
-        ? `/api/employees?companyId=${currentCompanyId}`
-        : "/api/employees";
+      let employeesRef;
       
-      const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error("Erreur lors de la récupération des employés");
+      if (currentCompanyId) {
+        // Récupérer les employés d'une entreprise spécifique
+        employeesRef = query(
+          collection(firestore, `users/${userId}/employees`),
+          where("companyId", "==", currentCompanyId)
+        );
+      } else {
+        // Récupérer tous les employés
+        employeesRef = collection(firestore, `users/${userId}/employees`);
       }
-      const data = await response.json();
-      setEmployees(data.employees || []);
+      
+      const employeesSnapshot = await getDocs(employeesRef);
+      
+      if (employeesSnapshot.empty) {
+        setEmployees([]);
+      } else {
+        const employeesData: Employee[] = [];
+        const companies = new Map<string, { id: string; name: string }>();
+        
+        // Première passe pour récupérer les employés
+        employeesSnapshot.forEach((doc) => {
+          const data = doc.data();
+          
+          if (data.companyId && !companies.has(data.companyId)) {
+            companies.set(data.companyId, { id: data.companyId, name: "" });
+          }
+          
+          employeesData.push({
+            id: doc.id,
+            firstName: data.firstName || "",
+            lastName: data.lastName || "",
+            address: data.address || "",
+            city: data.city || "",
+            postalCode: data.postalCode || "",
+            country: data.country || "France",
+            email: data.email || "",
+            phoneNumber: data.phoneNumber || "",
+            birthDate: data.birthDate || "",
+            birthPlace: data.birthPlace || "",
+            nationality: data.nationality || "",
+            socialSecurityNumber: data.socialSecurityNumber || "",
+            position: data.position || "",
+            department: data.department || "",
+            contractType: data.contractType || "CDI",
+            isExecutive: data.isExecutive || false,
+            startDate: data.startDate || new Date().toISOString(),
+            endDate: data.endDate || "",
+            hourlyRate: data.hourlyRate || 0,
+            monthlyHours: data.monthlyHours || 0,
+            baseSalary: data.baseSalary || 0,
+            createdAt: data.createdAt || new Date().toISOString(),
+            companyId: data.companyId || "",
+            payslips: data.payslips || []
+          });
+        });
+        
+        // Deuxième passe pour charger les noms des entreprises si nécessaire
+        if (!currentCompanyId && companies.size > 0) {
+          await Promise.all(Array.from(companies.keys()).map(async (companyId) => {
+            try {
+              const companyRef = doc(firestore, `users/${userId}/companies`, companyId);
+              const companySnapshot = await getDoc(companyRef);
+              
+              if (companySnapshot.exists()) {
+                const companyData = companySnapshot.data();
+                companies.set(companyId, {
+                  id: companyId,
+                  name: companyData.name || companyData.raisonSociale || "Sans nom"
+                });
+              }
+            } catch (err) {
+              console.error(`Erreur lors de la récupération de l'entreprise ${companyId}:`, err);
+            }
+          }));
+          
+          // Associer les entreprises aux employés
+          employeesData.forEach(employee => {
+            if (employee.companyId && companies.has(employee.companyId)) {
+              employee.company = companies.get(employee.companyId);
+            }
+          });
+        }
+        
+        setEmployees(employeesData);
+      }
+      
       setError(null);
     } catch (err) {
       console.error("Erreur:", err);
@@ -148,14 +253,13 @@ export default function DashboardEmployee({ companyId }: DashboardEmployeeProps)
   // Fonction pour supprimer un employé
   async function deleteEmployee(id: string) {
     try {
-      const response = await fetch(`/api/employees/${id}`, {
-        method: "DELETE",
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Erreur lors de la suppression de l'employé");
+      if (!auth.currentUser) {
+        throw new Error("Vous devez être connecté pour effectuer cette action");
       }
+      
+      const userId = auth.currentUser.uid;
+      const employeeRef = doc(firestore, `users/${userId}/employees`, id);
+      await deleteDoc(employeeRef);
 
       // Mettre à jour la liste locale
       setEmployees(employees.filter(employee => employee.id !== id));
@@ -224,7 +328,11 @@ export default function DashboardEmployee({ companyId }: DashboardEmployeeProps)
         title="Erreur de chargement"
         description={error}
         icon={AlertCircle}
-        action={<Button onClick={fetchEmployees}>Réessayer</Button>}
+        action={<Button onClick={() => {
+          if (auth.currentUser) {
+            fetchEmployees(auth.currentUser.uid);
+          }
+        }}>Réessayer</Button>}
       />
     );
   }

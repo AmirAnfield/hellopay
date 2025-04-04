@@ -13,7 +13,8 @@ import {
   List, 
   FileText, 
   Award, 
-  Settings 
+  Settings,
+  Archive
 } from "lucide-react";
 
 interface NavLink {
@@ -53,6 +54,7 @@ export function SideNav({ links }: SideNavProps) {
       case "file-text": return <FileText className={className} />;
       case "badge": return <Award className={className} />;
       case "settings": return <Settings className={className} />;
+      case "archive": return <Archive className={className} />;
       default: return null;
     }
   };

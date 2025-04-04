@@ -141,7 +141,7 @@ export default function CertificatesPage() {
         return <Badge variant="outline">{status}</Badge>;
     }
   };
-
+  
   return (
     <PageContainer>
       <PageHeader 
@@ -223,7 +223,7 @@ export default function CertificatesPage() {
                             <Download className="h-4 w-4" />
                           </Button>
                         )}
-                      </div>
+    </div>
                     </TableCell>
                   </TableRow>
                 ))}

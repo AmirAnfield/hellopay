@@ -4,6 +4,7 @@ import { ReactNode } from "react";
 import { Toaster } from "sonner";
 import { AuthProvider } from "@/hooks/useAuth";
 import { ThemeProvider } from "@/components/theme-provider";
+import { NotificationProvider } from "@/components/ui/notification-bar";
 
 interface ProvidersProps {
   children: ReactNode;
@@ -22,8 +23,10 @@ export function Providers({ children }: ProvidersProps) {
       disableTransitionOnChange
     >
       <AuthProvider>
-        <Toaster position="top-right" closeButton richColors />
-        {children}
+        <NotificationProvider>
+          <Toaster position="top-right" closeButton richColors />
+          {children}
+        </NotificationProvider>
       </AuthProvider>
     </ThemeProvider>
   );

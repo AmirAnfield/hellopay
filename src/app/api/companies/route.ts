@@ -1,22 +1,10 @@
 import { NextResponse } from 'next/server';
 
 export async function GET() {
-  // Simuler un délai réseau
-  await new Promise(resolve => setTimeout(resolve, 300));
-  
-  try {
-    // Dans un environnement serveur, nous n'avons pas accès au localStorage
-    // Cette solution est temporaire pour la démonstration 
-    // En production, nous utiliserions une vraie base de données
-    
-    // Renvoyer une réponse avec un tableau vide qui sera remplacé par les données du côté client
-    return NextResponse.json({ 
-      companies: [] 
-    });
-  } catch (error) {
-    return NextResponse.json(
-      { error: "Impossible de récupérer les données des entreprises" },
-      { status: 500 }
-    );
-  }
+  // Cette API n'est plus utilisée.
+  // Les données sont récupérées directement dans le composant depuis Firebase.
+  return NextResponse.json({
+    success: false,
+    message: "Cette API n'est plus utilisée. Les données sont récupérées directement dans le composant."
+  });
 } 

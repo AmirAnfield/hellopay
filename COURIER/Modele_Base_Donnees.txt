@@ -1,1 +1,0 @@
-Structure relationnelle recommandée (Entreprise, Salarié, Contrat, Bulletin, LigneBulletin, Rubrique, Cumul, etc.).

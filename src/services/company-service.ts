@@ -1,16 +1,16 @@
-import { auth } from '@/lib/firebase';
-import { getDocument, getDocuments, deleteDocument, updateDocument } from './firestore-service';
+import { auth, db } from '@/lib/firebase';
+import { collection, doc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, serverTimestamp, addDoc } from 'firebase/firestore';
 import { companyValidationSchema } from '@/schemas/validation-schemas';
 import { validateOrThrow, sanitizeData } from '@/lib/utils/firestore-validation';
 
-// Type pour les entreprises (compatible avec l'existant)
+// Type pour les entreprises
 export interface Company {
   id: string;
   name: string;
   siret: string;
   address: string;
-  city: string;
   postalCode: string;
+  city: string;
   country: string;
   activityCode?: string;
   urssafNumber?: string;
@@ -19,14 +19,11 @@ export interface Company {
   phoneNumber?: string;
   email?: string;
   website?: string;
-  iban?: string;
-  bic?: string;
   legalRepresentative?: string;
   legalRepresentativeRole?: string;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: any;
+  updatedAt: any;
   ownerId: string;
-  employeeCount?: number;
 }
 
 // Type pour la création/mise à jour d'une entreprise
@@ -46,27 +43,52 @@ export interface CompanyInput {
 }
 
 /**
- * Obtenir toutes les entreprises de l'utilisateur
+ * Récupérer toutes les entreprises de l'utilisateur courant
  */
-export async function getUserCompanies(): Promise<Company[]> {
-  if (!auth.currentUser) {
-    throw new Error("Utilisateur non authentifié");
+export async function getCompanies(): Promise<Company[]> {
+  try {
+    if (!auth.currentUser) {
+      throw new Error("Utilisateur non authentifié");
+    }
+
+    const userId = auth.currentUser.uid;
+    const companiesRef = collection(db, `users/${userId}/companies`);
+    const querySnapshot = await getDocs(companiesRef);
+    
+    const companies: Company[] = [];
+    querySnapshot.forEach((doc) => {
+      companies.push({ id: doc.id, ...doc.data() } as Company);
+    });
+    
+    return companies;
+  } catch (error) {
+    console.error("Erreur lors de la récupération des entreprises:", error);
+    throw new Error("Impossible de récupérer vos entreprises. Veuillez réessayer.");
   }
-  
-  return getDocuments<Company>(`users/${auth.currentUser.uid}/companies`, {
-    orderBy: [{ field: 'name' }]
-  });
 }
 
 /**
- * Obtenir une entreprise par son ID
+ * Récupérer une entreprise par son ID
  */
 export async function getCompany(companyId: string): Promise<Company | null> {
-  if (!auth.currentUser) {
-    throw new Error("Utilisateur non authentifié");
+  try {
+    if (!auth.currentUser) {
+      throw new Error("Utilisateur non authentifié");
+    }
+
+    const userId = auth.currentUser.uid;
+    const companyDoc = doc(db, `users/${userId}/companies/${companyId}`);
+    const companySnapshot = await getDoc(companyDoc);
+    
+    if (companySnapshot.exists()) {
+      return { id: companySnapshot.id, ...companySnapshot.data() } as Company;
+    }
+    
+    return null;
+  } catch (error) {
+    console.error("Erreur lors de la récupération de l'entreprise:", error);
+    throw new Error("Impossible de récupérer l'entreprise. Veuillez réessayer.");
   }
-  
-  return getDocument<Company>(`users/${auth.currentUser.uid}/companies`, companyId);
 }
 
 /**
@@ -74,58 +96,26 @@ export async function getCompany(companyId: string): Promise<Company | null> {
  */
 export async function createCompany(companyData: Partial<Company>): Promise<string> {
   try {
-    console.log("Données reçues pour création d'entreprise:", companyData);
+    if (!auth.currentUser) {
+      throw new Error("Utilisateur non authentifié");
+    }
 
-    // Vérifier l'authentification, mais continuer même en cas d'erreur
-    const userId = auth.currentUser?.uid || "demo-user-id";
+    const userId = auth.currentUser.uid;
     
-    // Générer un ID unique pour cette entreprise (en situation réelle, cela viendrait de Firestore)
-    const companyId = `company-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
-    
-    // Simuler un délai d'appel API
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // Préparation des données
+    // Préparer les données de l'entreprise
     const data = {
       ...companyData,
-      id: companyId,
-      ownerId: userId,
-      createdAt: new Date(),
-      updatedAt: new Date()
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+      ownerId: userId
     };
     
-    // En environnement de développement, on peut stocker en localStorage pour simuler
-    if (typeof window !== 'undefined') {
-      try {
-        // Récupérer les entreprises existantes ou créer un tableau vide
-        let existingCompanies = [];
-        try {
-          const companiesStr = localStorage.getItem('companies');
-          existingCompanies = companiesStr ? JSON.parse(companiesStr) : [];
-          console.log("Entreprises existantes récupérées:", existingCompanies.length);
-        } catch (e) {
-          console.warn("Erreur lors de la récupération des entreprises existantes:", e);
-          existingCompanies = [];
-        }
-        
-        // Ajouter la nouvelle entreprise
-        existingCompanies.push(data);
-        console.log("Nouvelle entreprise ajoutée, total:", existingCompanies.length);
-        
-        // Sauvegarder dans localStorage
-        localStorage.setItem('companies', JSON.stringify(existingCompanies));
-        
-        // Vérifier que la sauvegarde a fonctionné
-        const verificationStr = localStorage.getItem('companies');
-        const verification = verificationStr ? JSON.parse(verificationStr) : [];
-        console.log("Vérification après sauvegarde:", verification.length, "entreprises");
-      } catch (e) {
-        console.error("Impossible de stocker l'entreprise dans localStorage:", e);
-      }
-    }
+    // Créer un document dans la collection des entreprises de l'utilisateur
+    const companiesRef = collection(db, `users/${userId}/companies`);
+    const docRef = await addDoc(companiesRef, data);
     
-    console.log("Entreprise créée avec succès (mode simulation):", companyId);
-    return companyId;
+    console.log("Entreprise créée avec succès:", docRef.id);
+    return docRef.id;
   } catch (error) {
     console.error("Erreur lors de la création de l'entreprise:", error);
     throw new Error("Impossible de créer l'entreprise. Veuillez vérifier les informations et réessayer.");
@@ -135,71 +125,49 @@ export async function createCompany(companyData: Partial<Company>): Promise<stri
 /**
  * Mettre à jour une entreprise existante
  */
-export async function updateCompany(companyId: string, companyData: Partial<CompanyInput>): Promise<void> {
-  if (!auth.currentUser) {
-    throw new Error("Utilisateur non authentifié");
-  }
-  
-  // Récupérer l'entreprise existante pour vérification
-  const existingCompany = await getCompany(companyId);
-  if (!existingCompany) {
-    throw new Error("Entreprise non trouvée");
-  }
-  
-  // Si le SIRET est modifié, vérifier qu'il n'existe pas déjà
-  if (companyData.siret && companyData.siret !== existingCompany.siret) {
-    // Valider le siret
-    validateOrThrow({ siret: companyData.siret }, { siret: companyValidationSchema.siret });
-    
-    const existingCompanies = await getDocuments<Company>(`users/${auth.currentUser.uid}/companies`, {
-      where: [
-        { field: 'siret', operator: '==', value: companyData.siret },
-        { field: 'id', operator: '!=', value: companyId }
-      ]
-    });
-    
-    if (existingCompanies.length > 0) {
-      throw new Error(`Une entreprise avec le SIRET ${companyData.siret} existe déjà`);
+export async function updateCompany(companyId: string, companyData: Partial<Company>): Promise<void> {
+  try {
+    if (!auth.currentUser) {
+      throw new Error("Utilisateur non authentifié");
     }
+
+    const userId = auth.currentUser.uid;
+    
+    // Préparer les données à mettre à jour
+    const data = {
+      ...companyData,
+      updatedAt: serverTimestamp()
+    };
+    
+    // Mettre à jour le document
+    const companyDoc = doc(db, `users/${userId}/companies/${companyId}`);
+    await updateDoc(companyDoc, data);
+    
+    console.log("Entreprise mise à jour avec succès:", companyId);
+  } catch (error) {
+    console.error("Erreur lors de la mise à jour de l'entreprise:", error);
+    throw new Error("Impossible de mettre à jour l'entreprise. Veuillez réessayer.");
   }
-  
-  // Valider les données avec le schéma
-  validateOrThrow(companyData, companyValidationSchema);
-  
-  // Nettoyer les données selon le schéma
-  const sanitizedData = sanitizeData(companyData, companyValidationSchema);
-  
-  // Mettre à jour l'entreprise dans Firestore
-  await updateDocument(`users/${auth.currentUser.uid}/companies`, companyId, sanitizedData);
 }
 
 /**
  * Supprimer une entreprise
  */
 export async function deleteCompany(companyId: string): Promise<void> {
-  if (!auth.currentUser) {
-    throw new Error("Utilisateur non authentifié");
+  try {
+    if (!auth.currentUser) {
+      throw new Error("Utilisateur non authentifié");
+    }
+
+    const userId = auth.currentUser.uid;
+    
+    // Supprimer le document
+    const companyDoc = doc(db, `users/${userId}/companies/${companyId}`);
+    await deleteDoc(companyDoc);
+    
+    console.log("Entreprise supprimée avec succès:", companyId);
+  } catch (error) {
+    console.error("Erreur lors de la suppression de l'entreprise:", error);
+    throw new Error("Impossible de supprimer l'entreprise. Veuillez réessayer.");
   }
-  
-  // Récupérer l'entreprise existante pour vérification
-  const existingCompany = await getCompany(companyId);
-  if (!existingCompany) {
-    throw new Error("Entreprise non trouvée");
-  }
-  
-  // Vérifier que l'utilisateur est bien le propriétaire
-  if (existingCompany.ownerId !== auth.currentUser.uid) {
-    throw new Error("Vous n'êtes pas autorisé à supprimer cette entreprise");
-  }
-  
-  // Récupérer les employés liés à cette entreprise
-  const employees = await getDocuments(`users/${auth.currentUser.uid}/companies/${companyId}/employees`, {});
-  
-  // Si des employés sont liés, ne pas supprimer l'entreprise
-  if (employees.length > 0) {
-    throw new Error(`Impossible de supprimer cette entreprise: ${employees.length} employé(s) y sont rattachés. Veuillez d'abord supprimer tous les employés.`);
-  }
-  
-  // Supprimer l'entreprise
-  await deleteDocument(`users/${auth.currentUser.uid}/companies`, companyId);
 } 
