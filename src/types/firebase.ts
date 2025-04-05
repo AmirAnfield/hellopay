@@ -124,6 +124,83 @@ export interface Certificate extends FirestoreDocument {
   pdfUrl?: string;
 }
 
+// Mémoire IA pour la création de contrat
+export interface AIContractMemory extends FirestoreDocument {
+  userId: string;
+  step: number;
+  contractType?: 'CDI_temps_plein' | 'CDI_temps_partiel' | 'CDD_temps_plein' | 'CDD_temps_partiel' | 'STAGE' | 'FREELANCE';
+  
+  company?: {
+    id: string;
+    name: string;
+    siret?: string;
+    address?: string;
+    postalCode?: string;
+    city?: string;
+  };
+  
+  employee?: {
+    id: string;
+    fullName: string;
+    firstName?: string;
+    lastName?: string;
+    birthDate?: string;
+    birthPlace?: string;
+    address?: string;
+    postalCode?: string;
+    city?: string;
+    socialSecurityNumber?: string;
+  };
+  
+  fields: {
+    workingHours?: string;
+    hasRemoteWork?: boolean;
+    salary?: number;
+    startDate?: string;
+    endDate?: string;
+    trialPeriod?: boolean;
+    trialPeriodDuration?: string;
+    position?: string;
+    qualification?: string;
+    workLocation?: string;
+    [key: string]: unknown; // Pour permettre des champs dynamiques
+  };
+  
+  clauses: {
+    introduction?: string;
+    workingTime?: string;
+    duties?: string;
+    remuneration?: string;
+    trialPeriod?: string;
+    duration?: string;
+    termination?: string;
+    [key: string]: string | null | undefined; // Pour permettre des clauses dynamiques
+  };
+  
+  // Historique limité aux 5 derniers échanges
+  history: Array<{
+    role: 'user' | 'assistant';
+    content: string;
+    timestamp: Timestamp;
+  }>;
+}
+
+// Message d'échange avec l'IA
+export interface AIMessage {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+}
+
+// Suggestion IA pour les clauses et les questions suivantes
+export interface AISuggestion {
+  suggestion: string;
+  fields?: Record<string, unknown>;
+  nextQuestion?: string;
+  suggestedFields?: Record<string, unknown>;
+  missingFieldWarning?: string;
+  followUpQuestion?: string;
+}
+
 // Type pour la validation des données
 export type ValidationSchema<T> = {
   [K in keyof T]?: {
