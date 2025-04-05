@@ -67,7 +67,24 @@ export const registerUser = async (email: string, password: string, userData: Pa
  * Connecter un utilisateur existant
  */
 export const loginUser = async (email: string, password: string): Promise<UserCredential> => {
-  return await signInWithEmailAndPassword(auth, email, password);
+  console.log("🔐 Tentative de connexion avec email:", email);
+  console.log("🔥 État de Firebase Auth:", auth ? "Initialisé" : "Non initialisé");
+  
+  try {
+    const result = await signInWithEmailAndPassword(auth, email, password);
+    console.log("✅ Connexion réussie pour:", email);
+    return result;
+  } catch (error: any) {
+    console.error("❌ Erreur de connexion:", error);
+    
+    // Erreur d'API Key invalide
+    if (error.code === 'auth/api-key-not-valid') {
+      console.error("⚠️ API Key Firebase invalide. Vérifiez votre configuration Firebase.");
+      // On pourrait tenter une réinitialisation de Firebase ici
+    }
+    
+    throw error;
+  }
 };
 
 /**

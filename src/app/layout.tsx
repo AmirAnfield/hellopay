@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter as FontSans } from "next/font/google";
 import { cn } from "@/lib/utils";
 import { Providers } from "@/components/providers";
-import "@/styles/globals.css";
+import "./globals.css";
 import { ThemeScript } from "@/components/theme-provider";
 import NavBar from "@/components/NavBar";
 import Script from 'next/script'
@@ -65,6 +65,7 @@ export default function RootLayout({
       >
         <Script 
           src="https://www.google.com/recaptcha/enterprise.js?render=6LdUnwUrAAAAAL3u-4zxXrmXOCLMBEVLjkkd2Y4_"
+          strategy="lazyOnload"
         />
         <Providers>
           <div className="flex min-h-screen flex-col">

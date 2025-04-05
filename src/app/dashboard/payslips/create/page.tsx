@@ -14,7 +14,7 @@ import { useRouter } from 'next/navigation';
 import { toast } from "sonner";
 // import { v4 as uuidv4 } from "uuid";
 // import Link from "next/link";
-import {
+import { 
   ChevronLeft as ArrowLeft,
   // Calendar,
   // User,
@@ -22,7 +22,7 @@ import {
   // Euro,
   // Download,
   // FileText,
-  Calculator,
+  Calculator, 
 } from "lucide-react";
 /*
 import {
@@ -393,7 +393,7 @@ export default function CreatePayslip() {
       toast.error("Erreur", {
         description: "Impossible de charger les données. Veuillez réessayer."
       });
-    } finally {
+      } finally {
       setIsLoading(false);
     }
   };
@@ -418,7 +418,7 @@ export default function CreatePayslip() {
     
     // Pour les autres champs, mettre à jour les options du bulletin
     setPayslipOptions(prev => ({
-      ...prev,
+          ...prev,
       [name]: name === 'notes' ? value : parseFloat(value)
     }));
     // Le calcul est maintenant géré automatiquement par useEffect
@@ -992,7 +992,7 @@ export default function CreatePayslip() {
       </PageContainer>
     );
   }
-
+  
   return (
     <PageContainer>
       <PageHeader
@@ -1001,14 +1001,14 @@ export default function CreatePayslip() {
         actions={
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => router.back()}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Retour
-            </Button>
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Retour
+        </Button>
             <Button variant="secondary" onClick={() => setConfigOpen(true)}>
               <Calculator className="h-4 w-4 mr-2" />
               Configuration
             </Button>
-          </div>
+        </div>
         }
       />
 
@@ -1017,7 +1017,7 @@ export default function CreatePayslip() {
           <TabsTrigger value="configuration">Configuration</TabsTrigger>
           <TabsTrigger value="periodes">Périodes</TabsTrigger>
           <TabsTrigger value="preview">Aperçu</TabsTrigger>
-        </TabsList>
+                </TabsList>
         
         <TabsContent value="configuration" className="space-y-6 mt-6">
           <form className="space-y-8">
@@ -1042,44 +1042,44 @@ export default function CreatePayslip() {
                       ))}
                     </SelectContent>
                   </Select>
-                </div>
-                
+                  </div>
+                  
                 {selectedEmployee && (
                   <div className="border rounded-md p-4 bg-slate-50 dark:bg-slate-900">
-                    {(() => {
+                      {(() => {
                       const employee = employees.find(e => e.id === selectedEmployee);
                       if (!employee) return null;
-                      
-                      return (
+                        
+                        return (
                         <div className="space-y-2 text-sm">
-                          <div className="flex justify-between">
-                            <span className="text-sm text-gray-500">Nom</span>
+                            <div className="flex justify-between">
+                              <span className="text-sm text-gray-500">Nom</span>
                             <span className="font-medium">{employee.firstName} {employee.lastName}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-sm text-gray-500">Poste</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-sm text-gray-500">Poste</span>
                             <span className="font-medium">{employee.position}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-sm text-gray-500">Statut</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-sm text-gray-500">Statut</span>
                             <span className="font-medium">{employee.isExecutive ? 'Cadre' : 'Non-cadre'}</span>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-sm text-gray-500">Date d&apos;entrée</span>
                             <span className="font-medium">{employee.startDate ? format(new Date(employee.startDate), 'dd/MM/yyyy') : 'Non spécifiée'}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-sm text-gray-500">Salaire mensuel brut</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-sm text-gray-500">Salaire mensuel brut</span>
                             <span className="font-medium">{formatCurrency(employee.baseSalary)}</span>
+                            </div>
                           </div>
-                        </div>
                       );
-                    })()}
+                      })()}
+                    </div>
+                  )}
                   </div>
-                )}
-              </div>
-            </div>
-            
+                    </div>
+                    
             <div className="flex justify-end">
               <Button 
                 type="button" 
@@ -1088,10 +1088,10 @@ export default function CreatePayslip() {
               >
                 Suivant - Gestion des périodes
               </Button>
-            </div>
+                    </div>
           </form>
-        </TabsContent>
-        
+                </TabsContent>
+                
         <TabsContent value="periodes" className="mt-6 space-y-6">
           <div className="border rounded-md p-6 bg-white dark:bg-slate-900">
             <h3 className="text-lg font-medium mb-4">Périodes de paie disponibles</h3>
@@ -1105,7 +1105,7 @@ export default function CreatePayslip() {
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-amber-500 mr-2" viewBox="0 0 20 20" fill="currentColor">
                           <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
                         </svg>
-                        <div>
+                    <div>
                           <p className="font-medium text-amber-800">Date d&apos;entrée manquante</p>
                           <p className="text-sm text-amber-700 mt-1">
                             La date d&apos;entrée de cet employé n&apos;est pas définie. Les périodes affichées sont basées sur les 12 derniers mois.
@@ -1172,7 +1172,7 @@ export default function CreatePayslip() {
                                     Valider
                                   </Button>
                                 )}
-                              </div>
+                        </div>
                             </TableCell>
                           </TableRow>
                         ))}
@@ -1194,7 +1194,7 @@ export default function CreatePayslip() {
                       Générer tous les bulletins validés
                     </LoadingButton>
                   </div>
-                </div>
+              </div>
               </>
             ) : (
               <div className="text-center py-12">
@@ -1213,12 +1213,12 @@ export default function CreatePayslip() {
                       <li>La date d&apos;entrée est invalide ou mal formatée</li>
                       <li>Une erreur s&apos;est produite lors du chargement des données</li>
                     </ul>
-                    <Button 
-                      variant="outline" 
+                <Button 
+                  variant="outline" 
                       onClick={() => router.push(`/dashboard/employees/${selectedEmployee}/edit`)}
-                    >
+                >
                       Modifier le profil de l&apos;employé
-                    </Button>
+                </Button>
                   </div>
                 )}
                 <Button 
@@ -1230,7 +1230,7 @@ export default function CreatePayslip() {
                 </Button>
               </div>
             )}
-          </div>
+        </div>
         </TabsContent>
         
         <TabsContent value="preview" className="mt-6">
@@ -1283,7 +1283,7 @@ export default function CreatePayslip() {
                     );
                   })()}
                 </div>
-              </div>
+                  </div>
               
               <div>
                 <h3 className="font-medium mb-2">SALARIÉ</h3>
@@ -1301,9 +1301,9 @@ export default function CreatePayslip() {
                       </>
                     );
                   })()}
+                    </div>
+                    </div>
                 </div>
-              </div>
-            </div>
             
             <div className="mt-6">
               <Table>
@@ -1342,21 +1342,21 @@ export default function CreatePayslip() {
                   ))}
                 </TableBody>
               </Table>
-            </div>
-            
+              </div>
+              
             <div className="mt-6 grid grid-cols-2 gap-6">
               <div className="border rounded-md p-4 bg-slate-50 dark:bg-slate-900">
                 <h3 className="font-medium mb-2">CUMULS ANNÉE</h3>
                 <div className="text-sm space-y-2">
-                  <div className="flex justify-between">
+                <div className="flex justify-between">
                     <span>Brut imposable</span>
                     <span>{formatCurrency(calculatedValues.grossSalary)}</span>
-                  </div>
+                </div>
                   <div className="flex justify-between">
                     <span>Net imposable</span>
                     <span>{formatCurrency(calculatedValues.netSalary)}</span>
-                  </div>
-                  <div className="flex justify-between">
+              </div>
+                <div className="flex justify-between">
                     <span>Total cotisations</span>
                     <span>{formatCurrency(calculatedValues.employeeContributions)}</span>
                   </div>
@@ -1366,26 +1366,26 @@ export default function CreatePayslip() {
               <div className="border rounded-md p-4 bg-slate-50 dark:bg-slate-900">
                 <h3 className="font-medium mb-2">CONGÉS</h3>
                 <div className="text-sm space-y-2">
-                  <div className="flex justify-between">
+                <div className="flex justify-between">
                     <span>Congés acquis</span>
                     <span>2.5 jours</span>
-                  </div>
+                </div>
                   <div className="flex justify-between">
                     <span>Congés pris</span>
                     <span>{payslipOptions.paidLeaveDays} jours</span>
-                  </div>
+              </div>
                   <div className="flex justify-between">
                     <span>Solde restant</span>
                     <span>21.5 jours</span>
-                  </div>
-                </div>
+              </div>
               </div>
             </div>
+          </div>
             
             <div className="mt-8 text-center text-sm text-gray-500">
               <p>Document non contractuel - Simulation</p>
-            </div>
-          </div>
+        </div>
+      </div>
         </TabsContent>
       </Tabs>
     </PageContainer>

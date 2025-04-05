@@ -10,42 +10,133 @@ import { Button } from "@/components/ui/button";
 import {
   Form,
   FormControl,
-  FormDescription,
   FormField,
   FormItem,
   FormLabel,
-  FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2, ArrowLeft, Save } from "lucide-react";
+import { auth } from "@/lib/firebase";
+import { doc, getDoc, setDoc, collection, getDocs } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+
+// Style personnalisé pour afficher les messages d'erreur en orange (warning)
+const WarningFormMessage = ({ children }: { children: React.ReactNode }) => {
+  if (!children) return null;
+  return (
+    <div className="text-amber-500 text-xs font-medium mt-1">
+      {children}
+    </div>
+  );
+};
 
 // Schéma de validation avec Zod
 const employeeFormSchema = z.object({
   // Informations personnelles
-  firstName: z.string()
-    .min(2, "Le prénom doit comporter au moins 2 caractères")
-    .trim(),
+  firstName: z.string().optional(),
+  lastName: z.string().optional(),
+  position: z.string().optional(),
+  companyId: z.string().optional(),
   
-  lastName: z.string()
-    .min(2, "Le nom doit comporter au moins 2 caractères")
-    .trim(),
+  // Coordonnées
+  email: z.string().optional(),
+  phoneNumber: z.string().optional(),
   
-  position: z.string()
-    .min(2, "Le poste doit comporter au moins 2 caractères")
-    .trim(),
+  // Informations administratives
+  socialSecurityNumber: z.string().optional(),
+  iban: z.string().optional(),
   
-  companyId: z.string()
-    .min(1, "Veuillez sélectionner une entreprise"),
+  // Adresse
+  address: z.string().optional(),
+  addressComplement: z.string().optional().nullable(),
+  city: z.string().optional(),
+  postalCode: z.string().optional(),
+  country: z.string().optional().default("France"),
+}).superRefine((data, ctx) => {
+  // Validations pour affichage des messages mais sans bloquer la soumission
+  if (data.firstName && data.firstName.length < 2) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Le prénom devrait comporter au moins 2 caractères",
+      path: ["firstName"],
+    });
+  }
+
+  if (data.lastName && data.lastName.length < 2) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Le nom devrait comporter au moins 2 caractères",
+      path: ["lastName"],
+    });
+  }
+
+  if (data.position && data.position.length < 2) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Le poste devrait comporter au moins 2 caractères",
+      path: ["position"],
+    });
+  }
+
+  if (data.email && !data.email.includes("@")) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Format email non valide",
+      path: ["email"],
+    });
+  }
+
+  if (data.phoneNumber && data.phoneNumber.length < 10) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Le téléphone devrait comporter au moins 10 caractères",
+      path: ["phoneNumber"],
+    });
+  }
+
+  if (data.socialSecurityNumber && (data.socialSecurityNumber.length < 13 || data.socialSecurityNumber.length > 15)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Le numéro de sécurité sociale devrait comporter entre 13 et 15 caractères",
+      path: ["socialSecurityNumber"],
+    });
+  }
+
+  if (data.iban && data.iban.length < 15) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "IBAN devrait comporter au moins 15 caractères",
+      path: ["iban"],
+    });
+  }
+
+  if (data.address && data.address.length < 5) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Adresse devrait comporter au moins 5 caractères",
+      path: ["address"],
+    });
+  }
+
+  if (data.city && data.city.length < 2) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "La ville devrait comporter au moins 2 caractères",
+      path: ["city"],
+    });
+  }
+
+  if (data.postalCode && data.postalCode.length < 2) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Le code postal devrait comporter au moins 2 caractères",
+      path: ["postalCode"],
+    });
+  }
   
-  // Champs optionnels
-  email: z.string().email("Format d'email invalide").optional().nullable(),
-  phoneNumber: z.string().optional().nullable(),
-  address: z.string().optional().nullable(),
-  city: z.string().optional().nullable(),
-  postalCode: z.string().optional().nullable(),
-  country: z.string().default("France").optional().nullable(),
+  // Toujours retourner les données telles quelles, même si non conformes
+  return data;
 });
 
 // Types pour les props et le formulaire
@@ -74,29 +165,45 @@ export default function EmployeeForm({ employeeId, defaultCompanyId }: EmployeeF
       companyId: defaultCompanyId || "",
       email: "",
       phoneNumber: "",
+      socialSecurityNumber: "",
+      iban: "",
       address: "",
+      addressComplement: "",
       city: "",
       postalCode: "",
       country: "France",
     },
   });
 
-  // Charger les entreprises depuis localStorage
+  // Charger les entreprises depuis Firestore
   useEffect(() => {
-    const fetchCompanies = () => {
-      if (typeof window !== 'undefined') {
-        try {
-          const companiesStr = localStorage.getItem('companies');
-          if (companiesStr) {
-            const parsedCompanies = JSON.parse(companiesStr);
-            setCompanies(parsedCompanies.map((company: any) => ({
-              id: company.id,
-              name: company.name
-            })));
-          }
-        } catch (e) {
-          console.error("Erreur lors de la récupération des entreprises:", e);
+    const fetchCompanies = async () => {
+      try {
+        if (!auth.currentUser) {
+          console.log("Utilisateur non authentifié");
+          return;
         }
+        
+        const userId = auth.currentUser.uid;
+        const companiesRef = collection(db, `users/${userId}/companies`);
+        const companiesSnapshot = await getDocs(companiesRef);
+        
+        const companiesData: Array<{id: string, name: string}> = [];
+        
+        companiesSnapshot.forEach((doc) => {
+          const data = doc.data();
+          // Ne récupérer que les entreprises actives (non archivées)
+          if (!data.isArchived) {
+            companiesData.push({
+              id: doc.id,
+              name: data.name || ''
+            });
+          }
+        });
+        
+        setCompanies(companiesData);
+      } catch (e) {
+        console.error("Erreur lors de la récupération des entreprises:", e);
       }
     };
     
@@ -115,50 +222,48 @@ export default function EmployeeForm({ employeeId, defaultCompanyId }: EmployeeF
   async function fetchEmployeeData(id: string) {
     setIsFetching(true);
     try {
-      // En mode développement, récupérer depuis localStorage
-      if (typeof window !== 'undefined') {
-        try {
-          const employeesStr = localStorage.getItem('employees');
-          if (employeesStr) {
-            const employees = JSON.parse(employeesStr);
-            const employee = employees.find((e: { id: string }) => e.id === id);
-            
-            if (employee) {
-              // Remplir le formulaire avec les données existantes
-              form.reset({
-                firstName: employee.firstName || "",
-                lastName: employee.lastName || "",
-                position: employee.position || "",
-                companyId: employee.companyId || "",
-                email: employee.email || "",
-                phoneNumber: employee.phoneNumber || "",
-                address: employee.address || "",
-                city: employee.city || "",
-                postalCode: employee.postalCode || "",
-                country: employee.country || "France",
-              });
-              
-              setIsFetching(false);
-              return;
-            }
-          }
-        } catch (e) {
-          console.error("Erreur lors de la récupération depuis localStorage:", e);
-        }
+      // Récupérer depuis Firestore
+      if (!auth.currentUser) {
+        throw new Error("Vous devez être connecté pour voir les détails de l'employé");
       }
       
-      // Si aucune donnée n'a été trouvée, afficher un message d'erreur
-      toast({
-        variant: "destructive",
-        title: "Erreur",
-        description: "Impossible de charger les informations de l'employé."
-      });
+      const userId = auth.currentUser.uid;
+      
+      // Chemin pour l'employé dans Firestore
+      const employeeRef = doc(db, `users/${userId}/employees`, id);
+      const employeeDoc = await getDoc(employeeRef);
+      
+      if (employeeDoc.exists()) {
+        const employeeData = employeeDoc.data();
+        console.log("Données employé de Firestore:", employeeData);
+        
+        // Remplir le formulaire avec les données existantes
+        form.reset({
+          firstName: employeeData.firstName || "",
+          lastName: employeeData.lastName || "",
+          position: employeeData.position || "",
+          companyId: employeeData.companyId || "",
+          email: employeeData.email || "",
+          phoneNumber: employeeData.phoneNumber || employeeData.phone || "",
+          socialSecurityNumber: employeeData.socialSecurityNumber || "",
+          iban: employeeData.iban || "",
+          address: employeeData.address || "",
+          addressComplement: employeeData.addressComplement || "",
+          city: employeeData.city || "",
+          postalCode: employeeData.postalCode || "",
+          country: employeeData.country || "France",
+        });
+      } else {
+        throw new Error("Employé non trouvé");
+      }
     } catch (err) {
       console.error("Erreur:", err);
       toast({
         variant: "destructive",
         title: "Erreur",
-        description: "Impossible de charger les informations de l'employé."
+        description: err instanceof Error 
+          ? err.message 
+          : "Impossible de charger les informations de l'employé."
       });
     } finally {
       setIsFetching(false);
@@ -178,72 +283,79 @@ export default function EmployeeForm({ employeeId, defaultCompanyId }: EmployeeF
     console.log("Données soumises:", data);
     
     try {
-      // En mode développement, sauvegarder dans localStorage
-      if (typeof window !== 'undefined') {
-        try {
-          const employeesStr = localStorage.getItem('employees');
-          const employees = employeesStr ? JSON.parse(employeesStr) : [];
-          
-          // Trouver le nom de l'entreprise pour l'affichage
-          const company = companies.find(c => c.id === data.companyId);
-          const companyName = company ? company.name : '';
-          
-          if (isEditMode) {
-            // Mettre à jour l'employé existant
-            const updatedEmployees = employees.map((employee: { id: string }) => {
-              if (employee.id === employeeId) {
-                return {
-                  ...employee,
-                  ...data,
-                  companyName,
-                  updatedAt: new Date()
-                };
-              }
-              return employee;
-            });
-            
-            localStorage.setItem('employees', JSON.stringify(updatedEmployees));
-          } else {
-            // Créer un nouvel employé
-            const newEmployeeId = `employee-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
-            const newEmployee = {
-              ...data,
-              id: newEmployeeId,
-              companyName,
-              createdAt: new Date(),
-              updatedAt: new Date()
-            };
-            
-            employees.push(newEmployee);
-            localStorage.setItem('employees', JSON.stringify(employees));
-          }
-          
-          // Simuler un délai pour l'enregistrement
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          
-          // Notification
-          toast({
-            title: isEditMode ? "Employé mis à jour" : "Employé créé",
-            description: isEditMode 
-              ? `Les informations de l'employé "${data.firstName} ${data.lastName}" ont été mises à jour avec succès.` 
-              : `L'employé "${data.firstName} ${data.lastName}" a été créé avec succès.`,
-            variant: "default",
-          });
-          
-          // Rediriger vers la liste des employés après un court délai
-          const fullName = `${data.firstName} ${data.lastName}`;
-          setTimeout(() => {
-            window.location.href = `/dashboard/employees?action=${isEditMode ? 'updated' : 'created'}&name=${encodeURIComponent(fullName)}`;
-          }, 1500);
-          return;
-        } catch (e) {
-          console.error("Erreur lors de la sauvegarde dans localStorage:", e);
-          throw new Error("Impossible de sauvegarder l'employé");
-        }
+      // Vérifier que l'utilisateur est connecté
+      if (!auth.currentUser) {
+        throw new Error("Vous devez être connecté pour enregistrer un employé");
       }
       
-      // Si nous sommes ici, c'est qu'il y a un problème
-      throw new Error("Problème lors de l'enregistrement de l'employé");
+      const userId = auth.currentUser.uid;
+      
+      // Trouver le nom de l'entreprise pour l'affichage
+      const company = companies.find(c => c.id === data.companyId);
+      const companyName = company ? company.name : '';
+      
+      // Valeurs par défaut pour les champs vides
+      const defaultValues = {
+        firstName: data.firstName || "Employé",
+        lastName: data.lastName || "Sans nom",
+        position: data.position || "Poste non spécifié",
+        email: data.email || "",
+        phoneNumber: data.phoneNumber || "",
+        socialSecurityNumber: data.socialSecurityNumber || "",
+        iban: data.iban || "",
+        address: data.address || "",
+        addressComplement: data.addressComplement || "",
+        city: data.city || "",
+        postalCode: data.postalCode || "",
+        country: data.country || "France",
+      };
+      
+      // Format des données pour Firestore avec valeurs par défaut
+      const employeeData = {
+        ...defaultValues,
+        companyId: data.companyId || "",
+        companyName,
+        phone: defaultValues.phoneNumber, // Assurer la compatibilité avec les deux noms de propriétés
+        updatedAt: new Date()
+      };
+      
+      // Sauvegarder dans Firestore
+      if (isEditMode) {
+        // Mise à jour de l'employé existant
+        const employeeRef = doc(db, `users/${userId}/employees`, employeeId as string);
+        await setDoc(employeeRef, {
+          ...employeeData,
+          updatedAt: new Date()
+        }, { merge: true });
+        console.log("Employé mis à jour dans Firestore");
+      } else {
+        // Création d'un nouvel employé
+        const newEmployeeId = `employee-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+        const employeeRef = doc(db, `users/${userId}/employees`, newEmployeeId);
+        await setDoc(employeeRef, {
+          ...employeeData,
+          id: newEmployeeId,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          isArchived: false,
+          isLocked: false
+        });
+        console.log("Nouvel employé créé dans Firestore");
+      }
+      
+      // Notification avec message spécifique pour la création
+      toast({
+        title: isEditMode ? "Employé mis à jour" : "Employé créé",
+        description: isEditMode 
+          ? `Employé ${employeeData.firstName} ${employeeData.lastName} mis à jour.` 
+          : `Employé ${employeeData.firstName} ${employeeData.lastName} créé. Vous pourrez le modifier plus tard.`,
+        variant: "default",
+      });
+      
+      // Rediriger vers la liste des employés
+      const fullName = `${employeeData.firstName} ${employeeData.lastName}`;
+      router.push(`/dashboard/employees?action=${isEditMode ? 'updated' : 'created'}&name=${encodeURIComponent(fullName)}`);
+      
     } catch (err) {
       console.error("Erreur:", err);
       toast({
@@ -273,38 +385,38 @@ export default function EmployeeForm({ employeeId, defaultCompanyId }: EmployeeF
 
   return (
     <div className="max-w-3xl mx-auto">
-      <div className="flex items-center mb-6">
-        <Button variant="ghost" onClick={handleCancel} className="mr-4">
-          <ArrowLeft className="h-4 w-4 mr-2" />
+      <div className="flex items-center mb-3">
+        <Button variant="ghost" onClick={handleCancel} className="mr-3 h-7">
+          <ArrowLeft className="h-3 w-3 mr-1" />
           Retour
         </Button>
-        <h1 className="text-2xl font-bold">
+        <h1 className="text-base font-medium">
           {isEditMode ? "Modifier l'employé" : "Ajouter un employé"}
         </h1>
       </div>
 
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
           {/* Informations générales */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-xl">Informations de l'employé</CardTitle>
-              <CardDescription>
-                Les informations principales de l'employé - <span className="text-destructive font-medium">* Champs obligatoires</span>
+          <Card className="shadow-sm">
+            <CardHeader className="p-3 pb-1">
+              <CardTitle className="text-sm font-medium">Informations de l'employé</CardTitle>
+              <CardDescription className="text-xs">
+                <span className="text-amber-500 font-medium">Tous les champs sont facultatifs.</span> Les messages en orange sont uniquement des suggestions de format.
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <CardContent className="p-3 pt-1 space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <FormField
                   control={form.control}
                   name="firstName"
                   render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Prénom <span className="text-destructive">*</span></FormLabel>
+                    <FormItem className="space-y-1">
+                      <FormLabel className="text-xs font-medium">Prénom</FormLabel>
                       <FormControl>
-                        <Input placeholder="Prénom" {...field} />
+                        <Input placeholder="Prénom" {...field} className="h-7 text-sm" />
                       </FormControl>
-                      <FormMessage />
+                      <WarningFormMessage>{form.formState.errors.firstName?.message}</WarningFormMessage>
                     </FormItem>
                   )}
                 />
@@ -313,76 +425,28 @@ export default function EmployeeForm({ employeeId, defaultCompanyId }: EmployeeF
                   control={form.control}
                   name="lastName"
                   render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Nom <span className="text-destructive">*</span></FormLabel>
+                    <FormItem className="space-y-1">
+                      <FormLabel className="text-xs font-medium">Nom</FormLabel>
                       <FormControl>
-                        <Input placeholder="Nom" {...field} />
+                        <Input placeholder="Nom" {...field} className="h-7 text-sm" />
                       </FormControl>
-                      <FormMessage />
+                      <WarningFormMessage>{form.formState.errors.lastName?.message}</WarningFormMessage>
                     </FormItem>
                   )}
                 />
               </div>
 
-              <FormField
-                control={form.control}
-                name="position"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Poste <span className="text-destructive">*</span></FormLabel>
-                    <FormControl>
-                      <Input placeholder="Poste ou fonction" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="companyId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Entreprise <span className="text-destructive">*</span></FormLabel>
-                    <Select 
-                      onValueChange={field.onChange}
-                      defaultValue={field.value}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Sélectionner une entreprise" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {companies.length > 0 ? (
-                          companies.map(company => (
-                            <SelectItem key={company.id} value={company.id}>
-                              {company.name}
-                            </SelectItem>
-                          ))
-                        ) : (
-                          <SelectItem value="no-companies" disabled>
-                            Aucune entreprise disponible
-                          </SelectItem>
-                        )}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <FormField
                   control={form.control}
                   name="email"
                   render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Email</FormLabel>
+                    <FormItem className="space-y-1">
+                      <FormLabel className="text-xs font-medium">Email</FormLabel>
                       <FormControl>
-                        <Input type="email" placeholder="email@exemple.fr" {...field} value={field.value || ''} />
+                        <Input type="email" placeholder="email@exemple.fr" {...field} value={field.value || ''} className="h-7 text-sm" />
                       </FormControl>
-                      <FormMessage />
+                      <WarningFormMessage>{form.formState.errors.email?.message}</WarningFormMessage>
                     </FormItem>
                   )}
                 />
@@ -391,12 +455,53 @@ export default function EmployeeForm({ employeeId, defaultCompanyId }: EmployeeF
                   control={form.control}
                   name="phoneNumber"
                   render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Téléphone</FormLabel>
+                    <FormItem className="space-y-1">
+                      <FormLabel className="text-xs font-medium">Téléphone</FormLabel>
                       <FormControl>
-                        <Input placeholder="Ex: 0123456789" {...field} value={field.value || ''} />
+                        <Input placeholder="Ex: 0123456789" {...field} value={field.value || ''} className="h-7 text-sm" />
                       </FormControl>
-                      <FormMessage />
+                      <WarningFormMessage>{form.formState.errors.phoneNumber?.message}</WarningFormMessage>
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Informations administratives */}
+          <Card className="shadow-sm">
+            <CardHeader className="p-3 pb-1">
+              <CardTitle className="text-sm font-medium">Informations administratives</CardTitle>
+              <CardDescription className="text-xs">
+                <span className="text-amber-500 font-medium">Tous les champs sont facultatifs.</span> Ces informations peuvent être ajoutées ultérieurement.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-3 pt-1 space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <FormField
+                  control={form.control}
+                  name="socialSecurityNumber"
+                  render={({ field }) => (
+                    <FormItem className="space-y-1">
+                      <FormLabel className="text-xs font-medium">Numéro de sécurité sociale</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Numéro de sécurité sociale" {...field} value={field.value || ''} className="h-7 text-sm" />
+                      </FormControl>
+                      <WarningFormMessage>{form.formState.errors.socialSecurityNumber?.message}</WarningFormMessage>
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="iban"
+                  render={({ field }) => (
+                    <FormItem className="space-y-1">
+                      <FormLabel className="text-xs font-medium">IBAN</FormLabel>
+                      <FormControl>
+                        <Input placeholder="IBAN" {...field} value={field.value || ''} className="h-7 text-sm" />
+                      </FormControl>
+                      <WarningFormMessage>{form.formState.errors.iban?.message}</WarningFormMessage>
                     </FormItem>
                   )}
                 />
@@ -405,39 +510,53 @@ export default function EmployeeForm({ employeeId, defaultCompanyId }: EmployeeF
           </Card>
 
           {/* Adresse */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-xl">Adresse</CardTitle>
-              <CardDescription>
-                Adresse de l'employé (optionnel)
+          <Card className="shadow-sm">
+            <CardHeader className="p-3 pb-1">
+              <CardTitle className="text-sm font-medium">Adresse</CardTitle>
+              <CardDescription className="text-xs">
+                <span className="text-amber-500 font-medium">Tous les champs sont facultatifs.</span> L&apos;adresse peut être complétée plus tard.
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
+            <CardContent className="p-3 pt-1 space-y-3">
               <FormField
                 control={form.control}
                 name="address"
                 render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Adresse</FormLabel>
+                  <FormItem className="space-y-1">
+                    <FormLabel className="text-xs font-medium">Adresse</FormLabel>
                     <FormControl>
-                      <Input placeholder="Numéro et nom de rue" {...field} value={field.value || ''} />
+                      <Input placeholder="Numéro et nom de rue" {...field} value={field.value || ''} className="h-7 text-sm" />
                     </FormControl>
-                    <FormMessage />
+                    <WarningFormMessage>{form.formState.errors.address?.message}</WarningFormMessage>
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={form.control}
+                name="addressComplement"
+                render={({ field }) => (
+                  <FormItem className="space-y-1">
+                    <FormLabel className="text-xs font-medium">Complément d&apos;adresse</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Bâtiment, étage, etc." {...field} value={field.value || ''} className="h-7 text-sm" />
+                    </FormControl>
+                    <WarningFormMessage>{form.formState.errors.addressComplement?.message}</WarningFormMessage>
                   </FormItem>
                 )}
               />
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <FormField
                   control={form.control}
                   name="postalCode"
                   render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Code postal</FormLabel>
+                    <FormItem className="space-y-1">
+                      <FormLabel className="text-xs font-medium">Code postal</FormLabel>
                       <FormControl>
-                        <Input placeholder="Code postal" {...field} value={field.value || ''} />
+                        <Input placeholder="Code postal" {...field} value={field.value || ''} className="h-7 text-sm" />
                       </FormControl>
-                      <FormMessage />
+                      <WarningFormMessage>{form.formState.errors.postalCode?.message}</WarningFormMessage>
                     </FormItem>
                   )}
                 />
@@ -446,12 +565,12 @@ export default function EmployeeForm({ employeeId, defaultCompanyId }: EmployeeF
                   control={form.control}
                   name="city"
                   render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Ville</FormLabel>
+                    <FormItem className="space-y-1">
+                      <FormLabel className="text-xs font-medium">Ville</FormLabel>
                       <FormControl>
-                        <Input placeholder="Ville" {...field} value={field.value || ''} />
+                        <Input placeholder="Ville" {...field} value={field.value || ''} className="h-7 text-sm" />
                       </FormControl>
-                      <FormMessage />
+                      <WarningFormMessage>{form.formState.errors.city?.message}</WarningFormMessage>
                     </FormItem>
                   )}
                 />
@@ -461,12 +580,12 @@ export default function EmployeeForm({ employeeId, defaultCompanyId }: EmployeeF
                 control={form.control}
                 name="country"
                 render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Pays</FormLabel>
+                  <FormItem className="space-y-1">
+                    <FormLabel className="text-xs font-medium">Pays</FormLabel>
                     <FormControl>
-                      <Input placeholder="Pays" {...field} value={field.value || ''} />
+                      <Input placeholder="Pays" {...field} value={field.value || ''} className="h-7 text-sm" />
                     </FormControl>
-                    <FormMessage />
+                    <WarningFormMessage>{form.formState.errors.country?.message}</WarningFormMessage>
                   </FormItem>
                 )}
               />
@@ -474,21 +593,22 @@ export default function EmployeeForm({ employeeId, defaultCompanyId }: EmployeeF
           </Card>
 
           {/* Actions */}
-          <div className="flex justify-end gap-4">
+          <div className="flex justify-end gap-2 pt-1">
             <Button 
               type="button" 
               variant="outline" 
               onClick={handleCancel}
+              className="h-7 text-xs"
             >
               Annuler
             </Button>
             <Button 
               type="submit" 
               disabled={isLoading}
-              className="gap-2"
+              className="h-7 text-xs gap-1"
             >
-              {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
-              <Save className="h-4 w-4 mr-1" />
+              {isLoading && <Loader2 className="h-3 w-3 animate-spin" />}
+              <Save className="h-3 w-3 mr-1" />
               {isEditMode ? "Mettre à jour" : "Enregistrer"}
             </Button>
           </div>

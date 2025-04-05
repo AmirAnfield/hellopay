@@ -7,9 +7,7 @@ import { Button } from "@/components/ui/button";
 import {
   Building2,
   CreditCard,
-  File,
   FileText,
-  Home,
   LogIn,
   LogOut,
   Menu,
@@ -17,19 +15,14 @@ import {
   User,
   Users,
   X,
-  ChevronDown,
-  LayoutDashboard,
+  HelpCircle,
+  MonitorSmartphone,
+  Briefcase,
+  Home,
 } from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-  DropdownMenuGroup,
-} from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/hooks/useAuth";
+import Image from "next/image";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export default function NavBar() {
   const router = useRouter();
@@ -39,192 +32,172 @@ export default function NavBar() {
 
   const isAuthenticated = !!user;
 
+  // Charger les données utilisateur depuis Firestore
+  useEffect(() => {
+    // Fermer le menu mobile lors du changement de route
+    setMobileMenuOpen(false);
+  }, [pathname]);
+
   const handleLogout = async () => {
     await logoutUser();
     setMobileMenuOpen(false);
     router.push("/");
   };
 
-  // Fermer le menu mobile lors du changement de route
-  useEffect(() => {
-    setMobileMenuOpen(false);
-  }, [pathname]);
+  const handleLogin = () => {
+    router.push("/auth/login");
+  };
 
   return (
     <header className="border-b sticky top-0 z-50 bg-background/95 backdrop-blur">
       <div className="container flex h-16 items-center justify-between px-4 md:px-6 lg:px-8">
-        <div className="flex items-center gap-4">
-          <Link href="/" className="flex items-center gap-2">
-            <File className="h-6 w-6 text-primary" />
-            <span className="text-xl font-bold">HelloPay</span>
+        {/* Logo - côté gauche */}
+        <div className="flex items-center">
+          <Link href="/" className="flex items-center">
+            <Image 
+              src="/media/logo/logo_hellopay.png" 
+              alt="HelloPay Logo" 
+              width={96} 
+              height={38} 
+              className="h-9 w-auto object-contain" 
+              priority
+            />
           </Link>
-
-          {/* Navigation principale - Desktop */}
-          <nav className="hidden md:flex items-center gap-8 ml-6">
-            <Link
-              href="/"
-              className={`text-sm font-medium transition-colors hover:text-primary ${
-                pathname === "/" ? "text-primary" : "text-muted-foreground"
-              }`}
-            >
-              Accueil
-            </Link>
-
-            {isAuthenticated ? (
-              // Liens pour utilisateurs authentifiés
-              <>
-                <Link
-                  href="/dashboard"
-                  className={`text-sm font-medium transition-colors hover:text-primary ${
-                    pathname?.startsWith("/dashboard") ? "text-primary" : "text-muted-foreground"
-                  }`}
-                >
-                  Tableau de bord
-                </Link>
-                <DropdownMenu>
-                  <DropdownMenuTrigger className="flex items-center gap-1 text-sm font-medium transition-colors hover:text-primary">
-                    <span className={
-                      pathname?.includes("/companies") || pathname?.includes("/employees") 
-                        ? "text-primary" 
-                        : "text-muted-foreground"
-                    }>
-                      Gestion
-                    </span>
-                    <ChevronDown className="h-4 w-4" />
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent className="bg-background border shadow-lg">
-                    <Link href="/dashboard/companies" className="flex items-center p-2 cursor-pointer hover:bg-accent text-sm">
-                      <Building2 className="h-4 w-4 mr-2" />
-                      Entreprises
-                    </Link>
-                    <Link href="/dashboard/employees" className="flex items-center p-2 cursor-pointer hover:bg-accent text-sm">
-                      <Users className="h-4 w-4 mr-2" />
-                      Employés
-                    </Link>
-                    <Link href="/dashboard/payslips/create" className="flex items-center p-2 cursor-pointer hover:bg-accent text-sm">
-                      <FileText className="h-4 w-4 mr-2" />
-                      Nouveau bulletin
-                    </Link>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-                <Link
-                  href="/dashboard/documents"
-                  className={`text-sm font-medium transition-colors hover:text-primary ${
-                    pathname?.startsWith("/dashboard/documents") ? "text-primary" : "text-muted-foreground"
-                  }`}
-                >
-                  Documents
-                </Link>
-              </>
-            ) : (
-              // Liens pour visiteurs
-              <>
-                <Link
-                  href="/tarifs"
-                  className={`text-sm font-medium transition-colors hover:text-primary ${
-                    pathname === "/tarifs" ? "text-primary" : "text-muted-foreground"
-                  }`}
-                >
-                  Tarifs
-                </Link>
-                <Link
-                  href="/demo"
-                  className={`text-sm font-medium transition-colors hover:text-primary ${
-                    pathname === "/demo" ? "text-primary" : "text-muted-foreground"
-                  }`}
-                >
-                  Démo
-                </Link>
-                <Link
-                  href="/faq"
-                  className={`text-sm font-medium transition-colors hover:text-primary ${
-                    pathname === "/faq" ? "text-primary" : "text-muted-foreground"
-                  }`}
-                >
-                  FAQ
-                </Link>
-              </>
-            )}
-          </nav>
         </div>
+
+        {/* Navigation principale - Desktop */}
+        <nav className="hidden md:flex items-center gap-8">
+          {isAuthenticated ? (
+            // Liens pour utilisateurs authentifiés
+            <>
+              {/* Espace réservé pour les futures notifications */}
+            </>
+          ) : (
+            // Liens pour visiteurs
+            <>
+              <Link
+                href="/solutions"
+                className={`text-sm font-medium transition-colors hover:text-primary ${
+                  pathname === "/solutions" ? "text-primary" : "text-muted-foreground"
+                }`}
+              >
+                <span className="flex items-center">
+                  <Briefcase className="h-4 w-4 mr-1" />
+                  Solutions
+                </span>
+              </Link>
+              <Link
+                href="/tarifs"
+                className={`text-sm font-medium transition-colors hover:text-primary ${
+                  pathname === "/tarifs" ? "text-primary" : "text-muted-foreground"
+                }`}
+              >
+                <span className="flex items-center">
+                  <CreditCard className="h-4 w-4 mr-1" />
+                  Tarifs
+                </span>
+              </Link>
+              <Link
+                href="/demo"
+                className={`text-sm font-medium transition-colors hover:text-primary ${
+                  pathname === "/demo" ? "text-primary" : "text-muted-foreground"
+                }`}
+              >
+                <span className="flex items-center">
+                  <MonitorSmartphone className="h-4 w-4 mr-1" />
+                  Démo
+                </span>
+              </Link>
+              <Link
+                href="/faq"
+                className={`text-sm font-medium transition-colors hover:text-primary ${
+                  pathname === "/faq" ? "text-primary" : "text-muted-foreground"
+                }`}
+              >
+                <span className="flex items-center">
+                  <HelpCircle className="h-4 w-4 mr-1" />
+                  FAQ
+                </span>
+              </Link>
+            </>
+          )}
+        </nav>
 
         {/* Actions - Desktop */}
         <div className="hidden md:flex items-center gap-4">
-          {/* Sélecteur de thème supprimé */}
-          
           {isAuthenticated ? (
-            // Utilisateur connecté - Menu du profil
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="flex items-center gap-2 px-3 py-2"
-                >
-                  <User className="h-4 w-4" />
-                  <span className="max-w-[120px] truncate">{user?.email || "Mon compte"}</span>
-                  <ChevronDown className="h-4 w-4 ml-1" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56 bg-background border shadow-lg">
-                <DropdownMenuLabel className="flex justify-between items-center">
-                  <span>Mon compte</span>
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <Link href="/profile" className="flex items-center p-2 cursor-pointer hover:bg-accent text-sm">
-                  <User className="h-4 w-4 mr-2" />
-                  Profil
+            // Utilisateur connecté - Icônes de navigation
+            <>
+              <Button
+                variant="ghost"
+                size="icon"
+                asChild
+                title="Tableau de bord"
+              >
+                <Link href="/dashboard">
+                  <Home className="h-5 w-5" />
                 </Link>
-                <Link href="/profile/settings" className="flex items-center p-2 cursor-pointer hover:bg-accent text-sm">
-                  <Settings className="h-4 w-4 mr-2" />
-                  Paramètres
+              </Button>
+              
+              <Button
+                variant="ghost"
+                size="icon"
+                asChild
+                title="Profil"
+              >
+                <Link href="/profile">
+                  <User className="h-5 w-5" />
                 </Link>
-                <Link href="/profile/billing" className="flex items-center p-2 cursor-pointer hover:bg-accent text-sm">
-                  <CreditCard className="h-4 w-4 mr-2" />
-                  Facturation
+              </Button>
+              
+              <Button
+                variant="ghost"
+                size="icon"
+                asChild
+                title="Facturation"
+              >
+                <Link href="/profile/billing">
+                  <CreditCard className="h-5 w-5" />
                 </Link>
-                <DropdownMenuSeparator />
-                <DropdownMenuGroup>
-                  <DropdownMenuLabel className="text-xs">Gestion</DropdownMenuLabel>
-                  <Link href="/dashboard/companies" className="flex items-center p-2 cursor-pointer hover:bg-accent text-sm">
-                    <Building2 className="h-4 w-4 mr-2" />
-                    Mes entreprises
-                  </Link>
-                  <Link href="/dashboard/employees" className="flex items-center p-2 cursor-pointer hover:bg-accent text-sm">
-                    <Users className="h-4 w-4 mr-2" />
-                    Mes employés
-                  </Link>
-                  <Link href="/dashboard/documents" className="flex items-center p-2 cursor-pointer hover:bg-accent text-sm">
-                    <FileText className="h-4 w-4 mr-2" />
-                    Documents
-                  </Link>
-                </DropdownMenuGroup>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleLogout}>
-                  <LogOut className="h-4 w-4 mr-2" />
-                  Déconnexion
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+              </Button>
+              
+              <Button
+                variant="ghost"
+                size="icon"
+                asChild
+                title="Paramètres"
+              >
+                <Link href="/profile/settings">
+                  <Settings className="h-5 w-5" />
+                </Link>
+              </Button>
+              
+              {/* Sélecteur de thème */}
+              <ThemeToggle />
+              
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleLogout}
+                title="Déconnexion"
+              >
+                <LogOut className="h-5 w-5" />
+              </Button>
+            </>
           ) : (
-            // Utilisateur non connecté - Bouton de connexion unifié
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button className="flex items-center gap-2 px-3 py-2">
-                  <LogIn className="h-4 w-4" />
-                  Se connecter
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56 bg-background border shadow-lg">
-                <Link href="/auth/login" className="flex items-center p-2 cursor-pointer hover:bg-accent text-sm">
-                  <LogIn className="h-4 w-4 mr-2" />
-                  Connexion
-                </Link>
-                <Link href="/auth/register" className="flex items-center p-2 cursor-pointer hover:bg-accent text-sm">
-                  <User className="h-4 w-4 mr-2" />
-                  Inscription
-                </Link>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            // Utilisateur non connecté - Bouton de connexion direct
+            <>
+              <Button 
+                className="flex items-center gap-2"
+                onClick={handleLogin}
+              >
+                <LogIn className="h-4 w-4" />
+                Se connecter
+              </Button>
+              
+              {/* Sélecteur de thème - toujours à droite */}
+              <ThemeToggle />
+            </>
           )}
         </div>
 
@@ -255,8 +228,14 @@ export default function NavBar() {
                 className="-m-1.5 p-1.5 flex items-center gap-2"
                 onClick={() => setMobileMenuOpen(false)}
               >
-                <File className="h-6 w-6 text-primary" />
-                <span className="text-xl font-bold">HelloPay</span>
+                <Image 
+                  src="/media/logo/logo_hellopay.png" 
+                  alt="HelloPay Logo" 
+                  width={96} 
+                  height={38} 
+                  className="h-9 w-auto object-contain" 
+                  priority
+                />
               </Link>
               <Button
                 variant="outline"
@@ -268,16 +247,7 @@ export default function NavBar() {
             </div>
             <div className="mt-6 flow-root">
               <div className="-my-6 divide-y divide-gray-200">
-                <div className="space-y-2 py-6">
-                  <Link
-                    href="/"
-                    className="-mx-3 block rounded-lg px-3 py-2 text-base font-medium leading-7 text-gray-900 hover:bg-gray-50"
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    <Home className="h-4 w-4 inline-block mr-2" />
-                    Accueil
-                  </Link>
-                  
+                <div className="space-y-2 py-6">                  
                   {isAuthenticated ? (
                     <>
                       <Link
@@ -285,8 +255,8 @@ export default function NavBar() {
                         className="-mx-3 block rounded-lg px-3 py-2 text-base font-medium leading-7 text-gray-900 hover:bg-gray-50"
                         onClick={() => setMobileMenuOpen(false)}
                       >
-                        <LayoutDashboard className="h-4 w-4 inline-block mr-2" />
-                        Tableau de bord
+                        <Home className="h-4 w-4 inline-block mr-2" />
+                        Hub
                       </Link>
                       <Link
                         href="/dashboard/companies"
@@ -313,14 +283,6 @@ export default function NavBar() {
                         Documents
                       </Link>
                       <Link
-                        href="/dashboard/payslips/create"
-                        className="-mx-3 block rounded-lg px-3 py-2 text-base font-medium leading-7 text-gray-900 hover:bg-gray-50"
-                        onClick={() => setMobileMenuOpen(false)}
-                      >
-                        <FileText className="h-4 w-4 inline-block mr-2" />
-                        Nouveau bulletin
-                      </Link>
-                      <Link
                         href="/profile"
                         className="-mx-3 block rounded-lg px-3 py-2 text-base font-medium leading-7 text-gray-900 hover:bg-gray-50"
                         onClick={() => setMobileMenuOpen(false)}
@@ -331,6 +293,14 @@ export default function NavBar() {
                     </>
                   ) : (
                     <>
+                      <Link
+                        href="/solutions"
+                        className="-mx-3 block rounded-lg px-3 py-2 text-base font-medium leading-7 text-gray-900 hover:bg-gray-50"
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        <Briefcase className="h-4 w-4 inline-block mr-2" />
+                        Solutions
+                      </Link>
                       <Link
                         href="/tarifs"
                         className="-mx-3 block rounded-lg px-3 py-2 text-base font-medium leading-7 text-gray-900 hover:bg-gray-50"
@@ -344,7 +314,7 @@ export default function NavBar() {
                         className="-mx-3 block rounded-lg px-3 py-2 text-base font-medium leading-7 text-gray-900 hover:bg-gray-50"
                         onClick={() => setMobileMenuOpen(false)}
                       >
-                        <FileText className="h-4 w-4 inline-block mr-2" />
+                        <MonitorSmartphone className="h-4 w-4 inline-block mr-2" />
                         Démo
                       </Link>
                       <Link
@@ -352,7 +322,7 @@ export default function NavBar() {
                         className="-mx-3 block rounded-lg px-3 py-2 text-base font-medium leading-7 text-gray-900 hover:bg-gray-50"
                         onClick={() => setMobileMenuOpen(false)}
                       >
-                        <FileText className="h-4 w-4 inline-block mr-2" />
+                        <HelpCircle className="h-4 w-4 inline-block mr-2" />
                         FAQ
                       </Link>
                     </>
@@ -373,25 +343,18 @@ export default function NavBar() {
                       Déconnexion
                     </a>
                   ) : (
-                    <>
-                      <Link
-                        href="/auth/login"
-                        className="-mx-3 block rounded-lg px-3 py-2.5 text-base font-medium leading-7 text-gray-900 hover:bg-gray-50"
-                        onClick={() => setMobileMenuOpen(false)}
-                      >
-                        <LogIn className="h-4 w-4 inline-block mr-2" />
-                        Connexion
-                      </Link>
-                      <Link
-                        href="/auth/register"
-                        className="-mx-3 block rounded-lg px-3 py-2.5 text-base font-medium leading-7 text-gray-900 hover:bg-gray-50"
-                        onClick={() => setMobileMenuOpen(false)}
-                      >
-                        <User className="h-4 w-4 inline-block mr-2" />
-                        Inscription
-                      </Link>
-                    </>
+                    <Link
+                      href="/auth/login"
+                      className="-mx-3 block rounded-lg px-3 py-2.5 text-base font-medium leading-7 text-gray-900 hover:bg-gray-50"
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      <LogIn className="h-4 w-4 inline-block mr-2" />
+                      Connexion
+                    </Link>
                   )}
+                  <div className="mt-4 px-3">
+                    <ThemeToggle />
+                  </div>
                 </div>
               </div>
             </div>

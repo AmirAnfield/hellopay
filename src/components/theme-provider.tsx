@@ -3,6 +3,8 @@
 import * as React from "react";
 import { ThemeProvider as NextThemesProvider } from "next-themes";
 
+type Attribute = "class" | "data-theme" | "data-mode";
+
 interface ThemeProviderProps {
   children: React.ReactNode;
   defaultTheme?: string;
@@ -11,15 +13,45 @@ interface ThemeProviderProps {
   enableColorScheme?: boolean;
   disableTransitionOnChange?: boolean;
   themes?: string[];
+  attribute?: Attribute | Attribute[];
 }
 
+/**
+ * Fournisseur de thème amélioré pour gérer les thèmes clair/sombre
+ * - Ajoute une transition douce entre les thèmes
+ * - Persiste la préférence de l'utilisateur
+ * - Respecte la préférence système par défaut
+ */
 export function ThemeProvider({ children, ...props }: ThemeProviderProps) {
+  const [mounted, setMounted] = React.useState(false);
+
+  // Nécessaire car next-themes fonctionne côté client uniquement
+  React.useEffect(() => {
+    setMounted(true);
+
+    // Ajouter la classe pour les transitions fluides une fois que le thème est chargé
+    const timer = setTimeout(() => {
+      document.documentElement.classList.add('theme-transition');
+    }, 300);
+
+    return () => {
+      clearTimeout(timer);
+      document.documentElement.classList.remove('theme-transition');
+    };
+  }, []);
+
+  // Éviter le clignotement lors du changement de thème en rendant l'application
+  // uniquement après que le thème ait été déterminé
+  if (!mounted) {
+    return <div style={{ visibility: "hidden" }}>{children}</div>;
+  }
+
   return (
     <NextThemesProvider
       attribute="class"
       defaultTheme="system"
-      enableSystem
-      disableTransitionOnChange
+      enableSystem={true}
+      disableTransitionOnChange={false}
       {...props}
     >
       {children}

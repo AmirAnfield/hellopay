@@ -1,0 +1,389 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { useAuth } from "@/hooks/useAuth";
+import { 
+  Building, FileSpreadsheet, FileText, Plus, User as UserIcon, 
+  UserPlus, Users, BarChart3, ArrowUpRight, Briefcase,
+  GraduationCap, PlusCircle, Clock, CircleCheck, Package, ClipboardList
+} from "lucide-react";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { collection, getDocs, query, limit } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { doc, getDoc } from "firebase/firestore";
+
+// Type simplifié pour les entreprises
+interface Company {
+  id: string;
+  name: string;
+  siret: string;
+  address?: string;
+  postalCode?: string;
+  city?: string;
+}
+
+// Type pour les données utilisateur
+interface UserData {
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+}
+
+// Composant DashboardCard pour afficher des cartes d'actions
+interface DashboardCardProps {
+  title: string;
+  description: string;
+  icon: React.ElementType;
+  cta: React.ReactNode;
+}
+
+const DashboardCard = ({ title, description, icon: Icon, cta }: DashboardCardProps) => {
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-lg">{title}</CardTitle>
+          <Icon className="h-5 w-5 text-muted-foreground" />
+        </div>
+        <CardDescription>{description}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="flex justify-start">
+          {cta}
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
+// Hook personnalisé pour récupérer les entreprises de Firestore
+function useFirestoreCompanies<T>() {
+  const [data, setData] = useState<T[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
+  
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!user || !user.uid) {
+        setLoading(false);
+        return;
+      }
+      
+      try {
+        // Récupérer les entreprises de l'utilisateur depuis Firestore
+        const userId = user.uid;
+        const companiesRef = collection(db, `users/${userId}/companies`);
+        const querySnapshot = await getDocs(companiesRef);
+        
+        const companiesData: T[] = [];
+        querySnapshot.forEach((doc) => {
+          companiesData.push({ id: doc.id, ...doc.data() } as unknown as T);
+        });
+        
+        setData(companiesData);
+      } catch (error) {
+        console.error("Erreur lors de la récupération des entreprises:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchData();
+  }, [user]);
+  
+  return {
+    data,
+    loading
+  };
+}
+
+export default function DashboardPage() {
+  const { user, loading: authLoading } = useAuth();
+  const [userData, setUserData] = useState<UserData | null>(null);
+  const { data: companies, loading: companiesLoading } = useFirestoreCompanies<Company>();
+  const [employeeCount, setEmployeeCount] = useState<number>(0);
+  const [documentsCount, setDocumentsCount] = useState<number>(0);
+  const [tasksCount, setTasksCount] = useState<number>(3); // Valeur factice pour l'exemple
+  
+  // Récupérer les données utilisateur
+  useEffect(() => {
+    const fetchUserData = async () => {
+      if (user && user.uid) {
+        try {
+          const userRef = doc(db, 'users', user.uid);
+          const userSnap = await getDoc(userRef);
+          
+          if (userSnap.exists()) {
+            setUserData(userSnap.data() as UserData);
+          }
+        } catch (error) {
+          console.error("Erreur lors de la récupération des données utilisateur:", error);
+        }
+      }
+    };
+    
+    fetchUserData();
+  }, [user]);
+  
+  // Récupérer le nombre d'employés
+  useEffect(() => {
+    const fetchEmployeeCount = async () => {
+      if (user && user.uid && companies && companies.length > 0) {
+        try {
+          let totalEmployees = 0;
+          for (const company of companies) {
+            const employeesRef = collection(db, `users/${user.uid}/companies/${company.id}/employees`);
+            const employeesSnapshot = await getDocs(employeesRef);
+            totalEmployees += employeesSnapshot.size;
+          }
+          setEmployeeCount(totalEmployees);
+        } catch (error) {
+          console.error("Erreur lors de la récupération des employés:", error);
+        }
+      }
+    };
+    
+    fetchEmployeeCount();
+  }, [user, companies]);
+  
+  // Récupérer le nombre de documents
+  useEffect(() => {
+    const fetchDocumentsCount = async () => {
+      if (user && user.uid) {
+        try {
+          const documentsRef = collection(db, `users/${user.uid}/documents`);
+          const documentsSnapshot = await getDocs(documentsRef);
+          setDocumentsCount(documentsSnapshot.size);
+        } catch (error) {
+          console.error("Erreur lors de la récupération des documents:", error);
+        }
+      }
+    };
+    
+    fetchDocumentsCount();
+  }, [user]);
+  
+  // Afficher un état de chargement
+  if (authLoading) {
+    return (
+      <div className="container mx-auto p-4">
+        <Skeleton className="h-12 w-full mb-4" />
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => (
+            <Skeleton key={i} className="h-20 w-full" />
+          ))}
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-6">
+          {[...Array(3)].map((_, i) => (
+            <Skeleton key={i} className="h-40 w-full" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+  
+  // Si l'utilisateur n'est pas connecté, rediriger vers la page de connexion
+  if (!user) {
+    return null; // Le middleware gérera la redirection
+  }
+  
+  // Obtenir le prénom de l'utilisateur
+  const firstName = userData?.firstName || (user.displayName ? user.displayName.split(' ')[0] : '');
+  
+  return (
+    <div className="container mx-auto p-4">
+      <div className="mb-4 flex flex-col md:flex-row justify-between items-start md:items-center">
+        <div>
+          <div className="flex items-center">
+            <h1 className="text-2xl font-bold">Hub</h1>
+            <Badge variant="outline" className="ml-3 px-2 bg-blue-50 text-blue-700 border-blue-200">
+              {user.uid.substring(0, 6)}
+            </Badge>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            {firstName ? `${firstName}` : ''} <span className="text-xs opacity-60">{user.email}</span>
+          </p>
+        </div>
+        <div className="mt-2 md:mt-0">
+          <Button size="sm" variant="outline" asChild>
+            <Link href="/profile">
+              <UserIcon className="h-4 w-4 mr-1" />
+              Profil
+            </Link>
+          </Button>
+        </div>
+      </div>
+      
+      {/* Tableau de bord compact */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+        <Card className="bg-white shadow-sm">
+          <CardContent className="p-4 flex justify-between items-center">
+            <div>
+              <p className="text-xs text-muted-foreground">Entreprises</p>
+              <p className="text-2xl font-bold">{companiesLoading ? '...' : companies?.length || 0}</p>
+            </div>
+            <Briefcase className="h-8 w-8 text-blue-500 opacity-80" />
+          </CardContent>
+        </Card>
+        
+        <Card className="bg-white shadow-sm">
+          <CardContent className="p-4 flex justify-between items-center">
+            <div>
+              <p className="text-xs text-muted-foreground">Employés</p>
+              <p className="text-2xl font-bold">{employeeCount}</p>
+            </div>
+            <Users className="h-8 w-8 text-green-500 opacity-80" />
+          </CardContent>
+        </Card>
+        
+        <Card className="bg-white shadow-sm">
+          <CardContent className="p-4 flex justify-between items-center">
+            <div>
+              <p className="text-xs text-muted-foreground">Documents</p>
+              <p className="text-2xl font-bold">{documentsCount}</p>
+            </div>
+            <FileText className="h-8 w-8 text-orange-500 opacity-80" />
+          </CardContent>
+        </Card>
+        
+        <Card className="bg-white shadow-sm">
+          <CardContent className="p-4 flex justify-between items-center">
+            <div>
+              <p className="text-xs text-muted-foreground">Tâches</p>
+              <p className="text-2xl font-bold">{tasksCount}</p>
+            </div>
+            <ClipboardList className="h-8 w-8 text-violet-500 opacity-80" />
+          </CardContent>
+        </Card>
+      </div>
+      
+      {/* Actions rapides */}
+      <div className="mb-6">
+        <h2 className="text-lg font-semibold mb-3">Actions rapides</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
+            <CardContent className="p-4 flex items-center">
+              <div className="mr-4 bg-white p-2 rounded-md">
+                <UserPlus className="h-5 w-5 text-blue-500" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-medium text-sm">Ajouter un employé</h3>
+                <p className="text-xs text-muted-foreground mt-1">Créer un nouvel employé</p>
+              </div>
+              <Button size="sm" variant="ghost" asChild className="ml-2">
+                <Link href="/dashboard/employees/wizard">
+                  <ArrowUpRight className="h-4 w-4" />
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+          
+          <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200">
+            <CardContent className="p-4 flex items-center">
+              <div className="mr-4 bg-white p-2 rounded-md">
+                <FileSpreadsheet className="h-5 w-5 text-green-500" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-medium text-sm">Créer un bulletin</h3>
+                <p className="text-xs text-muted-foreground mt-1">Générer un bulletin de paie</p>
+              </div>
+              <Button size="sm" variant="ghost" asChild className="ml-2">
+                <Link href="/dashboard/payslips/create">
+                  <ArrowUpRight className="h-4 w-4" />
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+          
+          <Card className="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200">
+            <CardContent className="p-4 flex items-center">
+              <div className="mr-4 bg-white p-2 rounded-md">
+                <Package className="h-5 w-5 text-orange-500" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-medium text-sm">Ajouter une entreprise</h3>
+                <p className="text-xs text-muted-foreground mt-1">Créer une nouvelle société</p>
+              </div>
+              <Button size="sm" variant="ghost" asChild className="ml-2">
+                <Link href="/dashboard/companies/new">
+                  <ArrowUpRight className="h-4 w-4" />
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+      
+      {/* Entreprises récentes */}
+      <div className="mb-6">
+        <div className="flex justify-between items-center mb-3">
+          <h2 className="text-lg font-semibold">Vos entreprises</h2>
+          <Button size="sm" variant="ghost" asChild className="text-xs">
+            <Link href="/dashboard/companies">
+              Voir tout
+              <ArrowUpRight className="h-3.5 w-3.5 ml-1" />
+            </Link>
+          </Button>
+        </div>
+        
+        {companiesLoading ? (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {[...Array(3)].map((_, i) => (
+              <Skeleton key={i} className="h-32 w-full" />
+            ))}
+          </div>
+        ) : companies && companies.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {companies.slice(0, 2).map((company) => (
+              <Card key={company.id} className="overflow-hidden">
+                <CardContent className="p-4">
+                  <div className="flex justify-between items-start mb-2">
+                    <h3 className="font-medium text-sm">{company.name}</h3>
+                    <Badge variant="outline" className="text-xs px-1.5 py-0">SIRET</Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground mb-3">{company.siret || 'N/A'}</p>
+                  <div className="text-xs text-muted-foreground mb-3">
+                    {company.address && `${company.address}, `}
+                    {company.postalCode && `${company.postalCode} `}
+                    {company.city && company.city}
+                  </div>
+                  <Button size="sm" variant="outline" asChild className="w-full mt-2">
+                    <Link href={`/dashboard/companies/${company.id}`}>
+                      Gérer
+                    </Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
+            
+            <Link href="/dashboard/companies/new" className="block h-full">
+              <Card className="h-full border-dashed bg-muted/20 hover:bg-muted/50 transition-colors flex flex-col items-center justify-center p-4">
+                <PlusCircle className="h-8 w-8 text-muted-foreground mb-2" />
+                <p className="text-sm font-medium text-muted-foreground">Nouvelle entreprise</p>
+              </Card>
+            </Link>
+          </div>
+        ) : (
+          <Card className="bg-muted/20">
+            <CardContent className="p-6 flex flex-col items-center">
+              <Building className="h-10 w-10 text-muted-foreground mb-3" />
+              <h3 className="text-base font-medium mb-1">Aucune entreprise</h3>
+              <p className="text-sm text-muted-foreground mb-4 text-center">Commencez par ajouter votre première entreprise</p>
+              <Button size="sm" asChild>
+                <Link href="/dashboard/companies/new">
+                  <PlusCircle className="mr-2 h-4 w-4" />
+                  Ajouter une entreprise
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    </div>
+  );
+} 

@@ -20,6 +20,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2, ArrowLeft, Save } from "lucide-react";
+import { auth, db } from "@/lib/firebase";
+import { doc, getDoc, updateDoc, serverTimestamp, collection, addDoc } from "firebase/firestore";
 
 // Schéma de validation avec Zod
 const companyFormSchema = z.object({
@@ -29,11 +31,12 @@ const companyFormSchema = z.object({
     .trim(),
   
   siret: z.string()
-    .regex(/^\d{14}$/, "Le SIRET doit comporter exactement 14 chiffres")
+    .min(5, "Le SIRET doit comporter au moins 5 caractères")
+    .max(14, "Le SIRET ne peut pas dépasser 14 caractères")
     .trim(),
   
   address: z.string()
-    .min(5, "L'adresse doit comporter au moins 5 caractères")
+    .min(2, "L'adresse doit comporter au moins 2 caractères")
     .trim(),
   
   city: z.string()
@@ -49,15 +52,21 @@ const companyFormSchema = z.object({
     .default("France"),
   
   // Champs optionnels - exactement comme dans le schéma serveur
-  activityCode: z.string().optional().nullable(),
-  urssafNumber: z.string().optional().nullable(),
-  legalForm: z.string().default("SARL").optional().nullable(),
-  vatNumber: z.string().optional().nullable(),
-  phoneNumber: z.string().optional().nullable(),
-  email: z.string().email("Format d'email invalide").optional().nullable(),
-  website: z.string().optional().nullable(),
-  legalRepresentative: z.string().optional().nullable(),
-  legalRepresentativeRole: z.string().optional().nullable(),
+  apeCode: z.string().optional(),
+  urssafRegion: z.string().optional(),
+  collectiveAgreement: z.string().optional(),
+  legalForm: z.string().default("SARL").optional(),
+  vatNumber: z.string().optional(),
+  phoneNumber: z.string().optional(),
+  // Email est optionnel mais s'il est fourni, il doit être valide
+  email: z.union([
+    z.string().email("Format d'email invalide"),
+    z.string().length(0)
+  ]).optional(),
+  website: z.string().optional(),
+  legalFirstName: z.string().optional(),
+  legalLastName: z.string().optional(),
+  legalRepresentativeRole: z.string().optional(),
 });
 
 // Types pour les props et le formulaire
@@ -84,14 +93,16 @@ export default function CompanyForm({ companyId }: CompanyFormProps) {
       postalCode: "",
       city: "",
       country: "France",
-      activityCode: "",
-      urssafNumber: "",
+      apeCode: "",
+      urssafRegion: "",
+      collectiveAgreement: "",
       legalForm: "SARL",
       vatNumber: "",
       phoneNumber: "",
       email: "",
       website: "",
-      legalRepresentative: "",
+      legalFirstName: "",
+      legalLastName: "",
       legalRepresentativeRole: "",
     },
   });
@@ -106,97 +117,75 @@ export default function CompanyForm({ companyId }: CompanyFormProps) {
   async function fetchCompanyData() {
     setIsFetching(true);
     try {
-      // En mode développement, récupérer depuis localStorage au lieu de l'API
-      if (typeof window !== 'undefined') {
-        try {
-          const companiesStr = localStorage.getItem('companies');
-          if (companiesStr) {
-            const companies = JSON.parse(companiesStr);
-            const company = companies.find((c: { id: string }) => c.id === companyId);
-            
-            if (company) {
-              // Remplir le formulaire avec les données existantes
-              form.reset({
-                name: company.name || "",
-                siret: company.siret || "",
-                address: company.address || "",
-                postalCode: company.postalCode || "",
-                city: company.city || "",
-                country: company.country || "France",
-                activityCode: company.activityCode || "",
-                urssafNumber: company.urssafNumber || "",
-                legalForm: company.legalForm || "SARL",
-                vatNumber: company.vatNumber || "",
-                phoneNumber: company.phoneNumber || "",
-                email: company.email || "",
-                website: company.website || "",
-                legalRepresentative: company.legalRepresentative || "",
-                legalRepresentativeRole: company.legalRepresentativeRole || "",
-              });
-              
-              setIsFetching(false);
-              return;
-            }
-          }
-        } catch (e) {
-          console.error("Erreur lors de la récupération depuis localStorage:", e);
-        }
+      if (!auth.currentUser) {
+        throw new Error("Utilisateur non authentifié");
       }
+
+      const userId = auth.currentUser.uid;
+      const companyDocRef = doc(db, `users/${userId}/companies/${companyId}`);
+      const companySnapshot = await getDoc(companyDocRef);
       
-      // Fallback vers l'API (désactivé pour le moment)
-      /*
-      const response = await fetch(`/api/companies/${companyId}`);
-      
-      if (!response.ok) {
-        const errorMsg = `Erreur ${response.status}: Impossible de récupérer les données de l'entreprise`;
-        console.error(errorMsg);
+      if (companySnapshot.exists()) {
+        const companyData = companySnapshot.data();
+        
+        // Vérifier si l'entreprise est verrouillée
+        if (companyData.isLocked) {
         toast({
+            title: "Accès refusé",
+            description: "Cette entreprise est verrouillée et ne peut pas être modifiée.",
           variant: "destructive",
-          title: "Erreur",
-          description: "Impossible de charger les informations de l'entreprise."
+            duration: 5000,
         });
+          
+          // Rediriger vers la liste des entreprises
+          setTimeout(() => {
+            router.push("/dashboard/companies");
+          }, 1500);
         setIsFetching(false);
         return;
       }
       
-      const data = await response.json();
-      
       // Remplir le formulaire avec les données existantes
-      if (data.company) {
-        const company = data.company;
         form.reset({
-          name: company.name,
-          siret: company.siret,
-          address: company.address,
-          postalCode: company.postalCode,
-          city: company.city,
-          country: company.country || "France",
-          activityCode: company.activityCode || "",
-          urssafNumber: company.urssafNumber || "",
-          legalForm: company.legalForm || "SARL",
-          vatNumber: company.vatNumber || "",
-          phoneNumber: company.phoneNumber || "",
-          email: company.email || "",
-          website: company.website || "",
-          legalRepresentative: company.legalRepresentative || "",
-          legalRepresentativeRole: company.legalRepresentativeRole || "",
+          name: companyData.name || "",
+          siret: companyData.siret || "",
+          address: companyData.address || "",
+          postalCode: companyData.postalCode || "",
+          city: companyData.city || "",
+          country: companyData.country || "France",
+          apeCode: companyData.apeCode || "",
+          urssafRegion: companyData.urssafRegion || "",
+          collectiveAgreement: companyData.collectiveAgreement || "",
+          legalForm: companyData.legalForm || "SARL",
+          vatNumber: companyData.vatNumber || "",
+          phoneNumber: companyData.phoneNumber || "",
+          email: companyData.email || "",
+          website: companyData.website || "",
+          legalFirstName: companyData.legalFirstName || "",
+          legalLastName: companyData.legalLastName || "",
+          legalRepresentativeRole: companyData.legalRepresentativeRole || "",
         });
+        
+        setIsFetching(false);
+        return;
       }
-      */
       
-      // Si aucune donnée n'a été trouvée, afficher un message d'erreur
-      toast({
-        variant: "destructive",
-        title: "Erreur",
-        description: "Impossible de charger les informations de l'entreprise."
-      });
+      // Si l'entreprise n'existe pas
+      throw new Error("Cette entreprise n'existe pas");
     } catch (err) {
       console.error("Erreur:", err);
       toast({
         variant: "destructive",
         title: "Erreur",
-        description: "Impossible de charger les informations de l'entreprise."
+        description: err instanceof Error 
+          ? err.message 
+          : "Une erreur est survenue lors de la récupération des informations de l'entreprise."
       });
+      
+      // Rediriger vers la liste des entreprises
+      setTimeout(() => {
+        router.push("/dashboard/companies");
+      }, 2000);
     } finally {
       setIsFetching(false);
     }
@@ -217,135 +206,63 @@ export default function CompanyForm({ companyId }: CompanyFormProps) {
       data.website = `https://${data.website}`;
     }
     
+    // Combiner prénom et nom pour le représentant légal pour la compatibilité avec d'autres parties de l'application
+    const legalRepresentative = data.legalFirstName && data.legalLastName 
+      ? `${data.legalFirstName} ${data.legalLastName}`
+      : '';
+    
     console.log("Données soumises:", data);
     
     try {
-      // En mode développement, sauvegarder dans localStorage
-      if (typeof window !== 'undefined') {
-        try {
-          const companiesStr = localStorage.getItem('companies');
-          const companies = companiesStr ? JSON.parse(companiesStr) : [];
-          
-          if (isEditMode) {
-            // Mettre à jour l'entreprise existante
-            const updatedCompanies = companies.map((company: { id: string }) => {
-              if (company.id === companyId) {
-                return {
-                  ...company,
-                  ...data,
-                  updatedAt: new Date()
-                };
-              }
-              return company;
-            });
-            
-            localStorage.setItem('companies', JSON.stringify(updatedCompanies));
-          } else {
-            // Créer une nouvelle entreprise
-            const newCompanyId = `company-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
-            const newCompany = {
-              ...data,
-              id: newCompanyId,
-              createdAt: new Date(),
-              updatedAt: new Date()
-            };
-            
-            companies.push(newCompany);
-            localStorage.setItem('companies', JSON.stringify(companies));
-          }
-          
-          // Simuler un délai pour l'enregistrement
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          
-          // Notification plus claire
-          toast({
-            title: isEditMode ? "Entreprise mise à jour" : "Entreprise créée",
-            description: isEditMode 
-              ? `Les informations de l'entreprise "${data.name}" ont été mises à jour avec succès.` 
-              : `L'entreprise "${data.name}" a été créée avec succès.`,
-            variant: "default",
-          });
-          
-          // Rediriger vers la liste des entreprises après un court délai
-          setTimeout(() => {
-            // Utiliser window.location.href pour forcer un rechargement complet
-            window.location.href = `/dashboard/companies?action=${isEditMode ? 'updated' : 'created'}&name=${encodeURIComponent(data.name)}`;
-          }, 1500);
-          return;
-        } catch (e) {
-          console.error("Erreur lors de la sauvegarde dans localStorage:", e);
-          throw new Error("Impossible de sauvegarder l'entreprise");
-        }
+      if (!auth.currentUser) {
+        throw new Error("Utilisateur non authentifié");
       }
-      
-      // Fallback vers l'API (désactivé pour le moment)
-      /*
-      const url = isEditMode ? `/api/companies/${companyId}` : "/api/companies";
-      const method = isEditMode ? "PUT" : "POST";
-      
-      const response = await fetch(url, {
-        method,
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(data),
-      });
 
-      if (!response.ok) {
-        let errorMessage = "Une erreur est survenue";
-        
-        // Tenter d'extraire le message d'erreur JSON si disponible
-        const contentType = response.headers.get("content-type");
-        if (contentType && contentType.includes("application/json")) {
-          try {
-            const errorData = await response.json();
-            if (errorData.error || errorData.message) {
-              errorMessage = errorData.error || errorData.message;
-            }
-            
-            // Si nous avons des erreurs de validation détaillées, les afficher
-            if (errorData.errors && Array.isArray(errorData.errors)) {
-              errorMessage += ": " + errorData.errors.map((err: { message?: string; path?: string[] }) => 
-                err.message || (err.path ? err.path.join('.') : 'Erreur de validation')
-              ).join(', ');
-            }
-          } catch (e) {
-            // Ignorer l'erreur de parsing JSON et utiliser le message par défaut
-            console.error("Erreur de parsing JSON:", e);
-          }
-        } else {
-          // Utiliser le statut HTTP comme information d'erreur si pas de JSON
-          errorMessage = `Erreur ${response.status}: ${response.statusText || 'Erreur serveur'}`;
-        }
-        
-        // Afficher l'erreur dans la console pour le débogage
-        console.error("Erreur API:", errorMessage);
-        
-        // Afficher l'erreur à l'utilisateur
-        toast({
-          variant: "destructive",
-          title: "Erreur",
-          description: errorMessage
+      const userId = auth.currentUser.uid;
+      
+      if (isEditMode) {
+        // Mettre à jour l'entreprise existante
+        const companyRef = doc(db, `users/${userId}/companies/${companyId}`);
+        await updateDoc(companyRef, {
+          ...data,
+          legalRepresentative, // Ajouter le champ combiné pour la compatibilité
+          updatedAt: serverTimestamp()
         });
         
-        // Terminer la fonction sans throw pour éviter l'erreur de console
-        setIsLoading(false);
-        return;
+        // Notification de succès - plus visible
+        toast({
+          title: "Entreprise mise à jour",
+          description: `Les informations de l'entreprise "${data.name}" ont été mises à jour avec succès.`,
+          variant: "default",
+        });
+        
+        // Redirection avec paramètres pour afficher une notification sur la page de destination
+        setTimeout(() => {
+          router.push(`/dashboard/companies?action=updated&name=${encodeURIComponent(data.name)}`);
+        }, 1000);
+      } else {
+        // Créer une nouvelle entreprise
+        const companiesRef = collection(db, `users/${userId}/companies`);
+        await addDoc(companiesRef, {
+          ...data,
+          legalRepresentative, // Ajouter le champ combiné pour la compatibilité
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+          ownerId: userId
+        });
+        
+        // Notification de succès
+        toast({
+          title: "Entreprise créée",
+          description: `L'entreprise "${data.name}" a été créée avec succès.`,
+          variant: "default",
+        });
+        
+        // Rediriger vers la liste des entreprises avec paramètres pour notification
+        setTimeout(() => {
+          router.push(`/dashboard/companies?action=created&name=${encodeURIComponent(data.name)}`);
+        }, 1000);
       }
-
-      toast({
-        title: isEditMode ? "Entreprise mise à jour" : "Entreprise créée",
-        description: isEditMode 
-          ? "Les informations de l'entreprise ont été mises à jour avec succès." 
-          : "Votre entreprise a été créée avec succès.",
-      });
-
-      // Rediriger vers la liste des entreprises
-      router.push("/dashboard/companies");
-      */
-      
-      // Si nous sommes ici, c'est qu'il y a un problème
-      throw new Error("Problème lors de l'enregistrement de l'entreprise");
     } catch (err) {
       console.error("Erreur:", err);
       toast({
@@ -418,10 +335,10 @@ export default function CompanyForm({ companyId }: CompanyFormProps) {
                     <FormItem>
                       <FormLabel>SIRET <span className="text-destructive">*</span></FormLabel>
                       <FormControl>
-                        <Input placeholder="14 chiffres" {...field} />
+                        <Input placeholder="5 à 14 chiffres" {...field} />
                       </FormControl>
                       <FormDescription>
-                        Format: 14 chiffres sans espaces
+                        Format: 5 à 14 chiffres sans espaces
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
@@ -452,7 +369,8 @@ export default function CompanyForm({ companyId }: CompanyFormProps) {
                           <SelectItem value="SCI">SCI</SelectItem>
                           <SelectItem value="EI">Entreprise Individuelle</SelectItem>
                           <SelectItem value="EIRL">EIRL</SelectItem>
-                          <SelectItem value="Autre">Autre</SelectItem>
+                          <SelectItem value="SNC">SNC</SelectItem>
+                          <SelectItem value="Micro-entreprise">Micro-entreprise</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -464,7 +382,7 @@ export default function CompanyForm({ companyId }: CompanyFormProps) {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <FormField
                   control={form.control}
-                  name="activityCode"
+                  name="apeCode"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Code APE/NAF</FormLabel>
@@ -481,12 +399,12 @@ export default function CompanyForm({ companyId }: CompanyFormProps) {
 
                 <FormField
                   control={form.control}
-                  name="urssafNumber"
+                  name="urssafRegion"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Numéro URSSAF</FormLabel>
+                      <FormLabel>URSSAF Région</FormLabel>
                       <FormControl>
-                        <Input placeholder="9 chiffres" {...field} />
+                        <Input placeholder="Ex: 12" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -506,6 +424,20 @@ export default function CompanyForm({ companyId }: CompanyFormProps) {
                     <FormDescription>
                       Format: FR suivi de 11 chiffres
                     </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="collectiveAgreement"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Convention Collective</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Ex: Convention Collective Nationale des Bureaux d'Études Techniques" {...field} />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -662,22 +594,35 @@ export default function CompanyForm({ companyId }: CompanyFormProps) {
             <CardContent className="space-y-6">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <FormLabel htmlFor="legalRepresentative">Représentant légal</FormLabel>
+                  <FormLabel htmlFor="legalFirstName">Prénom</FormLabel>
                   <Input
-                    id="legalRepresentative"
-                    placeholder="Nom et prénom"
-                    {...form.register("legalRepresentative")}
+                    id="legalFirstName"
+                    placeholder="Prénom"
+                    {...form.register("legalFirstName")}
                   />
                 </div>
                 <div>
-                  <FormLabel htmlFor="legalRepresentativeRole">Fonction</FormLabel>
+                  <FormLabel htmlFor="legalLastName">Nom</FormLabel>
                   <Input
-                    id="legalRepresentativeRole"
-                    placeholder="Ex: Gérant, Président, etc."
-                    {...form.register("legalRepresentativeRole")}
+                    id="legalLastName"
+                    placeholder="Nom"
+                    {...form.register("legalLastName")}
                   />
                 </div>
               </div>
+              <FormField
+                control={form.control}
+                name="legalRepresentativeRole"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Fonction</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Ex: Gérant, Président, etc." {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             </CardContent>
           </Card>
 

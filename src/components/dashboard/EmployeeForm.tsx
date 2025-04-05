@@ -11,6 +11,8 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Loader2 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
+import { collection, doc, getDoc, getDocs, setDoc, addDoc, updateDoc } from "firebase/firestore";
+import { firestore, auth } from "@/lib/firebase/config";
 
 // Types pour le formulaire
 interface EmployeeFormData {
@@ -92,26 +94,61 @@ export default function EmployeeForm({ employeeId, initialCompanyId }: EmployeeF
   });
 
   useEffect(() => {
-    // Charger la liste des entreprises
-    fetchCompanies();
+    // Vérifier l'authentification et charger les données
+    const checkAuthAndLoadData = async () => {
+      if (!auth.currentUser) {
+        const unsubscribe = auth.onAuthStateChanged((user) => {
+          if (user) {
+            // Charger la liste des entreprises
+            fetchCompanies(user.uid);
+            
+            // Si on est en mode édition, charger les données de l'employé
+            if (employeeId) {
+              fetchEmployeeData(user.uid, employeeId);
+            } else {
+              setIsLoading(false);
+            }
+          } else {
+            setIsLoading(false);
+            toast({
+              variant: "destructive",
+              title: "Erreur d'authentification",
+              description: "Vous devez être connecté pour accéder à cette fonctionnalité."
+            });
+          }
+          unsubscribe();
+        });
+      } else {
+        // Charger la liste des entreprises
+        fetchCompanies(auth.currentUser.uid);
+        
+        // Si on est en mode édition, charger les données de l'employé
+        if (employeeId) {
+          fetchEmployeeData(auth.currentUser.uid, employeeId);
+        } else {
+          setIsLoading(false);
+        }
+      }
+    };
     
-    // Si on est en mode édition, charger les données de l'employé
-    if (employeeId) {
-      fetchEmployeeData(employeeId);
-    } else {
-      setIsLoading(false);
-    }
-  }, [employeeId, initialCompanyId]);
+    checkAuthAndLoadData();
+  }, [employeeId, initialCompanyId, toast]);
 
   // Fonction pour récupérer les entreprises
-  async function fetchCompanies() {
+  async function fetchCompanies(userId: string) {
     try {
-      const response = await fetch("/api/companies");
-      if (!response.ok) {
-        throw new Error("Erreur lors de la récupération des entreprises");
-      }
-      const data = await response.json();
-      setCompanies(data.companies || []);
+      const companiesCollection = collection(firestore, `users/${userId}/companies`);
+      const companiesSnapshot = await getDocs(companiesCollection);
+      
+      const companiesData: Company[] = [];
+      companiesSnapshot.forEach((doc) => {
+        companiesData.push({
+          id: doc.id,
+          name: doc.data().name || doc.data().raisonSociale || "Entreprise sans nom"
+        });
+      });
+      
+      setCompanies(companiesData);
     } catch (err) {
       console.error("Erreur:", err);
       toast({
@@ -123,29 +160,34 @@ export default function EmployeeForm({ employeeId, initialCompanyId }: EmployeeF
   }
 
   // Fonction pour récupérer les données d'un employé existant
-  async function fetchEmployeeData(id: string) {
+  async function fetchEmployeeData(userId: string, employeeId: string) {
     setIsLoading(true);
     try {
-      const response = await fetch(`/api/employees/${id}`);
-      if (!response.ok) {
-        throw new Error("Erreur lors de la récupération des données de l'employé");
-      }
-      const data = await response.json();
+      const employeeDoc = doc(firestore, `users/${userId}/employees`, employeeId);
+      const employeeSnapshot = await getDoc(employeeDoc);
       
-      if (data.employee) {
+      if (employeeSnapshot.exists()) {
+        const employeeData = employeeSnapshot.data();
+        
         // Formatter les dates pour les champs de type date
-        const employee = data.employee;
         const formattedEmployee = {
-          ...employee,
-          birthDate: employee.birthDate ? format(new Date(employee.birthDate), "yyyy-MM-dd") : "",
-          startDate: employee.startDate ? format(new Date(employee.startDate), "yyyy-MM-dd") : "",
-          endDate: employee.endDate ? format(new Date(employee.endDate), "yyyy-MM-dd") : "",
-          trialPeriodEndDate: employee.trialPeriodEndDate 
-            ? format(new Date(employee.trialPeriodEndDate), "yyyy-MM-dd") 
+          ...employeeData,
+          id: employeeSnapshot.id,
+          birthDate: employeeData.birthDate ? format(new Date(employeeData.birthDate), "yyyy-MM-dd") : "",
+          startDate: employeeData.startDate ? format(new Date(employeeData.startDate), "yyyy-MM-dd") : "",
+          endDate: employeeData.endDate ? format(new Date(employeeData.endDate), "yyyy-MM-dd") : "",
+          trialPeriodEndDate: employeeData.trialPeriodEndDate 
+            ? format(new Date(employeeData.trialPeriodEndDate), "yyyy-MM-dd") 
             : "",
         };
         
-        setFormData(formattedEmployee as EmployeeFormData);
+        setFormData(formattedEmployee as unknown as EmployeeFormData);
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Erreur",
+          description: "Employé non trouvé."
+        });
       }
     } catch (err) {
       console.error("Erreur:", err);
@@ -219,8 +261,8 @@ export default function EmployeeForm({ employeeId, initialCompanyId }: EmployeeF
       }
       
       // Validation email si fourni
-      if (!formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-        validationErrors.push("L&apos;adresse email n&apos;est pas valide");
+      if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+        validationErrors.push("L'adresse email n'est pas valide");
       }
 
       // Si des erreurs de validation sont trouvées, les afficher et arrêter la soumission
@@ -240,24 +282,28 @@ export default function EmployeeForm({ employeeId, initialCompanyId }: EmployeeF
         return;
       }
 
-      // Création ou mise à jour de l'employé
-      const url = employeeId
-        ? `/api/employees/${employeeId}`
-        : "/api/employees";
-      
-      const method = employeeId ? "PUT" : "POST";
-      
-      const response = await fetch(url, {
-        method,
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(formData),
-      });
+      if (!auth.currentUser) {
+        throw new Error("Vous devez être connecté pour effectuer cette action");
+      }
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Une erreur est survenue");
+      const userId = auth.currentUser.uid;
+      
+      // Création ou mise à jour de l'employé dans Firestore
+      if (employeeId) {
+        // Mise à jour d'un employé existant
+        const employeeRef = doc(firestore, `users/${userId}/employees`, employeeId);
+        await updateDoc(employeeRef, {
+          ...formData,
+          updatedAt: new Date().toISOString()
+        });
+      } else {
+        // Création d'un nouvel employé
+        const employeesCollection = collection(firestore, `users/${userId}/employees`);
+        await addDoc(employeesCollection, {
+          ...formData,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        });
       }
 
       toast({

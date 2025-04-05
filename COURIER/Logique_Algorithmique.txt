@@ -1,1 +1,0 @@
-Étapes de calcul automatisé d’un bulletin de paie pour développeurs.

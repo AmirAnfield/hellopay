@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createSessionCookie, verifyIdToken } from '@/lib/firebase-admin-node';
+import { createSessionCookie, verifyIdToken } from '@/lib/firebase/admin';
 
 // Configuration de la route pour être dynamique
 export const dynamic = "force-dynamic";
@@ -11,7 +11,19 @@ export const dynamic = "force-dynamic";
  */
 export async function POST(request: NextRequest) {
   try {
-    const { idToken } = await request.json();
+    // Vérifier si la requête est valide
+    let body;
+    try {
+      body = await request.json();
+    } catch (e) {
+      console.error('Erreur de parsing JSON:', e);
+      return NextResponse.json(
+        { error: 'Format de requête invalide' },
+        { status: 400 }
+      );
+    }
+    
+    const { idToken } = body;
     
     if (!idToken) {
       return NextResponse.json(
@@ -21,7 +33,15 @@ export async function POST(request: NextRequest) {
     }
     
     // Vérifier le token d'ID
-    await verifyIdToken(idToken);
+    try {
+      await verifyIdToken(idToken);
+    } catch (e) {
+      console.error('Erreur de validation du token:', e);
+      return NextResponse.json(
+        { error: 'Token invalide', details: e instanceof Error ? e.message : 'Erreur inconnue' },
+        { status: 401 }
+      );
+    }
     
     // Créer un cookie de session (5 jours par défaut)
     const expiresIn = 5 * 24 * 60 * 60 * 1000; // 5 jours en millisecondes
@@ -52,8 +72,11 @@ export async function POST(request: NextRequest) {
     console.error('Erreur de création de session:', error);
     
     return NextResponse.json(
-      { error: 'Erreur d\'authentification' },
-      { status: 401 }
+      { 
+        error: 'Erreur d\'authentification', 
+        details: error instanceof Error ? error.message : 'Erreur inconnue'
+      },
+      { status: 500 }
     );
   }
 }

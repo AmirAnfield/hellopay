@@ -18,7 +18,7 @@ import {
   PageContainer, 
   PageHeader, 
   EmptyState, 
-  LoadingState
+  LoadingState 
 } from "@/components/shared/PageContainer";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -188,7 +188,7 @@ export default function CertificatesPage() {
 
   return (
     <PageContainer>
-      <PageHeader
+      <PageHeader 
         title="Attestations de travail"
         description="Consultez et gérez vos attestations de travail"
         actions={
@@ -291,10 +291,10 @@ export default function CertificatesPage() {
           <CardDescription>
             Consultez et gérez vos attestations de travail
           </CardDescription>
-        </CardHeader>
+          </CardHeader>
         <CardContent>
-          {isLoading ? (
-            <LoadingState message="Chargement des attestations..." />
+            {isLoading ? (
+              <LoadingState message="Chargement des attestations..." />
           ) : documents.length > 0 ? (
             <Table>
               <TableHeader>
@@ -313,7 +313,7 @@ export default function CertificatesPage() {
                       <div className="flex items-center space-x-3">
                         <FileBadge className="h-5 w-5 text-amber-500" />
                         <span className="font-medium">{doc.title}</span>
-                      </div>
+                        </div>
                     </TableCell>
                     <TableCell>
                       <div className="text-sm">
@@ -335,29 +335,29 @@ export default function CertificatesPage() {
                         {doc.pdfUrl && (
                           <Button variant="ghost" size="icon" onClick={() => generatePdf(doc)}>
                             <Download className="h-4 w-4" />
-                          </Button>
-                        )}
-                      </div>
+                        </Button>
+                      )}
+                    </div>
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
-          ) : (
-            <EmptyState
+            ) : (
+              <EmptyState
               title="Aucune attestation"
               description="Vous n'avez pas encore généré d'attestation de travail."
               icon={FileBadge}
-              action={
+                action={
                 <Button onClick={() => window.location.href = '/dashboard/documents?documentType=attestation&openCreateDialog=true'}>
                   <Plus className="h-4 w-4 mr-2" />
-                  Créer une attestation
-                </Button>
-              }
-            />
-          )}
-        </CardContent>
-      </Card>
+                    Créer une attestation
+                  </Button>
+                }
+              />
+            )}
+          </CardContent>
+        </Card>
     </PageContainer>
   );
 } 

@@ -28,6 +28,8 @@ import {
 } from "@/components/shared/PageContainer";
 import { DeleteConfirmationDialog } from "@/components/shared/ConfirmationDialog";
 import { TableLoader } from "@/components/shared/SkeletonLoader";
+import { collection, getDocs, doc, deleteDoc } from "firebase/firestore";
+import { firestore, auth } from "@/lib/firebase/config";
 
 // Type pour représenter un employé
 interface Employee {
@@ -64,19 +66,64 @@ export default function DashboardCompany() {
   const { toast } = useToast();
 
   useEffect(() => {
-    fetchCompanies();
-  }, []);
+    const checkAuthAndFetchCompanies = () => {
+      if (!auth.currentUser) {
+        const unsubscribe = auth.onAuthStateChanged((user) => {
+          if (user) {
+            fetchCompanies(user.uid);
+          } else {
+            setIsLoading(false);
+            setError("Vous devez être connecté pour accéder à cette fonctionnalité.");
+            toast({
+              variant: "destructive",
+              title: "Erreur d'authentification",
+              description: "Vous devez être connecté pour accéder à cette fonctionnalité."
+            });
+          }
+          unsubscribe();
+        });
+      } else {
+        fetchCompanies(auth.currentUser.uid);
+      }
+    };
+
+    checkAuthAndFetchCompanies();
+  }, [toast]);
 
   // Fonction pour récupérer les entreprises de l'utilisateur
-  async function fetchCompanies() {
+  async function fetchCompanies(userId: string) {
     setIsLoading(true);
     try {
-      const response = await fetch("/api/companies");
-      if (!response.ok) {
-        throw new Error("Erreur lors de la récupération des entreprises");
+      const companiesCollection = collection(firestore, `users/${userId}/companies`);
+      const companiesSnapshot = await getDocs(companiesCollection);
+      
+      if (companiesSnapshot.empty) {
+        setCompanies([]);
+      } else {
+        const companiesData: Company[] = [];
+        companiesSnapshot.forEach((doc) => {
+          const companyData = doc.data();
+          companiesData.push({
+            id: doc.id,
+            name: companyData.name || companyData.raisonSociale || "Sans nom",
+            siret: companyData.siret || "",
+            address: companyData.address || companyData.adresse || "",
+            city: companyData.city || companyData.ville || "",
+            postalCode: companyData.postalCode || companyData.codePostal || "",
+            activityCode: companyData.activityCode || companyData.codeActivite || "",
+            urssafNumber: companyData.urssafNumber || companyData.numeroUrssaf || "",
+            legalForm: companyData.legalForm || companyData.formeJuridique || "",
+            phoneNumber: companyData.phoneNumber || companyData.telephone || "",
+            email: companyData.email || "",
+            website: companyData.website || companyData.siteWeb || "",
+            legalRepresentative: companyData.legalRepresentative || companyData.representant || "",
+            legalRepresentativeRole: companyData.legalRepresentativeRole || companyData.fonction || "",
+            createdAt: companyData.createdAt || new Date().toISOString(),
+            employees: companyData.employees || []
+          });
+        });
+        setCompanies(companiesData);
       }
-      const data = await response.json();
-      setCompanies(data.companies || []);
       setError(null);
     } catch (err) {
       console.error("Erreur:", err);
@@ -94,13 +141,12 @@ export default function DashboardCompany() {
   // Fonction pour supprimer une entreprise
   async function deleteCompany(id: string) {
     try {
-      const response = await fetch(`/api/companies/${id}`, {
-        method: "DELETE",
-      });
-
-      if (!response.ok) {
-        throw new Error("Erreur lors de la suppression de l'entreprise");
+      if (!auth.currentUser) {
+        throw new Error("Vous devez être connecté pour effectuer cette action");
       }
+      
+      const companyRef = doc(firestore, `users/${auth.currentUser.uid}/companies`, id);
+      await deleteDoc(companyRef);
 
       // Mettre à jour la liste locale
       setCompanies(companies.filter(company => company.id !== id));

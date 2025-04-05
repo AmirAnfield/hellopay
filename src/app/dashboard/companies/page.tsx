@@ -2,65 +2,101 @@
 
 import React, { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Plus, RefreshCw, LayoutList, LayoutGrid } from "lucide-react";
-import Link from "next/link";
-import { Company } from "@/services/company-service";
+import { Plus, RefreshCw, LayoutList, LayoutGrid, PlusCircle } from "lucide-react";
 import CompanyCard from "@/components/dashboard/CompanyCard";
 import { PageContainer, EmptyState, PageHeader, LoadingState } from "@/components/shared/PageContainer";
 import { Building2 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
+import { collection, getDocs } from "firebase/firestore";
+import { db, auth } from "@/lib/firebase";
+import CompanyModal from "@/components/dashboard/CompanyModal";
+
+// Type pour les entreprises
+interface Company {
+  id: string;
+  name: string;
+  siret: string;
+  address?: string;
+  city?: string;
+  postalCode?: string;
+  employeeCount?: number;
+  country?: string;
+  isArchived?: boolean;
+  isLocked?: boolean;
+  createdAt?: any;
+  updatedAt?: any;
+  ownerId?: string;
+  legalForm?: string;
+  apeCode?: string;
+  urssafRegion?: string;
+  collectiveAgreement?: string;
+}
 
 export default function CompaniesPage() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
+  const [openCompanyModal, setOpenCompanyModal] = useState(false);
   const { toast } = useToast();
 
   const fetchCompanies = async () => {
     setIsLoading(true);
     
     try {
-      // Simuler un délai pour le chargement
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // Mode développement: lire depuis localStorage
-      let mockCompanies: Company[] = [];
-      if (typeof window !== 'undefined') {
-        try {
-          const companiesFromStorage = localStorage.getItem('companies');
-          console.log("Récupération des entreprises depuis localStorage:", companiesFromStorage ? "données trouvées" : "aucune donnée");
-          
-          if (companiesFromStorage) {
-            const parsedCompanies = JSON.parse(companiesFromStorage);
-            console.log("Entreprises parsées:", parsedCompanies.length);
-            
-            // Transformation pour correspondre à l'interface Company
-            mockCompanies = parsedCompanies.map((company: { 
-              id?: string;
-              name?: string;
-              siret?: string;
-              address?: string;
-            }) => ({
-              id: company.id || `company-${Date.now()}-${Math.floor(Math.random() * 10000)}`,
-              name: company.name || '',
-              siret: company.siret || '',
-              address: company.address || '',
-              employeeCount: 0
-            }));
-
-            console.log("Entreprises transformées:", mockCompanies.length);
-          } else {
-            console.log("Aucune entreprise dans localStorage");
-          }
-        } catch (e) {
-          console.error("Erreur lors de la lecture depuis localStorage:", e);
-        }
+      if (!auth.currentUser) {
+        console.log("Utilisateur non authentifié");
+        setIsLoading(false);
+        setIsRefreshing(false);
+        return;
       }
       
-      setCompanies(mockCompanies);
+      const userId = auth.currentUser.uid;
+      const companiesRef = collection(db, `users/${userId}/companies`);
+      const querySnapshot = await getDocs(companiesRef);
+      
+      const companiesData: Company[] = [];
+      querySnapshot.forEach((doc) => {
+        // Récupérer les données et les convertir au format attendu
+        const data = doc.data();
+        companiesData.push({
+          id: doc.id,
+          name: data.name || '',
+          siret: data.siret || '',
+          address: data.address || '',
+          city: data.city || '',
+          postalCode: data.postalCode || '',
+          employeeCount: data.employeeCount || 0,
+          country: data.country || '',
+          isArchived: data.isArchived || false,
+          isLocked: data.isLocked || false,
+          createdAt: data.createdAt,
+          updatedAt: data.updatedAt,
+          ownerId: data.ownerId || '',
+          legalForm: data.legalForm || '',
+          apeCode: data.apeCode || '',
+          urssafRegion: data.urssafRegion || '',
+          collectiveAgreement: data.collectiveAgreement || ''
+        });
+      });
+      
+      // Filtrer les entreprises non archivées
+      const activeCompanies = companiesData.filter(company => !company.isArchived);
+      setCompanies(activeCompanies);
+      
+      if (isRefreshing) {
+        toast({
+          title: "Actualisé",
+          description: `${activeCompanies.length} entreprises récupérées.`
+        });
+      }
     } catch (error) {
       console.error('Erreur lors du chargement des entreprises:', error);
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: "Impossible de charger vos entreprises."
+      });
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -98,6 +134,12 @@ export default function CompaniesPage() {
             ? `L'entreprise "${name}" a été supprimée avec succès.` 
             : 'L\'entreprise a été supprimée avec succès.';
           break;
+        case 'archived':
+          title = 'Entreprise archivée';
+          description = name 
+            ? `L'entreprise "${name}" a été archivée avec succès.` 
+            : 'L\'entreprise a été archivée avec succès.';
+          break;
       }
       
       if (title) {
@@ -123,6 +165,21 @@ export default function CompaniesPage() {
   
   const toggleViewMode = () => {
     setViewMode(prevMode => prevMode === 'grid' ? 'list' : 'grid');
+  };
+  
+  const handleCompanyCreated = () => {
+    // Recharger les données après création
+    fetchCompanies();
+  };
+  
+  const handleCompanyArchived = () => {
+    // Recharger les données après archivage
+    fetchCompanies();
+    
+    toast({
+      title: "Entreprise archivée",
+      description: "L'entreprise a été déplacée vers les archives."
+    });
   };
   
   if (isLoading) {
@@ -153,10 +210,8 @@ export default function CompaniesPage() {
               <RefreshCw className={`mr-2 h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
               {isRefreshing ? 'Rafraîchissement...' : 'Rafraîchir'}
             </Button>
-            <Button asChild>
-              <Link href="/dashboard/companies/new">
-                <Plus className="mr-2 h-4 w-4" /> Ajouter une entreprise
-              </Link>
+            <Button variant="secondary" onClick={() => setOpenCompanyModal(true)}>
+              <Plus className="mr-2 h-4 w-4" /> Ajouter une entreprise
             </Button>
           </div>
         }
@@ -168,26 +223,42 @@ export default function CompaniesPage() {
           description="Vous n'avez pas encore créé d'entreprise. Commencez par en ajouter une."
           icon={Building2}
           action={
-            <Button asChild>
-              <Link href="/dashboard/companies/new">
-                <Plus className="mr-2 h-4 w-4" /> Ajouter une entreprise
-              </Link>
+            <Button variant="secondary" onClick={() => setOpenCompanyModal(true)}>
+              <PlusCircle className="mr-2 h-4 w-4" />
+              Ajouter une entreprise
             </Button>
           }
         />
       ) : viewMode === 'grid' ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {companies.map((company) => (
-            <CompanyCard key={company.id} company={company} layout="grid" />
+            <CompanyCard 
+              key={company.id} 
+              company={company} 
+              layout="grid" 
+              onArchive={handleCompanyArchived}
+            />
           ))}
         </div>
       ) : (
         <div className="space-y-4">
           {companies.map((company) => (
-            <CompanyCard key={company.id} company={company} layout="list" />
+            <CompanyCard 
+              key={company.id} 
+              company={company} 
+              layout="list" 
+              onArchive={handleCompanyArchived}
+            />
           ))}
         </div>
       )}
+
+      {/* Modale d'ajout d'entreprise */}
+      <CompanyModal 
+        open={openCompanyModal} 
+        onOpenChange={setOpenCompanyModal} 
+        onCompanyCreated={handleCompanyCreated} 
+      />
     </PageContainer>
   );
 } 
