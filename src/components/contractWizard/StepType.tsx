@@ -1,11 +1,20 @@
 import React, { useState } from 'react';
 import { AIContractMemory, AISuggestion } from '@/types/firebase';
 import { Button } from '@/components/ui/button';
-import { Check, FileText, Calendar, Briefcase, GraduationCap } from 'lucide-react';
+import { 
+  Check, 
+  FileText, 
+  Calendar,
+  Clock,
+  ArrowRight
+} from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { useAIContractMemory } from '@/hooks/useAIContractMemory';
 import { AIAssistant } from './AIAssistant';
 import { suggestClause } from '@/lib/ai/service';
+import { Separator } from '@/components/ui/separator';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
 
 interface StepTypeProps {
   memory: AIContractMemory | null;
@@ -16,13 +25,14 @@ interface StepTypeProps {
   onComplete: () => void;
 }
 
-type ContractType = 'CDI_temps_plein' | 'CDI_temps_partiel' | 'CDD_temps_plein' | 'CDD_temps_partiel' | 'STAGE' | 'FREELANCE';
+type ContractType = 'CDI_temps_plein' | 'CDI_temps_partiel' | 'CDD_temps_plein' | 'CDD_temps_partiel';
 
 interface ContractTypeOption {
   id: ContractType;
   title: string;
   description: string;
   icon: React.ReactNode;
+  color: string;
 }
 
 export function StepType({ memory, onUpdateMemory, onComplete }: StepTypeProps) {
@@ -30,49 +40,60 @@ export function StepType({ memory, onUpdateMemory, onComplete }: StepTypeProps) 
   const [suggestion, setSuggestion] = useState<AISuggestion | null>(null);
   const { addMessage, updateField } = useAIContractMemory();
   const { toast } = useToast();
+  const [contractDuration, setContractDuration] = useState<'cdi' | 'cdd'>(
+    memory?.contractType?.startsWith('CDI') ? 'cdi' : 
+    memory?.contractType?.startsWith('CDD') ? 'cdd' : 'cdi'
+  );
+  const [workingTime, setWorkingTime] = useState<'full' | 'part'>(
+    memory?.contractType?.endsWith('temps_plein') ? 'full' : 
+    memory?.contractType?.endsWith('temps_partiel') ? 'part' : 'full'
+  );
 
-  // Options de types de contrat disponibles
+  // Options de types de contrat disponibles (seulement CDI et CDD)
   const contractTypes: ContractTypeOption[] = [
     {
       id: 'CDI_temps_plein',
       title: 'CDI à temps plein',
       description: 'Contrat à durée indéterminée avec horaires complets (35h/semaine)',
-      icon: <FileText className="h-10 w-10 text-primary/50" />
+      icon: <FileText className="h-10 w-10" />,
+      color: 'text-emerald-500'
     },
     {
       id: 'CDI_temps_partiel',
       title: 'CDI à temps partiel',
       description: 'Contrat à durée indéterminée avec horaires réduits',
-      icon: <FileText className="h-10 w-10 text-primary/50" />
+      icon: <FileText className="h-10 w-10" />,
+      color: 'text-emerald-500'
     },
     {
       id: 'CDD_temps_plein',
       title: 'CDD à temps plein',
       description: 'Contrat à durée déterminée avec horaires complets',
-      icon: <Calendar className="h-10 w-10 text-amber-500/50" />
+      icon: <Calendar className="h-10 w-10" />,
+      color: 'text-amber-500'
     },
     {
       id: 'CDD_temps_partiel',
       title: 'CDD à temps partiel',
       description: 'Contrat à durée déterminée avec horaires réduits',
-      icon: <Calendar className="h-10 w-10 text-amber-500/50" />
-    },
-    {
-      id: 'STAGE',
-      title: 'Stage',
-      description: 'Convention de stage pour stagiaires et étudiants',
-      icon: <GraduationCap className="h-10 w-10 text-blue-500/50" />
-    },
-    {
-      id: 'FREELANCE',
-      title: 'Freelance / Prestation',
-      description: 'Contrat de prestation de services indépendants',
-      icon: <Briefcase className="h-10 w-10 text-emerald-500/50" />
+      icon: <Calendar className="h-10 w-10" />,
+      color: 'text-amber-500'
     }
   ];
 
-  // Sélection d'un type de contrat
-  const handleContractTypeSelect = async (contractType: ContractType) => {
+  // Calculer le type de contrat actuel basé sur les sélections
+  const getCurrentContractType = (): ContractType => {
+    if (contractDuration === 'cdi') {
+      return workingTime === 'full' ? 'CDI_temps_plein' : 'CDI_temps_partiel';
+    } else {
+      return workingTime === 'full' ? 'CDD_temps_plein' : 'CDD_temps_partiel';
+    }
+  };
+
+  // Mettre à jour le type de contrat
+  const updateContractType = async () => {
+    const contractType = getCurrentContractType();
+    
     try {
       // Mettre à jour le type de contrat dans la mémoire IA
       await onUpdateMemory('contractType', contractType);
@@ -263,42 +284,137 @@ export function StepType({ memory, onUpdateMemory, onComplete }: StepTypeProps) 
     // Pour le moment, on se contente d'ajouter la question à l'historique
   };
 
+  // Gérer les changements de sélection et mettre à jour le contrat
+  const handleDurationChange = (value: 'cdi' | 'cdd') => {
+    setContractDuration(value);
+    updateContractType();
+  };
+
+  const handleWorkingTimeChange = (value: 'full' | 'part') => {
+    setWorkingTime(value);
+    updateContractType();
+  };
+
   return (
     <div className="space-y-6">
-      <div className="bg-white rounded-lg shadow-sm border p-5">
-        <h3 className="text-lg font-medium mb-5">Sélection du type de contrat</h3>
+      <div className="bg-white rounded-lg shadow-md p-6 border">
+        <h3 className="text-xl font-medium mb-6">Sélection du type de contrat</h3>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {contractTypes.map((type) => (
-            <div
-              key={type.id}
-              className={`
-                border rounded-lg p-4 cursor-pointer transition-all 
-                hover:border-primary hover:shadow-sm
-                ${memory?.contractType === type.id ? 'border-primary/70 bg-primary/5 shadow-sm' : ''}
-              `}
-              onClick={() => handleContractTypeSelect(type.id)}
+        <div className="space-y-6">
+          <div>
+            <h4 className="text-base font-medium mb-3">1. Quelle est la durée du contrat ?</h4>
+            <RadioGroup 
+              defaultValue={contractDuration} 
+              onValueChange={(v) => handleDurationChange(v as 'cdi' | 'cdd')}
+              className="flex flex-col md:flex-row gap-4"
             >
-              <div className="flex items-start space-x-3">
-                <div className="mt-1">{type.icon}</div>
-                <div className="flex-grow">
-                  <div className="flex justify-between">
-                    <h4 className="font-medium text-base mb-1">{type.title}</h4>
-                    {memory?.contractType === type.id && (
-                      <Check className="h-5 w-5 text-primary" />
-                    )}
+              <div className={`flex-1 p-4 border rounded-lg transition-all ${contractDuration === 'cdi' ? 'border-emerald-500 bg-emerald-50' : 'hover:border-primary'}`}>
+                <RadioGroupItem value="cdi" id="cdi" className="sr-only" />
+                <Label 
+                  htmlFor="cdi" 
+                  className="flex items-start cursor-pointer gap-4 h-full"
+                >
+                  <FileText className={`h-8 w-8 mt-1 ${contractDuration === 'cdi' ? 'text-emerald-500' : 'text-muted-foreground'}`} />
+                  <div>
+                    <div className="font-medium flex items-center gap-2">
+                      CDI
+                      {contractDuration === 'cdi' && <Check className="h-4 w-4 text-emerald-500" />}
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Contrat à durée indéterminée - relation de travail sans limite de temps.
+                    </p>
                   </div>
-                  <p className="text-sm text-muted-foreground">{type.description}</p>
-                </div>
+                </Label>
               </div>
-            </div>
-          ))}
+              
+              <div className={`flex-1 p-4 border rounded-lg transition-all ${contractDuration === 'cdd' ? 'border-amber-500 bg-amber-50' : 'hover:border-primary'}`}>
+                <RadioGroupItem value="cdd" id="cdd" className="sr-only" />
+                <Label 
+                  htmlFor="cdd" 
+                  className="flex items-start cursor-pointer gap-4 h-full"
+                >
+                  <Calendar className={`h-8 w-8 mt-1 ${contractDuration === 'cdd' ? 'text-amber-500' : 'text-muted-foreground'}`} />
+                  <div>
+                    <div className="font-medium flex items-center gap-2">
+                      CDD
+                      {contractDuration === 'cdd' && <Check className="h-4 w-4 text-amber-500" />}
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Contrat à durée déterminée - relation de travail limitée dans le temps.
+                    </p>
+                  </div>
+                </Label>
+              </div>
+            </RadioGroup>
+          </div>
+          
+          <Separator />
+          
+          <div>
+            <h4 className="text-base font-medium mb-3">2. Quel est le temps de travail ?</h4>
+            <RadioGroup 
+              defaultValue={workingTime}
+              onValueChange={(v) => handleWorkingTimeChange(v as 'full' | 'part')}
+              className="flex flex-col md:flex-row gap-4"
+            >
+              <div className={`flex-1 p-4 border rounded-lg transition-all ${workingTime === 'full' ? 'border-blue-500 bg-blue-50' : 'hover:border-primary'}`}>
+                <RadioGroupItem value="full" id="full" className="sr-only" />
+                <Label 
+                  htmlFor="full" 
+                  className="flex items-start cursor-pointer gap-4 h-full"
+                >
+                  <Clock className={`h-8 w-8 mt-1 ${workingTime === 'full' ? 'text-blue-500' : 'text-muted-foreground'}`} />
+                  <div>
+                    <div className="font-medium flex items-center gap-2">
+                      Temps plein
+                      {workingTime === 'full' && <Check className="h-4 w-4 text-blue-500" />}
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      35 heures par semaine (durée légale) ou équivalent selon convention.
+                    </p>
+                  </div>
+                </Label>
+              </div>
+              
+              <div className={`flex-1 p-4 border rounded-lg transition-all ${workingTime === 'part' ? 'border-purple-500 bg-purple-50' : 'hover:border-primary'}`}>
+                <RadioGroupItem value="part" id="part" className="sr-only" />
+                <Label 
+                  htmlFor="part" 
+                  className="flex items-start cursor-pointer gap-4 h-full"
+                >
+                  <Clock className={`h-8 w-8 mt-1 ${workingTime === 'part' ? 'text-purple-500' : 'text-muted-foreground'}`} />
+                  <div>
+                    <div className="font-medium flex items-center gap-2">
+                      Temps partiel
+                      {workingTime === 'part' && <Check className="h-4 w-4 text-purple-500" />}
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Durée inférieure à la durée légale du travail ou à la durée conventionnelle.
+                    </p>
+                  </div>
+                </Label>
+              </div>
+            </RadioGroup>
+          </div>
+        </div>
+        
+        <div className="mt-8">
+          <div className="bg-blue-50 border border-blue-100 rounded-lg p-4">
+            <h4 className="text-sm font-medium text-blue-700 flex items-center">
+              <FileText className="h-4 w-4 mr-2" />
+              Type de contrat sélectionné
+            </h4>
+            <p className="text-blue-700 font-medium mt-1">
+              {getContractTypeDisplayName(getCurrentContractType())}
+            </p>
+          </div>
         </div>
         
         {memory?.contractType && memory.clauses.introduction && (
           <div className="mt-6 flex justify-end">
-            <Button onClick={onComplete}>
+            <Button onClick={onComplete} className="gap-2">
               Continuer
+              <ArrowRight className="h-4 w-4" />
             </Button>
           </div>
         )}
@@ -314,4 +430,4 @@ export function StepType({ memory, onUpdateMemory, onComplete }: StepTypeProps) 
       />
     </div>
   );
-} 
+}

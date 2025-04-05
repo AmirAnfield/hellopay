@@ -19,6 +19,7 @@
     "dev:emulators": "NEXT_PUBLIC_USE_FIREBASE_EMULATORS=true next dev"
   },
   "dependencies": {
+    "@hello-pangea/dnd": "^18.0.1",
     "@radix-ui/react-accordion": "^1.2.3",
     "@radix-ui/react-alert-dialog": "^1.1.6",
     "@radix-ui/react-avatar": "^1.1.3",

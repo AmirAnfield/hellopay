@@ -139,12 +139,10 @@ export async function updateAIContractMemoryField<K extends keyof AIContractMemo
  * Ajoute un message à l'historique de la mémoire IA
  * @param userId ID de l'utilisateur
  * @param message Message à ajouter
- * @param maxHistoryLength Nombre maximum de messages à conserver (par défaut: 5)
  */
 export async function addMessageToAIMemory(
   userId: string,
-  message: Omit<AIMessage, 'timestamp'>,
-  maxHistoryLength: number = 5
+  message: Omit<AIMessage, 'timestamp'>
 ): Promise<AIContractMemory> {
   const memoryPath = getMemoryPath(userId);
   const docRef = doc(firestore, memoryPath);
@@ -165,8 +163,8 @@ export async function addMessageToAIMemory(
     timestamp: Timestamp.now()
   };
   
-  // Limiter la taille de l'historique
-  const updatedHistory = [...currentHistory, newMessage].slice(-maxHistoryLength);
+  // Conservation de tous les messages de l'historique (suppression de la limitation)
+  const updatedHistory = [...currentHistory, newMessage];
   
   // Mettre à jour l'historique
   await updateDoc(docRef, {

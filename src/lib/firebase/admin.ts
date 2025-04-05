@@ -1,5 +1,29 @@
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
+import { getAuth } from 'firebase-admin/auth';
+
+// Exporter les fonctions requises pour la gestion des cookies de session
+export async function createSessionCookie(idToken: string, expiresIn: number) {
+  try {
+    const app = getOrInitializeApp();
+    const auth = getAuth(app);
+    return await auth.createSessionCookie(idToken, { expiresIn });
+  } catch (error) {
+    console.error('Erreur lors de la création du cookie de session:', error);
+    throw new Error('Échec de la création du cookie de session');
+  }
+}
+
+export async function verifyIdToken(token: string) {
+  try {
+    const app = getOrInitializeApp();
+    const auth = getAuth(app);
+    return await auth.verifyIdToken(token);
+  } catch (error) {
+    console.error('Erreur lors de la vérification du token:', error);
+    throw new Error('Token invalide ou expiré');
+  }
+}
 
 export function getOrInitializeApp() {
   // Si l'app est déjà initialisée, ne pas la réinitialiser

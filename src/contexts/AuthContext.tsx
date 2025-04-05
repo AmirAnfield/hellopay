@@ -20,7 +20,7 @@ type AuthContextType = {
   register: (email: string, password: string, name?: string) => Promise<UserCredential>;
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
-  updateSession: () => Promise<void>; // Pour mettre à jour le cookie de session
+  updateSession: () => Promise<boolean>; // Pour mettre à jour le cookie de session
 };
 
 // Créer le contexte
@@ -98,15 +98,28 @@ export function AuthProvider({ children }: AuthProviderProps) {
       });
 
       if (!response.ok) {
-        throw new Error('Échec de la mise à jour de la session');
+        console.warn('Problème de mise à jour de session:', response.status, response.statusText);
+        // Ne pas lever d'erreur, juste logger
+        return false;
       }
+      
+      return true;
     } catch (error) {
       console.error('Erreur lors de la mise à jour de la session:', error);
-      toast({
-        variant: 'destructive',
-        title: 'Erreur de session',
-        description: 'Un problème est survenu avec votre session. Veuillez vous reconnecter.',
-      });
+      // Ne pas afficher de toast systématiquement pour éviter de perturber l'expérience utilisateur
+      // Le forcer à se reconnecter uniquement en cas d'erreur critique
+      if (error instanceof Error && error.message.includes('auth/id-token-expired')) {
+        toast({
+          variant: 'destructive',
+          title: 'Session expirée',
+          description: 'Votre session a expiré. Veuillez vous reconnecter.',
+        });
+        
+        // Déconnecter l'utilisateur si le token est expiré
+        await auth.signOut();
+      }
+      
+      return false;
     }
   };
 
