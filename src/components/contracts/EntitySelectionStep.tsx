@@ -17,9 +17,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/components/ui/use-toast";
 import { PlusCircle, Building, User } from "lucide-react";
 import { ContractData } from "./ContractData";
-import { v4 as uuidv4 } from "uuid";
-import { db } from "@/lib/firebase";
-import { collection, getDocs, addDoc, serverTimestamp } from "firebase/firestore";
+import { getCollection, setDocument } from "@/lib/firebase/firestore";
 
 interface Company {
   id: string;
@@ -99,48 +97,49 @@ export function EntitySelectionStep({
   // Chargement des entreprises depuis Firestore
   useEffect(() => {
     fetchData();
+    // Afficher un message dans la console pour indiquer que le composant est chargé
+    console.log("EntitySelectionStep monté - données initiales:", { 
+      selectedCompanyId, 
+      selectedEmployeeId, 
+      contractData 
+    });
   }, []);
 
   // Créer une fonction fetchData accessible en dehors de l'useEffect
   const fetchData = async () => {
     setLoading(true);
     try {
-      // Récupérer les entreprises
-      const companiesSnapshot = await getDocs(collection(db, 'companies'));
-      const fetchedCompanies: Company[] = [];
-      companiesSnapshot.forEach(doc => {
-        const data = doc.data();
-        console.log("Document entreprise:", doc.id, data);
-        fetchedCompanies.push({
-          id: doc.id,
-          name: data.name || '',
-          siret: data.siret || '',
-          address: data.address || '',
-          postalCode: data.postalCode || '',
-          city: data.city || '',
-          country: data.country || 'France'
-        });
-      });
-      console.log("Entreprises chargées:", fetchedCompanies.length, fetchedCompanies);
+      console.log("Début du chargement des données depuis Firestore...");
+      
+      // Récupérer les entreprises en utilisant la fonction getCollection
+      console.log("Tentative de récupération des entreprises avec getCollection");
+      const fetchedCompanies = await getCollection('companies');
+      console.log("Entreprises chargées avec getCollection:", fetchedCompanies.length, fetchedCompanies);
       setCompanies(fetchedCompanies);
 
-      // Récupérer les employés
-      const employeesSnapshot = await getDocs(collection(db, 'employees'));
-      const fetchedEmployees: Employee[] = [];
-      employeesSnapshot.forEach(doc => {
-        const data = doc.data();
-        console.log("Document employé:", doc.id, data);
-        fetchedEmployees.push({
-          id: doc.id,
-          firstName: data.firstName || '',
-          lastName: data.lastName || '',
-          position: data.position || '',
-          email: data.email || '',
-          companyId: data.companyId || ''
-        });
-      });
-      console.log("Employés chargés:", fetchedEmployees.length, fetchedEmployees);
+      // Récupérer les employés en utilisant la fonction getCollection
+      console.log("Tentative de récupération des employés avec getCollection");
+      const fetchedEmployees = await getCollection('employees');
+      console.log("Employés chargés avec getCollection:", fetchedEmployees.length, fetchedEmployees);
       setEmployees(fetchedEmployees);
+      
+      // Si aucune donnée n'est trouvée dans Firestore, essayer de charger depuis localStorage
+      if (fetchedCompanies.length === 0 && fetchedEmployees.length === 0) {
+        console.log("Aucune donnée dans Firestore, tentative de récupération depuis le localStorage");
+        const storedCompanies = localStorage.getItem("companies");
+        if (storedCompanies) {
+          const parsedCompanies = JSON.parse(storedCompanies);
+          console.log("Companies from localStorage:", parsedCompanies);
+          setCompanies(parsedCompanies);
+        }
+
+        const storedEmployees = localStorage.getItem("employees");
+        if (storedEmployees) {
+          const parsedEmployees = JSON.parse(storedEmployees);
+          console.log("Employees from localStorage:", parsedEmployees);
+          setEmployees(parsedEmployees);
+        }
+      }
     } catch (error) {
       console.error("Erreur lors du chargement des données:", error);
       toast({
@@ -151,20 +150,26 @@ export function EntitySelectionStep({
       
       // Essayer de charger depuis localStorage comme solution de secours
       try {
+        console.log("Tentative de récupération depuis le localStorage après erreur");
         const storedCompanies = localStorage.getItem("companies");
         if (storedCompanies) {
-          setCompanies(JSON.parse(storedCompanies));
+          const parsedCompanies = JSON.parse(storedCompanies);
+          console.log("Companies from localStorage (after error):", parsedCompanies);
+          setCompanies(parsedCompanies);
         }
 
         const storedEmployees = localStorage.getItem("employees");
         if (storedEmployees) {
-          setEmployees(JSON.parse(storedEmployees));
+          const parsedEmployees = JSON.parse(storedEmployees);
+          console.log("Employees from localStorage (after error):", parsedEmployees);
+          setEmployees(parsedEmployees);
         }
       } catch (localError) {
         console.error("Erreur lors du chargement depuis localStorage:", localError);
       }
     } finally {
       setLoading(false);
+      console.log("Chargement des données terminé");
     }
   };
 
@@ -242,7 +247,7 @@ export function EntitySelectionStep({
     }
 
     try {
-      // Ajout à Firestore
+      // Ajout à Firestore avec setDocument
       const companyData = {
         name: newCompany.name,
         siret: newCompany.siret,
@@ -250,36 +255,23 @@ export function EntitySelectionStep({
         postalCode: newCompany.postalCode || '',
         city: newCompany.city || '',
         country: newCompany.country || 'France',
-        createdAt: serverTimestamp()
+        createdAt: new Date()
       };
       
-      // Log avant l'ajout
-      console.log("Création entreprise:", companyData);
+      console.log("Tentative de création d'entreprise avec setDocument:", companyData);
       
-      const docRef = await addDoc(collection(db, 'companies'), companyData);
-      
-      // Créer l'objet entreprise avec ID
-      const newCompanyWithId = {
-        id: docRef.id,
-        name: companyData.name,
-        siret: companyData.siret,
-        address: companyData.address,
-        postalCode: companyData.postalCode,
-        city: companyData.city,
-        country: companyData.country
-      };
+      // Utiliser setDocument au lieu de addDoc
+      const newCompanyWithId = await setDocument('companies', companyData);
+      console.log("Entreprise créée avec setDocument:", newCompanyWithId);
 
-      // Mise à jour de l'état local avec un nouveau tableau
+      // Mise à jour de l'état local
       const updatedCompanies = [...companies, newCompanyWithId];
+      console.log("Nouveau tableau d'entreprises:", updatedCompanies);
       setCompanies(updatedCompanies);
-      setSelectedCompanyId(docRef.id);
+      setSelectedCompanyId(newCompanyWithId.id);
       
       // Mise à jour du localStorage
       localStorage.setItem("companies", JSON.stringify(updatedCompanies));
-      
-      // Log après l'ajout
-      console.log("Entreprise créée avec ID:", docRef.id);
-      console.log("Nouvel état companies:", updatedCompanies);
       
       // Réinitialiser le formulaire et fermer
       setNewCompany({
@@ -296,6 +288,9 @@ export function EntitySelectionStep({
         title: "Entreprise créée",
         description: `L'entreprise ${newCompanyWithId.name} a été créée avec succès.`,
       });
+      
+      // Rafraîchir manuellement la liste des entreprises
+      fetchData();
     } catch (error) {
       console.error("Erreur lors de la création de l'entreprise:", error);
       toast({
@@ -318,43 +313,30 @@ export function EntitySelectionStep({
     }
 
     try {
-      // Ajout à Firestore
+      // Ajout à Firestore avec setDocument
       const employeeData = {
         firstName: newEmployee.firstName,
         lastName: newEmployee.lastName,
         position: newEmployee.position || '',
         email: newEmployee.email || '',
         companyId: selectedCompanyId,
-        createdAt: serverTimestamp()
+        createdAt: new Date()
       };
       
-      // Log avant l'ajout
-      console.log("Création employé pour l'entreprise:", selectedCompanyId);
-      console.log("Données employé:", employeeData);
+      console.log("Tentative de création d'employé avec setDocument:", employeeData);
       
-      const docRef = await addDoc(collection(db, 'employees'), employeeData);
-      
-      // Créer l'objet employé avec ID
-      const newEmployeeWithId = {
-        id: docRef.id,
-        firstName: employeeData.firstName,
-        lastName: employeeData.lastName,
-        position: employeeData.position,
-        email: employeeData.email,
-        companyId: selectedCompanyId
-      };
+      // Utiliser setDocument au lieu de addDoc
+      const newEmployeeWithId = await setDocument('employees', employeeData);
+      console.log("Employé créé avec setDocument:", newEmployeeWithId);
 
-      // Mise à jour de l'état local avec le spread operator pour créer un nouveau tableau
+      // Mise à jour de l'état local
       const updatedEmployees = [...employees, newEmployeeWithId];
+      console.log("Nouveau tableau d'employés:", updatedEmployees);
       setEmployees(updatedEmployees);
-      setSelectedEmployeeId(docRef.id);
+      setSelectedEmployeeId(newEmployeeWithId.id);
       
-      // Mise à jour du localStorage avec le nouveau tableau
+      // Mise à jour du localStorage
       localStorage.setItem("employees", JSON.stringify(updatedEmployees));
-      
-      // Log après l'ajout
-      console.log("Employé créé avec ID:", docRef.id);
-      console.log("Nouvel état employees:", updatedEmployees);
       
       // Réinitialiser le formulaire et fermer
       setNewEmployee({
@@ -370,6 +352,9 @@ export function EntitySelectionStep({
         title: "Employé créé",
         description: `L'employé ${newEmployeeWithId.firstName} ${newEmployeeWithId.lastName} a été créé avec succès.`,
       });
+      
+      // Rafraîchir manuellement la liste des employés
+      fetchData();
     } catch (error) {
       console.error("Erreur lors de la création de l'employé:", error);
       toast({

@@ -9,8 +9,7 @@ import Link from "next/link";
 import { toast } from "@/components/ui/use-toast";
 import { Progress } from "@/components/ui/progress";
 import { v4 as uuidv4 } from "uuid";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { collection, getDocs, query, where } from "firebase/firestore";
+import { collection, getDocs } from "firebase/firestore";
 import { firestore, auth } from "@/lib/firebase/config";
 
 // Étapes du formulaire
@@ -205,6 +204,7 @@ export default function CreateContractPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [saveButtonEnabled, setSaveButtonEnabled] = useState(false);
 
   // Charger les données nécessaires
   useEffect(() => {
@@ -355,6 +355,11 @@ export default function CreateContractPage() {
           completedSteps
         }
       }));
+
+      // Activer le bouton Save après avoir validé l'étape 1
+      if (currentStep === "parties") {
+        setSaveButtonEnabled(true);
+      }
     }
   };
 
@@ -530,420 +535,305 @@ export default function CreateContractPage() {
     onChange: (data: Record<string, any>) => void;
     onChangeSalarie: (data: Record<string, any>) => void;
   }) => {
-    return (
-      <div className="space-y-6">
-        <Tabs defaultValue="employeur" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="employeur">Employeur</TabsTrigger>
-            <TabsTrigger value="salarie">Salarié</TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="employeur" className="space-y-4 pt-4">
-            {/* Sélecteur d'entreprise - toujours affiché */}
-            <div className="rounded-md bg-muted p-3 mb-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4"></path><path d="M12 8h.01"></path></svg>
-                  <p className="text-sm font-medium">Sélectionner une entreprise existante</p>
-                </div>
-                <select
-                  className="text-sm p-1 border rounded-md"
-                  onChange={(e) => {
-                    const companyId = e.target.value;
-                    if (companyId) {
-                      const company = companies.find(comp => comp.id === companyId);
-                      if (company) {
-                        console.log("Entreprise sélectionnée:", company);
-                        onChange({
-                          raisonSociale: company.name || company.raisonSociale || "",
-                          formeJuridique: company.formeJuridique || "",
-                          siret: company.siret || "",
-                          adresse: company.address || company.adresse || "",
-                          codePostal: company.postalCode || company.codePostal || "",
-                          ville: company.city || company.ville || "",
-                          representant: company.representant || "",
-                          fonction: company.fonction || "",
-                          conventionCollective: company.conventionCollective || "",
-                          codeConvention: company.codeConvention || "",
-                          caisseRetraite: company.caisseRetraite || "",
-                          organismePrevoyance: company.organismePrevoyance || ""
-                        });
-                      }
-                    }
-                  }}
-                >
-                  <option value="">Choisir une entreprise</option>
-                  {companies && companies.length > 0 ? (
-                    companies.map(company => {
-                      const displayName = company.name || company.raisonSociale || 
-                                          company.nom || `Entreprise ${company.id.substring(0, 4)}`;
-                      return (
-                        <option key={company.id} value={company.id}>
-                          {displayName}
-                        </option>
-                      );
-                    })
-                  ) : (
-                    <option value="" disabled>Aucune entreprise disponible</option>
-                  )}
-                </select>
-              </div>
-            </div>
-            
-            <div className="flex items-center space-x-2 pb-2 border-b">
-              <span className="h-6 w-6 rounded-full bg-primary/20 text-primary flex items-center justify-center text-sm font-medium">1</span>
-              <h3 className="text-base font-medium">Informations de l'entreprise</h3>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label htmlFor="raisonSociale" className="text-sm font-medium">Raison sociale <span className="text-destructive">*</span></label>
-                <input 
-                  id="raisonSociale"
-                  type="text"
-                  className="w-full p-2 border rounded-md text-sm" 
-                  value={data.raisonSociale}
-                  onChange={(e) => onChange({ ...data, raisonSociale: e.target.value })}
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <label htmlFor="formeJuridique" className="text-sm font-medium">Forme juridique <span className="text-destructive">*</span></label>
-                <select 
-                  id="formeJuridique"
-                  className="w-full p-2 border rounded-md text-sm"
-                  value={data.formeJuridique}
-                  onChange={(e) => onChange({ ...data, formeJuridique: e.target.value })}
-                >
-                  <option value="">Sélectionner</option>
-                  <option value="SARL">SARL</option>
-                  <option value="EURL">EURL</option>
-                  <option value="SAS">SAS</option>
-                  <option value="SASU">SASU</option>
-                  <option value="SA">SA</option>
-                  <option value="SNC">SNC</option>
-                  <option value="EI">Entreprise Individuelle</option>
-                </select>
-              </div>
-              
-              <div className="space-y-2">
-                <label htmlFor="siret" className="text-sm font-medium">SIRET</label>
-                <input 
-                  id="siret"
-                  type="text"
-                  className="w-full p-2 border rounded-md text-sm" 
-                  value={data.siret || ""}
-                  onChange={(e) => onChange({ ...data, siret: e.target.value })}
-                  placeholder="123 456 789 00012"
-                />
-              </div>
+    const [subStep, setSubStep] = useState<1 | 2>(1);
+    const [companySelected, setCompanySelected] = useState(false);
+    const [employeeSelected, setEmployeeSelected] = useState(false);
 
-              <div className="space-y-2 col-span-1 md:col-span-2">
-                <label htmlFor="adresse" className="text-sm font-medium">Adresse <span className="text-destructive">*</span></label>
-                <input 
-                  id="adresse"
-                  type="text"
-                  className="w-full p-2 border rounded-md text-sm" 
-                  value={data.adresse}
-                  onChange={(e) => onChange({ ...data, adresse: e.target.value })}
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <label htmlFor="codePostal" className="text-sm font-medium">Code postal <span className="text-destructive">*</span></label>
-                <input 
-                  id="codePostal"
-                  type="text"
-                  className="w-full p-2 border rounded-md text-sm" 
-                  value={data.codePostal}
-                  onChange={(e) => onChange({ ...data, codePostal: e.target.value })}
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <label htmlFor="ville" className="text-sm font-medium">Ville <span className="text-destructive">*</span></label>
-                <input 
-                  id="ville"
-                  type="text"
-                  className="w-full p-2 border rounded-md text-sm" 
-                  value={data.ville}
-                  onChange={(e) => onChange({ ...data, ville: e.target.value })}
-                />
-              </div>
+    const validateCompanySelection = () => {
+      if (data.raisonSociale) {
+        setCompanySelected(true);
+        setSubStep(2);
+      } else {
+        toast({
+          title: "Sélection requise",
+          description: "Veuillez sélectionner une entreprise avant de continuer",
+          variant: "destructive",
+        });
+      }
+    };
+
+    const validateEmployeeSelection = () => {
+      if (salarieData.nom) {
+        setEmployeeSelected(true);
+      } else {
+        toast({
+          title: "Sélection requise",
+          description: "Veuillez sélectionner un employé avant de continuer",
+          variant: "destructive",
+        });
+      }
+    };
+
+    return (
+      <div className="space-y-8">
+        {/* Progression des sous-étapes */}
+        <div className="flex mb-6">
+          <div className="w-1/2 pr-2">
+            <div className={`p-3 rounded-md flex items-center space-x-3 ${subStep === 1 ? 'bg-primary text-white' : 'bg-muted'}`}>
+              <span className={`h-6 w-6 rounded-full flex items-center justify-center text-xs ${subStep === 1 ? 'bg-white text-primary' : 'bg-primary/20 text-primary'}`}>1</span>
+              <span className="font-medium">Entreprise</span>
             </div>
+          </div>
+          <div className="w-1/2 pl-2">
+            <div className={`p-3 rounded-md flex items-center space-x-3 ${subStep === 2 ? 'bg-primary text-white' : 'bg-muted'}`}>
+              <span className={`h-6 w-6 rounded-full flex items-center justify-center text-xs ${subStep === 2 ? 'bg-white text-primary' : 'bg-primary/20 text-primary'}`}>2</span>
+              <span className="font-medium">Employé</span>
+            </div>
+          </div>
+        </div>
+
+        {subStep === 1 && (
+          <div className="bg-white rounded-lg shadow-sm border p-6">
+            <h3 className="text-lg font-medium mb-6">Sélection de l'entreprise</h3>
             
-            <div className="flex items-center space-x-2 pt-4 pb-2 border-b">
-              <span className="h-6 w-6 rounded-full bg-primary/20 text-primary flex items-center justify-center text-sm font-medium">2</span>
-              <h3 className="text-base font-medium">Représentant légal</h3>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label htmlFor="representant" className="text-sm font-medium">Nom et prénom <span className="text-destructive">*</span></label>
-                <input 
-                  id="representant"
-                  type="text"
-                  className="w-full p-2 border rounded-md text-sm" 
-                  value={data.representant}
-                  onChange={(e) => onChange({ ...data, representant: e.target.value })}
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <label htmlFor="fonction" className="text-sm font-medium">Fonction <span className="text-destructive">*</span></label>
-                <input 
-                  id="fonction"
-                  type="text"
-                  className="w-full p-2 border rounded-md text-sm" 
-                  value={data.fonction}
-                  onChange={(e) => onChange({ ...data, fonction: e.target.value })}
-                  placeholder="Gérant, Président, DRH..."
-                />
-              </div>
-            </div>
-            
-            <div className="flex items-center space-x-2 pt-4 pb-2 border-b">
-              <span className="h-6 w-6 rounded-full bg-primary/20 text-primary flex items-center justify-center text-sm font-medium">3</span>
-              <h3 className="text-base font-medium">Convention collective et organismes</h3>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label htmlFor="conventionCollective" className="text-sm font-medium">Convention collective</label>
-                <input 
-                  id="conventionCollective"
-                  type="text"
-                  className="w-full p-2 border rounded-md text-sm" 
-                  value={data.conventionCollective || ""}
-                  onChange={(e) => onChange({ ...data, conventionCollective: e.target.value })}
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <label htmlFor="codeConvention" className="text-sm font-medium">Code IDCC</label>
-                <input 
-                  id="codeConvention"
-                  type="text"
-                  className="w-full p-2 border rounded-md text-sm" 
-                  value={data.codeConvention || ""}
-                  onChange={(e) => onChange({ ...data, codeConvention: e.target.value })}
-                  placeholder="Ex: 1486"
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <label htmlFor="caisseRetraite" className="text-sm font-medium">Caisse de retraite</label>
-                <input 
-                  id="caisseRetraite"
-                  type="text"
-                  className="w-full p-2 border rounded-md text-sm" 
-                  value={data.caisseRetraite || ""}
-                  onChange={(e) => onChange({ ...data, caisseRetraite: e.target.value })}
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <label htmlFor="organismePrevoyance" className="text-sm font-medium">Organisme de prévoyance</label>
-                <input 
-                  id="organismePrevoyance"
-                  type="text"
-                  className="w-full p-2 border rounded-md text-sm" 
-                  value={data.organismePrevoyance || ""}
-                  onChange={(e) => onChange({ ...data, organismePrevoyance: e.target.value })}
-                />
-              </div>
-            </div>
-          </TabsContent>
-          
-          <TabsContent value="salarie" className="space-y-4 pt-4">
-            {/* Sélecteur d'employé - toujours affiché */}
-            <div className="rounded-md bg-muted p-3 mb-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4"></path><path d="M12 8h.01"></path></svg>
-                  <p className="text-sm font-medium">Sélectionner un employé existant</p>
-                </div>
-                <select
-                  className="text-sm p-1 border rounded-md"
-                  onChange={(e) => {
-                    const employeeId = e.target.value;
-                    if (employeeId) {
-                      const employee = employees.find(emp => emp.id === employeeId);
-                      if (employee) {
-                        console.log("Employé sélectionné:", employee);
-                        onChangeSalarie({
-                          civilite: employee.civilite || "",
-                          nom: employee.nom || employee.lastName || "",
-                          prenom: employee.prenom || employee.firstName || "",
-                          dateNaissance: employee.dateNaissance || employee.birthDate || "",
-                          lieuNaissance: employee.lieuNaissance || employee.birthPlace || "",
-                          nationalite: employee.nationalite || employee.nationality || "",
-                          adresse: employee.adresse || employee.address || "",
-                          codePostal: employee.codePostal || employee.postalCode || "",
-                          ville: employee.ville || employee.city || "",
-                          numeroSecuriteSociale: employee.numeroSecuriteSociale || employee.socialSecurityNumber || ""
-                        });
+            <div className="mb-6">
+              <div className="flex items-center space-x-3 mb-4">
+                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.29 7 12 12 20.71 7"></polyline><line x1="12" y1="22" x2="12" y2="12"></line></svg>
+                <div className="flex-grow">
+                  <select
+                    className="w-full p-3 text-base border rounded-md bg-white"
+                    onChange={(e) => {
+                      const companyId = e.target.value;
+                      if (companyId) {
+                        const company = companies.find(comp => comp.id === companyId);
+                        if (company) {
+                          console.log("Entreprise sélectionnée:", company);
+                          onChange({
+                            raisonSociale: company.name || company.raisonSociale || "",
+                            formeJuridique: company.formeJuridique || "",
+                            siret: company.siret || "",
+                            adresse: company.address || company.adresse || "",
+                            codePostal: company.postalCode || company.codePostal || "",
+                            ville: company.city || company.ville || "",
+                            representant: company.representant || "",
+                            fonction: company.fonction || "",
+                            conventionCollective: company.conventionCollective || "",
+                            codeConvention: company.codeConvention || "",
+                            caisseRetraite: company.caisseRetraite || "",
+                            organismePrevoyance: company.organismePrevoyance || ""
+                          });
+                          toast({
+                            title: "Entreprise sélectionnée",
+                            description: `Les informations de ${company.name || company.raisonSociale} ont été chargées.`,
+                            variant: "default",
+                          });
+                        }
                       }
-                    }
-                  }}
-                >
-                  <option value="">Choisir un employé</option>
-                  {employees && employees.length > 0 ? (
-                    employees.map(employee => {
-                      const firstName = employee.prenom || employee.firstName || "";
-                      const lastName = employee.nom || employee.lastName || "";
-                      const displayName = firstName && lastName 
-                        ? `${firstName} ${lastName}`
-                        : employee.name || `Employé ${employee.id.substring(0, 4)}`;
-                      return (
-                        <option key={employee.id} value={employee.id}>
-                          {displayName}
-                        </option>
-                      );
-                    })
-                  ) : (
-                    <option value="" disabled>Aucun employé disponible</option>
-                  )}
-                </select>
+                    }}
+                    defaultValue=""
+                  >
+                    <option value="" disabled>Choisir une entreprise</option>
+                    {companies && companies.length > 0 ? (
+                      companies.map(company => {
+                        const displayName = company.name || company.raisonSociale || 
+                                            company.nom || `Entreprise ${company.id.substring(0, 4)}`;
+                        return (
+                          <option key={company.id} value={company.id}>
+                            {displayName}
+                          </option>
+                        );
+                      })
+                    ) : (
+                      <option value="" disabled>Aucune entreprise disponible</option>
+                    )}
+                  </select>
+                </div>
               </div>
             </div>
             
-            <div className="flex items-center space-x-2 pb-2 border-b">
-              <span className="h-6 w-6 rounded-full bg-primary/20 text-primary flex items-center justify-center text-sm font-medium">1</span>
-              <h3 className="text-base font-medium">Identité du salarié</h3>
+            {data.raisonSociale && (
+              <div className="bg-blue-50 rounded-md border border-blue-100 p-4">
+                <h4 className="text-sm font-medium mb-4">Informations de l'entreprise</h4>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-y-4">
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-gray-500">Raison sociale</p>
+                    <p className="text-sm">{data.raisonSociale}</p>
+                  </div>
+                  
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-gray-500">Forme juridique</p>
+                    <p className="text-sm">{data.formeJuridique || "-"}</p>
+                  </div>
+                  
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-gray-500">SIRET</p>
+                    <p className="text-sm">{data.siret || "-"}</p>
+                  </div>
+                  
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-gray-500">Adresse</p>
+                    <p className="text-sm">{data.adresse}, {data.codePostal} {data.ville}</p>
+                  </div>
+                  
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-gray-500">Représentant</p>
+                    <p className="text-sm">{data.representant || "-"}</p>
+                  </div>
+                  
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-gray-500">Fonction</p>
+                    <p className="text-sm">{data.fonction || "-"}</p>
+                  </div>
+                  
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-gray-500">Convention collective</p>
+                    <p className="text-sm">{data.conventionCollective || "-"}</p>
+                  </div>
+                  
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-gray-500">Code IDCC</p>
+                    <p className="text-sm">{data.codeConvention || "-"}</p>
+                  </div>
+                  
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-gray-500">Caisse de retraite</p>
+                    <p className="text-sm">{data.caisseRetraite || "-"}</p>
+                  </div>
+                  
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-gray-500">Organisme de prévoyance</p>
+                    <p className="text-sm">{data.organismePrevoyance || "-"}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="mt-6 flex justify-end">
+              <Button onClick={validateCompanySelection}>
+                Continuer
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {subStep === 2 && (
+          <div className="bg-white rounded-lg shadow-sm border p-6">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-lg font-medium">Sélection du salarié</h3>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => setSubStep(1)}
+              >
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Retour
+              </Button>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <label htmlFor="civilite" className="text-sm font-medium">Civilité</label>
-                <select 
-                  id="civilite"
-                  className="w-full p-2 border rounded-md text-sm"
-                  value={salarieData.civilite}
-                  onChange={(e) => onChangeSalarie({ ...salarieData, civilite: e.target.value })}
-                >
-                  <option value="">Sélectionner</option>
-                  <option value="M">Monsieur</option>
-                  <option value="Mme">Madame</option>
-                </select>
-              </div>
-              
-              <div className="space-y-2">
-                <label htmlFor="nom" className="text-sm font-medium">Nom <span className="text-destructive">*</span></label>
-                <input 
-                  id="nom"
-                  type="text"
-                  className="w-full p-2 border rounded-md text-sm" 
-                  value={salarieData.nom}
-                  onChange={(e) => onChangeSalarie({ ...salarieData, nom: e.target.value })}
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <label htmlFor="prenom" className="text-sm font-medium">Prénom <span className="text-destructive">*</span></label>
-                <input 
-                  id="prenom"
-                  type="text"
-                  className="w-full p-2 border rounded-md text-sm" 
-                  value={salarieData.prenom}
-                  onChange={(e) => onChangeSalarie({ ...salarieData, prenom: e.target.value })}
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <label htmlFor="dateNaissance" className="text-sm font-medium">Date de naissance <span className="text-destructive">*</span></label>
-                <input 
-                  id="dateNaissance"
-                  type="date"
-                  className="w-full p-2 border rounded-md text-sm" 
-                  value={salarieData.dateNaissance}
-                  onChange={(e) => onChangeSalarie({ ...salarieData, dateNaissance: e.target.value })}
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <label htmlFor="lieuNaissance" className="text-sm font-medium">Lieu de naissance <span className="text-destructive">*</span></label>
-                <input 
-                  id="lieuNaissance"
-                  type="text"
-                  className="w-full p-2 border rounded-md text-sm" 
-                  value={salarieData.lieuNaissance}
-                  onChange={(e) => onChangeSalarie({ ...salarieData, lieuNaissance: e.target.value })}
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <label htmlFor="nationalite" className="text-sm font-medium">Nationalité</label>
-                <input 
-                  id="nationalite"
-                  type="text"
-                  className="w-full p-2 border rounded-md text-sm" 
-                  value={salarieData.nationalite || ""}
-                  onChange={(e) => onChangeSalarie({ ...salarieData, nationalite: e.target.value })}
-                />
+            <div className="mb-6">
+              <div className="flex items-center space-x-3 mb-4">
+                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                <div className="flex-grow">
+                  <select
+                    className="w-full p-3 text-base border rounded-md bg-white"
+                    onChange={(e) => {
+                      const employeeId = e.target.value;
+                      if (employeeId) {
+                        const employee = employees.find(emp => emp.id === employeeId);
+                        if (employee) {
+                          console.log("Employé sélectionné:", employee);
+                          onChangeSalarie({
+                            civilite: employee.civilite || "",
+                            nom: employee.nom || employee.lastName || "",
+                            prenom: employee.prenom || employee.firstName || "",
+                            dateNaissance: employee.dateNaissance || employee.birthDate || "",
+                            lieuNaissance: employee.lieuNaissance || employee.birthPlace || "",
+                            nationalite: employee.nationalite || employee.nationality || "",
+                            adresse: employee.adresse || employee.address || "",
+                            codePostal: employee.codePostal || employee.postalCode || "",
+                            ville: employee.ville || employee.city || "",
+                            numeroSecuriteSociale: employee.numeroSecuriteSociale || employee.socialSecurityNumber || ""
+                          });
+                          toast({
+                            title: "Employé sélectionné",
+                            description: `Les informations de ${employee.prenom || employee.firstName || ""} ${employee.nom || employee.lastName || ""} ont été chargées.`,
+                            variant: "default",
+                          });
+                        }
+                      }
+                    }}
+                    defaultValue=""
+                  >
+                    <option value="" disabled>Choisir un employé</option>
+                    {employees && employees.length > 0 ? (
+                      employees.map(employee => {
+                        const firstName = employee.prenom || employee.firstName || "";
+                        const lastName = employee.nom || employee.lastName || "";
+                        const displayName = firstName && lastName 
+                          ? `${firstName} ${lastName}`
+                          : employee.name || `Employé ${employee.id.substring(0, 4)}`;
+                        return (
+                          <option key={employee.id} value={employee.id}>
+                            {displayName}
+                          </option>
+                        );
+                      })
+                    ) : (
+                      <option value="" disabled>Aucun employé disponible</option>
+                    )}
+                  </select>
+                </div>
               </div>
             </div>
             
-            <div className="flex items-center space-x-2 pt-4 pb-2 border-b">
-              <span className="h-6 w-6 rounded-full bg-primary/20 text-primary flex items-center justify-center text-sm font-medium">2</span>
-              <h3 className="text-base font-medium">Adresse</h3>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2 col-span-1 md:col-span-2">
-                <label htmlFor="adresseSalarie" className="text-sm font-medium">Adresse <span className="text-destructive">*</span></label>
-                <input 
-                  id="adresseSalarie"
-                  type="text"
-                  className="w-full p-2 border rounded-md text-sm" 
-                  value={salarieData.adresse}
-                  onChange={(e) => onChangeSalarie({ ...salarieData, adresse: e.target.value })}
-                />
+            {salarieData.nom && (
+              <div className="bg-blue-50 rounded-md border border-blue-100 p-4">
+                <h4 className="text-sm font-medium mb-4">Informations du salarié</h4>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-y-4">
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-gray-500">Nom complet</p>
+                    <p className="text-sm">{salarieData.civilite} {salarieData.prenom} {salarieData.nom}</p>
+                  </div>
+                  
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-gray-500">Date de naissance</p>
+                    <p className="text-sm">{salarieData.dateNaissance || "-"}</p>
+                  </div>
+                  
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-gray-500">Lieu de naissance</p>
+                    <p className="text-sm">{salarieData.lieuNaissance || "-"}</p>
+                  </div>
+                  
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-gray-500">Nationalité</p>
+                    <p className="text-sm">{salarieData.nationalite || "-"}</p>
+                  </div>
+                  
+                  <div className="space-y-1 md:col-span-2">
+                    <p className="text-xs font-medium text-gray-500">Adresse</p>
+                    <p className="text-sm">{salarieData.adresse}, {salarieData.codePostal} {salarieData.ville}</p>
+                  </div>
+                  
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-gray-500">Numéro de sécurité sociale</p>
+                    <p className="text-sm">{salarieData.numeroSecuriteSociale || "-"}</p>
+                  </div>
+                </div>
               </div>
-              
-              <div className="space-y-2">
-                <label htmlFor="codePostalSalarie" className="text-sm font-medium">Code postal <span className="text-destructive">*</span></label>
-                <input 
-                  id="codePostalSalarie"
-                  type="text"
-                  className="w-full p-2 border rounded-md text-sm" 
-                  value={salarieData.codePostal}
-                  onChange={(e) => onChangeSalarie({ ...salarieData, codePostal: e.target.value })}
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <label htmlFor="villeSalarie" className="text-sm font-medium">Ville <span className="text-destructive">*</span></label>
-                <input 
-                  id="villeSalarie"
-                  type="text"
-                  className="w-full p-2 border rounded-md text-sm" 
-                  value={salarieData.ville}
-                  onChange={(e) => onChangeSalarie({ ...salarieData, ville: e.target.value })}
-                />
-              </div>
+            )}
+
+            <div className="mt-6 flex justify-end">
+              <Button onClick={validateEmployeeSelection}>
+                Valider
+                <CheckCircle2 className="ml-2 h-4 w-4" />
+              </Button>
             </div>
-            
-            <div className="flex items-center space-x-2 pt-4 pb-2 border-b">
-              <span className="h-6 w-6 rounded-full bg-primary/20 text-primary flex items-center justify-center text-sm font-medium">3</span>
-              <h3 className="text-base font-medium">Sécurité sociale</h3>
+          </div>
+        )}
+
+        <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4 text-sm text-yellow-700">
+          <div className="flex items-start space-x-2">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-yellow-600 mt-0.5"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path></svg>
+            <div>
+              <p>Vous devez sélectionner une entreprise et un salarié pour créer un contrat.</p>
+              <p className="mt-1">Si l&apos;entreprise ou le salarié souhaité n&apos;apparaît pas dans la liste, veuillez d&apos;abord le créer depuis le tableau de bord.</p>
             </div>
-            
-            <div className="grid grid-cols-1 gap-4">
-              <div className="space-y-2">
-                <label htmlFor="numeroSecuriteSociale" className="text-sm font-medium">Numéro de sécurité sociale</label>
-                <input 
-                  id="numeroSecuriteSociale"
-                  type="text"
-                  className="w-full p-2 border rounded-md text-sm" 
-                  value={salarieData.numeroSecuriteSociale || ""}
-                  onChange={(e) => onChangeSalarie({ ...salarieData, numeroSecuriteSociale: e.target.value })}
-                  placeholder="Ex: 1 85 12 34 567 890 12"
-                />
-              </div>
-            </div>
-          </TabsContent>
-        </Tabs>
+          </div>
+        </div>
       </div>
     );
   };
@@ -2503,6 +2393,66 @@ export default function CreateContractPage() {
     );
   };
 
+  const ContractPreview = () => {
+    return (
+      <div className="bg-white rounded-lg shadow-sm border p-6 h-full overflow-auto">
+        <h3 className="text-lg font-medium border-b pb-3 mb-5">Aperçu du contrat</h3>
+        {contractData.employeur.raisonSociale && contractData.salarie.nom ? (
+          <div className="space-y-8">
+            <div className="text-center mb-8">
+              <h1 className="text-xl font-bold uppercase mb-2">CONTRAT DE TRAVAIL</h1>
+              <p className="text-muted-foreground">
+                {contractData.contrat.type === "CDI_temps_plein" && "Contrat à durée indéterminée à temps plein"}
+                {contractData.contrat.type === "CDI_temps_partiel" && "Contrat à durée indéterminée à temps partiel"}
+                {contractData.contrat.type === "CDD_temps_plein" && "Contrat à durée déterminée à temps plein"}
+                {contractData.contrat.type === "CDD_temps_partiel" && "Contrat à durée déterminée à temps partiel"}
+              </p>
+            </div>
+            
+            <div className="space-y-5">
+              <h2 className="font-semibold text-lg">ENTRE LES SOUSSIGNÉS :</h2>
+              
+              <div className="pl-4 space-y-1">
+                <p><span className="font-medium">{contractData.employeur.raisonSociale}</span>, {contractData.employeur.formeJuridique}</p>
+                <p>Immatriculée au RCS sous le numéro SIRET {contractData.employeur.siret}</p>
+                <p>Dont le siège social est situé {contractData.employeur.adresse}, {contractData.employeur.codePostal} {contractData.employeur.ville}</p>
+                <p>Représentée par {contractData.employeur.representant} en qualité de {contractData.employeur.fonction}</p>
+                <p className="font-medium mt-2">Ci-après désignée "l'employeur"</p>
+              </div>
+              
+              <div className="pl-4 space-y-1">
+                <p>ET</p>
+                <p className="mt-2"><span className="font-medium">{contractData.salarie.civilite} {contractData.salarie.prenom} {contractData.salarie.nom}</span></p>
+                <p>Né(e) le {contractData.salarie.dateNaissance} à {contractData.salarie.lieuNaissance}</p>
+                <p>Demeurant {contractData.salarie.adresse}, {contractData.salarie.codePostal} {contractData.salarie.ville}</p>
+                <p>De nationalité {contractData.salarie.nationalite}</p>
+                <p>Numéro de sécurité sociale : {contractData.salarie.numeroSecuriteSociale}</p>
+                <p className="font-medium mt-2">Ci-après désigné(e) "le salarié"</p>
+              </div>
+            </div>
+            
+            {contractData.contrat.intitulePoste && (
+              <div className="space-y-5 mt-8">
+                <h2 className="font-semibold text-lg">ARTICLE 1 - ENGAGEMENT ET QUALIFICATION</h2>
+                <p className="pl-4">Le salarié est engagé en qualité de <span className="font-medium">{contractData.contrat.intitulePoste}</span>, statut {contractData.contrat.qualification}.</p>
+              </div>
+            )}
+            
+            {/* Plus d'articles selon les données du contrat */}
+            <div className="text-center text-muted-foreground italic mt-8">
+              <p>Aperçu du contrat - les détails seront complétés au fur et à mesure de votre progression</p>
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center h-[400px] text-muted-foreground">
+            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" className="mb-4 opacity-20"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><line x1="10" y1="9" x2="8" y2="9"></line></svg>
+            <p className="text-center max-w-xs">Sélectionnez une entreprise et un employé pour visualiser l'aperçu du contrat</p>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[70vh]">
@@ -2515,124 +2465,91 @@ export default function CreateContractPage() {
   }
 
   return (
-    <div className="max-w-[1200px] mx-auto p-4 space-y-6">
-      {/* En-tête */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center">
-          <Button variant="ghost" size="icon" asChild className="mr-2">
-            <Link href="/dashboard/contracts">
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">Créer un contrat de travail</h1>
-            <p className="text-sm text-muted-foreground">
-              {WIZARD_STEPS.find((step) => step.id === currentStep)?.description}
-            </p>
-          </div>
+    <div className="px-4 py-6 max-w-[1600px] mx-auto">
+      {/* En-tête et navigation */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
+        <div>
+          <Link href="/dashboard/documents" className="inline-flex items-center text-sm text-muted-foreground mb-2 hover:text-primary transition-colors">
+            <ArrowLeft className="mr-1 h-4 w-4" />
+            Retour à document
+          </Link>
+          <h1 className="text-2xl font-bold tracking-tight">Créer un nouveau contrat</h1>
         </div>
-        <Button
-          variant="outline"
-          onClick={saveAsDraft}
-          disabled={isSaving}
-        >
-          {isSaving ? (
-            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-          ) : (
-            <Save className="h-4 w-4 mr-2" />
-          )}
-          Enregistrer le brouillon
-        </Button>
-      </div>
-
-      {/* Barre de progression */}
-      <div className="relative mb-8">
-        <Progress 
-          value={progress} 
-          className="h-2.5 rounded-full bg-muted" 
-        />
-        <div className="flex justify-between mt-2">
-          {WIZARD_STEPS.map((step, index) => (
-            <div
-              key={step.id}
-              className="relative w-[12.5%] text-center"
-            >
-              <button
-                onClick={() => goToStep(step.id)}
-                disabled={!contractData.wizardProgress.completedSteps.includes(step.id) && step.id !== currentStep}
-                className={`
-                  absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-[calc(100%+10px)]
-                  flex items-center justify-center h-6 w-6 rounded-full text-xs font-medium transition-all
-                  ${currentStep === step.id
-                    ? "bg-primary text-white ring-4 ring-primary/20"
-                    : contractData.wizardProgress.completedSteps.includes(step.id)
-                    ? "bg-primary/80 text-white cursor-pointer hover:bg-primary"
-                    : "bg-muted text-muted-foreground cursor-not-allowed"}
-                `}
-              >
-                {contractData.wizardProgress.completedSteps.includes(step.id) && step.id !== currentStep ? (
-                  <CheckCircle2 className="h-3 w-3" />
-                ) : (
-                  index + 1
-                )}
-              </button>
-              <span 
-                className={`text-[10px] absolute text-center left-1/2 transform -translate-x-1/2 translate-y-[20px] w-20 
-                  ${currentStep === step.id ? "font-medium text-primary" : "text-muted-foreground"}`}
-              >
-                {step.title}
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Contenu de l'étape */}
-      <Card className="border rounded-xl shadow-sm">
-        <CardHeader className="border-b bg-muted/40 rounded-t-xl">
-          <CardTitle className="text-xl">
-            {WIZARD_STEPS.find((step) => step.id === currentStep)?.title}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-6">
-          {renderStepContent()}
-        </CardContent>
-      </Card>
-
-      {/* Navigation entre les étapes */}
-      <div className="flex justify-between pt-6">
-        <Button
-          variant="outline"
-          onClick={goToPreviousStep}
-          disabled={currentStep === WIZARD_STEPS[0].id}
-          className="px-4 py-2"
-        >
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Précédent
-        </Button>
         
-        {currentStep !== WIZARD_STEPS[WIZARD_STEPS.length - 1].id ? (
+        <div className="mt-4 md:mt-0 flex items-center space-x-3">
           <Button 
-            onClick={goToNextStep}
-            className="px-6 py-2"
+            variant="outline" 
+            size="icon"
+            onClick={goToPreviousStep}
+            disabled={currentStep === WIZARD_STEPS[0].id}
+            className="h-10 w-10"
           >
-            Suivant
-            <ArrowRight className="h-4 w-4 ml-2" />
+            <ArrowLeft className="h-5 w-5" />
           </Button>
-        ) : (
-          <Button
-            onClick={generateContract}
-            disabled={isSaving}
-            className="px-6 py-2 bg-primary hover:bg-primary/90"
+          <Button 
+            variant="outline"
+            size="icon"
+            onClick={saveAsDraft}
+            disabled={isSaving || !saveButtonEnabled}
+            className="h-10 w-10 relative"
           >
             {isSaving ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              <Loader2 className="h-5 w-5 animate-spin" />
             ) : (
-              <CheckCircle2 className="h-4 w-4 mr-2" />
+              <Save className="h-5 w-5" />
             )}
-            Générer le contrat
           </Button>
-        )}
+          <Button 
+            variant="outline"
+            size="icon"
+            onClick={() => router.push("/dashboard/contracts")}
+            className="h-10 w-10 text-destructive hover:text-destructive"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className=""><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+          </Button>
+          <Button 
+            variant="outline"
+            size="icon"
+            onClick={currentStep === WIZARD_STEPS[WIZARD_STEPS.length - 1].id ? generateContract : goToNextStep}
+            disabled={isSaving}
+            className="h-10 w-10"
+          >
+            <ArrowRight className="h-5 w-5" />
+          </Button>
+        </div>
+      </div>
+      
+      {/* Barre de progression unifiée */}
+      <div className="mb-8">
+        <div className="flex justify-between items-center mb-2">
+          <div className="flex items-center">
+            <span className="text-sm font-medium text-primary">{WIZARD_STEPS.findIndex(step => step.id === currentStep) + 1}</span>
+            <span className="text-sm text-muted-foreground mx-1.5">/</span>
+            <span className="text-sm text-muted-foreground">{WIZARD_STEPS.length}</span>
+            <span className="text-sm font-medium ml-3">{WIZARD_STEPS.find(step => step.id === currentStep)?.title}</span>
+          </div>
+          <span className="text-sm text-muted-foreground">{Math.round(progress)}% complété</span>
+        </div>
+        <Progress value={progress} className="h-2 mb-4" />
+      </div>
+      
+      {/* Nouvelle mise en page: formulaire à gauche et aperçu à droite */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* Formulaire interactif */}
+        <div className="lg:col-span-5 xl:col-span-5">
+          <div className="bg-blue-50 dark:bg-slate-800/30 rounded-lg p-5 h-full">
+            <Card className="border-0 shadow-none bg-transparent">
+              <CardContent className="p-0 space-y-6">
+                {renderStepContent()}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+        
+        {/* Aperçu du contrat (grande taille) */}
+        <div className="lg:col-span-7 xl:col-span-7">
+          <ContractPreview />
+        </div>
       </div>
     </div>
   );

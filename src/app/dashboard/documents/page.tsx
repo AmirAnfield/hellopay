@@ -111,7 +111,7 @@ export default function DocumentsPage() {
     e.stopPropagation();
     
     // Rediriger vers la page de création de contrat
-    window.location.href = "/dashboard/documents/contracts/create";
+    window.location.href = "/dashboard/contracts/create";
   };
 
   // Fonction pour passer à l'étape suivante
@@ -277,7 +277,7 @@ export default function DocumentsPage() {
   
   // Reprendre l'édition d'un brouillon
   const resumeEditingDraft = (docId: string) => {
-    window.location.href = `/dashboard/documents/contracts/edit/${docId}`;
+    window.location.href = `/dashboard/contracts/edit/${docId}`;
   };
 
   // Gérer le click sur les éléments du menu dropdown
