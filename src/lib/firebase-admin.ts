@@ -1,3 +1,11 @@
+/**
+ * Firebase Admin SDK - Point d'accès central
+ * 
+ * ATTENTION: Ce fichier est le SEUL endroit où Firebase Admin doit être initialisé.
+ * Ne pas créer d'autres instances de Firebase Admin SDK dans le projet pour éviter
+ * les doublons d'initialisation et les conflits.
+ */
+
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';

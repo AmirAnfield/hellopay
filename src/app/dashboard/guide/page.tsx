@@ -8,7 +8,7 @@ import {
   PageHeader
 } from "@/components/shared/PageContainer";
 
-export default function GuidePage() {
+export default function PayrollGuidePage() {
   const [activeTab, setActiveTab] = useState("introduction");
 
   return (

@@ -1,188 +1,255 @@
-import { Button } from "@/components/ui/button";
-import {
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
-} from "lucide-react";
+"use client";
 
-// Type pour les options de traduction
-type TranslationOptions = Record<string, string | number | boolean>;
+import { useMemo } from 'react';
+import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
+import { PaginationProps } from '@/types/pagination';
 
-// Fonction de traduction simple par défaut
-const defaultTranslate = (key: string, options?: TranslationOptions) => {
-  // Remplacer les variables dans la chaîne
-  if (options) {
-    let result = key;
-    Object.entries(options).forEach(([k, v]) => {
-      result = result.replace(`{${k}}`, String(v));
-    });
-    return result;
+/**
+ * Générer la plage de pages à afficher
+ */
+function generatePageRange(currentPage: number, totalPages: number, siblingCount: number = 1) {
+  // Calculer le nombre de pages à afficher
+  const totalPageNumbers = siblingCount * 2 + 3; // sibling gauche + sibling droit + page courante + première + dernière
+
+  // Si le nombre total de pages est inférieur au nombre total à afficher, afficher toutes les pages
+  if (totalPageNumbers >= totalPages) {
+    return Array.from({ length: totalPages }, (_, i) => i + 1);
   }
-  return key;
-};
 
-export interface PaginationProps {
-  currentPage: number;
-  totalPages: number;
-  onPageChange: (page: number) => void;
-  totalItems?: number;
-  pageSize?: number;
-  showGoToFirst?: boolean;
-  showGoToLast?: boolean;
-  maxPageButtons?: number;
-  className?: string;
-  translate?: (key: string, options?: TranslationOptions) => string;
+  // Calculer les index des pages autour de la page courante
+  const leftSiblingIndex = Math.max(currentPage - siblingCount, 1);
+  const rightSiblingIndex = Math.min(currentPage + siblingCount, totalPages);
+
+  // Ne pas afficher les points de suspension si les pages adjacentes sont proches
+  const shouldShowLeftDots = leftSiblingIndex > 2;
+  const shouldShowRightDots = rightSiblingIndex < totalPages - 1;
+
+  // Cas 1: Points de suspension à droite seulement
+  if (!shouldShowLeftDots && shouldShowRightDots) {
+    const leftItemCount = 1 + 2 * siblingCount;
+    const leftRange = Array.from({ length: leftItemCount }, (_, i) => i + 1);
+    return [...leftRange, -1, totalPages];
+  }
+
+  // Cas 2: Points de suspension à gauche seulement
+  if (shouldShowLeftDots && !shouldShowRightDots) {
+    const rightItemCount = 1 + 2 * siblingCount;
+    const rightRange = Array.from(
+      { length: rightItemCount },
+      (_, i) => totalPages - rightItemCount + i + 1
+    );
+    return [1, -2, ...rightRange];
+  }
+
+  // Cas 3: Points de suspension des deux côtés
+  if (shouldShowLeftDots && shouldShowRightDots) {
+    const middleRange = Array.from(
+      { length: rightSiblingIndex - leftSiblingIndex + 1 },
+      (_, i) => leftSiblingIndex + i
+    );
+    return [1, -3, ...middleRange, -4, totalPages];
+  }
+
+  // Par défaut, retourner un tableau vide (ne devrait jamais arriver)
+  return [];
 }
 
-export default function Pagination({
+/**
+ * Composant de pagination réutilisable
+ * 
+ * @example
+ * <Pagination
+ *   currentPage={currentPage}
+ *   totalPages={totalPages}
+ *   onPageChange={handlePageChange}
+ * />
+ */
+export function Pagination({
   currentPage,
   totalPages,
+  pageSize = 10,
   onPageChange,
-  totalItems,
-  pageSize,
-  showGoToFirst = true,
-  showGoToLast = true,
-  maxPageButtons = 5,
-  className = "",
-  translate = defaultTranslate,
+  showFirstLast = true,
+  siblingCount = 1,
+  className
 }: PaginationProps) {
-  // Utiliser la fonction de traduction fournie ou la fonction par défaut
-  const t = translate;
+  // Générer la plage de pages à afficher
+  const pageRange = useMemo(() => {
+    return generatePageRange(currentPage, totalPages, siblingCount);
+  }, [currentPage, totalPages, siblingCount]);
 
-  // Gérer les cas limites
+  // Si pas de pagination nécessaire (0 ou 1 page)
   if (totalPages <= 1) {
     return null;
   }
 
-  // S'assurer que la page courante est dans les limites valides
-  const safePage = Math.max(1, Math.min(currentPage, totalPages));
+  return (
+    <nav
+      role="navigation"
+      aria-label="Pagination"
+      className={cn("flex justify-center items-center space-x-2", className)}
+    >
+      {/* Bouton Première page */}
+      {showFirstLast && (
+        <Button
+          variant="outline"
+          size="icon"
+          className="h-8 w-8"
+          onClick={() => onPageChange(1)}
+          disabled={currentPage === 1}
+          aria-label="Première page"
+        >
+          <ChevronsLeft className="h-4 w-4" />
+        </Button>
+      )}
 
-  // Déterminer quelles pages afficher
-  const getPageNumbers = () => {
-    // Si peu de pages, afficher toutes les pages
-    if (totalPages <= maxPageButtons) {
-      return Array.from({ length: totalPages }, (_, i) => i + 1);
-    }
+      {/* Bouton Page précédente */}
+      <Button
+        variant="outline"
+        size="icon"
+        className="h-8 w-8"
+        onClick={() => onPageChange(currentPage - 1)}
+        disabled={currentPage === 1}
+        aria-label="Page précédente"
+      >
+        <ChevronLeft className="h-4 w-4" />
+      </Button>
 
-    // Calcul du milieu
-    const half = Math.floor(maxPageButtons / 2);
-    
-    // Si on est proche du début
-    if (safePage <= half + 1) {
-      return [
-        ...Array.from({ length: maxPageButtons - 1 }, (_, i) => i + 1),
-        "ellipsis",
-        totalPages,
-      ];
-    }
-    
-    // Si on est proche de la fin
-    if (safePage >= totalPages - half) {
-      return [
-        1,
-        "ellipsis",
-        ...Array.from(
-          { length: maxPageButtons - 1 },
-          (_, i) => totalPages - maxPageButtons + i + 2
-        ),
-      ];
-    }
-    
-    // On est au milieu
-    return [
-      1,
-      "ellipsis",
-      ...Array.from(
-        { length: maxPageButtons - 2 },
-        (_, i) => safePage - Math.floor((maxPageButtons - 2) / 2) + i
-      ),
-      "ellipsis",
-      totalPages,
-    ];
-  };
+      {/* Pages numérotées */}
+      {pageRange.map((page, index) => {
+        // Points de suspension à gauche
+        if (page === -1 || page === -3) {
+          return (
+            <Button
+              key={`dots-${index}`}
+              variant="outline"
+              size="icon"
+              className="h-8 w-8 cursor-default"
+              disabled
+            >
+              ...
+            </Button>
+          );
+        }
 
-  const pages = getPageNumbers();
+        // Points de suspension à droite
+        if (page === -2 || page === -4) {
+          return (
+            <Button
+              key={`dots-${index}`}
+              variant="outline" 
+              size="icon"
+              className="h-8 w-8 cursor-default"
+              disabled
+            >
+              ...
+            </Button>
+          );
+        }
+
+        // Page régulière
+        return (
+          <Button
+            key={`page-${page}`}
+            variant={currentPage === page ? "default" : "outline"}
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => onPageChange(page)}
+            aria-current={currentPage === page ? "page" : undefined}
+            aria-label={`Page ${page}`}
+          >
+            {page}
+          </Button>
+        );
+      })}
+
+      {/* Bouton Page suivante */}
+      <Button
+        variant="outline"
+        size="icon"
+        className="h-8 w-8"
+        onClick={() => onPageChange(currentPage + 1)}
+        disabled={currentPage === totalPages}
+        aria-label="Page suivante"
+      >
+        <ChevronRight className="h-4 w-4" />
+      </Button>
+
+      {/* Bouton Dernière page */}
+      {showFirstLast && (
+        <Button
+          variant="outline"
+          size="icon"
+          className="h-8 w-8"
+          onClick={() => onPageChange(totalPages)}
+          disabled={currentPage === totalPages}
+          aria-label="Dernière page"
+        >
+          <ChevronsRight className="h-4 w-4" />
+        </Button>
+      )}
+    </nav>
+  );
+}
+
+/**
+ * Composant pour afficher les informations de pagination
+ */
+export function PaginationInfo({
+  currentPage,
+  pageSize,
+  totalItems,
+  className
+}: {
+  currentPage: number;
+  pageSize: number;
+  totalItems: number;
+  className?: string;
+}) {
+  const startItem = Math.min((currentPage - 1) * pageSize + 1, totalItems);
+  const endItem = Math.min(currentPage * pageSize, totalItems);
 
   return (
-    <div className={`flex items-center justify-between ${className}`}>
-      <div className="text-sm text-muted-foreground">
-        {totalItems !== undefined && pageSize !== undefined && (
-          <p>
-            {t("pagination.showing")} {Math.min((safePage - 1) * pageSize + 1, totalItems)} - {Math.min(safePage * pageSize, totalItems)} {t("pagination.of")} {totalItems}
-          </p>
-        )}
-      </div>
+    <div className={cn("text-sm text-muted-foreground", className)}>
+      Affichage de <span className="font-medium">{startItem}</span> à{" "}
+      <span className="font-medium">{endItem}</span> sur{" "}
+      <span className="font-medium">{totalItems}</span> résultats
+    </div>
+  );
+}
 
-      <div className="flex items-center space-x-1">
-        {showGoToFirst && (
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => onPageChange(1)}
-            disabled={safePage === 1}
-            className="h-8 w-8"
-            aria-label={t("pagination.firstPage")}
-          >
-            <ChevronsLeft className="h-4 w-4" />
-          </Button>
-        )}
-
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={() => onPageChange(safePage - 1)}
-          disabled={safePage === 1}
-          className="h-8 w-8"
-          aria-label={t("pagination.previousPage")}
-        >
-          <ChevronLeft className="h-4 w-4" />
-        </Button>
-
-        {pages.map((page, i) =>
-          page === "ellipsis" ? (
-            <span key={`ellipsis-${i}`} className="px-2">
-              ...
-            </span>
-          ) : (
-            <Button
-              key={`page-${page}`}
-              variant={page === safePage ? "default" : "outline"}
-              size="icon"
-              onClick={() => onPageChange(page as number)}
-              className="h-8 w-8"
-              aria-label={t("pagination.goToPage", { page })}
-              aria-current={page === safePage ? "page" : undefined}
-            >
-              {page}
-            </Button>
-          )
-        )}
-
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={() => onPageChange(safePage + 1)}
-          disabled={safePage === totalPages}
-          className="h-8 w-8"
-          aria-label={t("pagination.nextPage")}
-        >
-          <ChevronRight className="h-4 w-4" />
-        </Button>
-
-        {showGoToLast && (
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => onPageChange(totalPages)}
-            disabled={safePage === totalPages}
-            className="h-8 w-8"
-            aria-label={t("pagination.lastPage")}
-          >
-            <ChevronsRight className="h-4 w-4" />
-          </Button>
-        )}
-      </div>
+/**
+ * Composant de sélection du nombre d'éléments par page
+ */
+export function PageSizeSelector({
+  pageSize,
+  onPageSizeChange,
+  options = [10, 25, 50, 100],
+  className
+}: {
+  pageSize: number;
+  onPageSizeChange: (pageSize: number) => void;
+  options?: number[];
+  className?: string;
+}) {
+  return (
+    <div className={cn("flex items-center space-x-2", className)}>
+      <span className="text-sm text-muted-foreground">Afficher</span>
+      <select
+        value={pageSize}
+        onChange={(e) => onPageSizeChange(Number(e.target.value))}
+        className="h-8 rounded-md border border-input bg-background px-2 py-1 text-sm"
+        aria-label="Nombre d'éléments par page"
+      >
+        {options.map((option) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+      </select>
+      <span className="text-sm text-muted-foreground">par page</span>
     </div>
   );
 } 

@@ -5,7 +5,7 @@ export const metadata: Metadata = {
   description: "Politique de confidentialité et traitement des données personnelles de HelloPay",
 };
 
-export default function ConfidentialitePage() {
+export default function PrivacyPolicyPage() {
   return (
     <div className="container mx-auto py-12">
       <div className="max-w-3xl mx-auto space-y-8">

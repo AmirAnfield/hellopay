@@ -157,7 +157,7 @@ npm run test:integration
 - **État global**: React Context API
 - **Tests**: Jest et React Testing Library
 
-## Architecture du projet
+## Architecture du projet (actualisée MVP 0.50)
 
 - `src/app/` - Routes et pages de l'application
   - `src/app/(public)/` - Pages publiques (tarifs, démo, contact)
@@ -168,17 +168,58 @@ npm run test:integration
     - `src/app/dashboard/payslips/` - Gestion des bulletins de paie
     - `src/app/dashboard/companies/` - Gestion des entreprises
     - `src/app/dashboard/employees/` - Gestion des employés
+    - `src/app/dashboard/certificates/` - Génération d'attestations
 - `src/components/` - Composants réutilisables
   - `src/components/ui/` - Éléments d'interface (shadcn/ui)
   - `src/components/shared/` - Composants partagés entre fonctionnalités
   - `src/components/payslip/` - Composants spécifiques aux bulletins
   - `src/components/contracts/` - Composants spécifiques aux contrats
 - `src/lib/` - Utilitaires et services
-  - `src/lib/api/` - Fonctions d'appels API centralisées
+  - `src/lib/firebase/` - Configuration centralisée de Firebase (à privilégier)
   - `src/lib/utils/` - Fonctions utilitaires
-  - `src/lib/validators/` - Schémas de validation Zod
-- `prisma/` - Schéma de base de données et migrations
-- `__tests__/` - Tests unitaires et d'intégration
+  - `src/lib/security/` - Fonctions de sécurité et authentification
+- `src/services/` - Services métier
+  - Importation via l'index centralisé: `import { AuthService, EmployeeService } from '@/services';`
+- `src/hooks/` - Hooks personnalisés
+  - Importation via l'index centralisé: `import { useAuth, useFirestoreDocument } from '@/hooks';`
+- `src/schemas/` - Schémas de validation
+- `src/types/` - Types TypeScript
+
+## Bonnes pratiques de développement
+
+### Structure et organisation
+
+1. **Éviter les duplications**
+   - Centraliser les définitions de types dans `src/types/`
+   - Utiliser les utilitaires communs dans `src/lib/utils.ts`
+   - Ne pas réimplémenter des fonctionnalités existantes
+
+2. **Nomenclature standardisée**
+   - Components: `PascalCase` (ex: `EmployeeList.tsx`)
+   - Hooks: `useCamelCase` (ex: `useFirestoreDocument.tsx`)
+   - Pages: Suffixe `Page` (ex: `export default function PayrollGuidePage()`)
+   - Services: Suffixe `Service` (ex: `employee-service.ts`)
+
+3. **Firebase/Firestore**
+   - Utiliser uniquement `src/lib/firebase/config.ts` pour l'initialisation
+   - Accéder aux services via les services dédiés, pas directement
+   - Le fichier `src/lib/firebase-admin.ts` est le point unique d'initialisation du SDK Admin
+
+### Performance et optimisation
+
+1. **Requêtes Firestore**
+   - Limiter les requêtes avec pagination (`limit()`)
+   - Mettre en cache les résultats quand c'est possible
+   - Utiliser les hooks `useFirestoreDocument` et `useFirestoreCollection`
+
+2. **Formulaires et validation**
+   - Utiliser les schémas dans `src/schemas/` pour valider les données
+   - Préférer la validation côté client pour une meilleure UX
+
+3. **Sécurité**
+   - Ne pas stocker de secrets dans le code client
+   - Toujours vérifier les permissions dans le middleware et les règles Firestore
+   - Utiliser les fonctions Firebase pour les opérations sensibles
 
 ## Contribution
 
@@ -193,3 +234,30 @@ Les contributions sont les bienvenues ! Voici comment contribuer au projet :
 ## License
 
 MIT
+
+## Nouveautés de la version 0.51
+
+Cette version introduit plusieurs améliorations importantes pour renforcer l'architecture du projet et optimiser les performances :
+
+### Pagination avancée
+
+- ✅ Nouveau système de pagination optimisé pour Firestore
+- ✅ Support de la pagination par curseurs pour de meilleures performances
+- ✅ Hook personnalisé `useFirestorePagination` pour faciliter l'implémentation
+- ✅ Composants UI réutilisables (`Pagination`, `PaginationInfo`, `PageSizeSelector`)
+- ✅ Support de la pagination infinie avec "Charger plus"
+
+### Structure du projet
+
+- ✅ Centralisation des services avec point d'accès unique (`@/services`)
+- ✅ Hooks personnalisés regroupés et exposés via un index central (`@/hooks`) 
+- ✅ Refactorisation du middleware avec unification des règles de sécurité
+- ✅ Élimination des composants en double et du code mort
+
+### Types et vérifications
+
+- ✅ Types cohérents pour les entités principales (Employee, Company, etc.)
+- ✅ Vérification adéquate des paramètres nuls ou optionnels
+- ✅ Consolidation des schémas de validation
+
+Cette version pose les bases d'une architecture solide et maintenable pour le développement futur.

@@ -10,6 +10,7 @@ import {
   where,
   orderBy,
   limit,
+  startAfter,
   serverTimestamp,
   DocumentSnapshot,
   QuerySnapshot,
@@ -20,10 +21,12 @@ import {
   onSnapshot,
   CollectionReference,
   QueryConstraint,
-  addDoc
+  addDoc,
+  getCountFromServer
 } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
 import { getFirestore } from 'firebase/firestore';
+import { FirestorePaginationParams, PaginatedResult } from '@/types/pagination';
 
 /**
  * Interface pour les options de requête
@@ -312,4 +315,114 @@ export function getUserDocPath(subPath: string = ''): string {
   }
   
   return `users/${user.uid}${subPath ? `/${subPath}` : ''}`;
+}
+
+/**
+ * Obtient une collection avec pagination basée sur un curseur
+ * Cette méthode est plus efficace que la pagination par offset pour les grandes collections
+ * 
+ * @param collectionPath Chemin de la collection
+ * @param paginationParams Paramètres de pagination (limit, lastVisible, whereConditions, etc.)
+ * @returns Résultat paginé (données, dernier document visible, indicateur hasMore)
+ */
+export async function getPaginatedCollection<T extends DocumentData>(
+  collectionPath: string,
+  paginationParams: FirestorePaginationParams = {}
+): Promise<PaginatedResult<T>> {
+  try {
+    const {
+      limit: limitCount = 10,
+      lastVisible = null,
+      sortBy = 'createdAt',
+      sortDirection = 'desc',
+      whereConditions = []
+    } = paginationParams;
+
+    // Construire les contraintes de la requête
+    const queryConstraints: QueryConstraint[] = [];
+
+    // Ajouter les conditions where
+    whereConditions.forEach(condition => {
+      queryConstraints.push(where(condition.field, condition.operator, condition.value));
+    });
+
+    // Ajouter le tri
+    queryConstraints.push(orderBy(sortBy, sortDirection));
+
+    // Si nous avons un document "lastVisible", l'utiliser comme point de départ
+    if (lastVisible) {
+      queryConstraints.push(startAfter(lastVisible));
+    }
+
+    // Ajouter la limite
+    queryConstraints.push(limit(limitCount + 1)); // +1 pour déterminer s'il y a plus de résultats
+
+    // Créer et exécuter la requête
+    const collectionRef = collection(db, collectionPath);
+    const q = query(collectionRef, ...queryConstraints);
+    const querySnapshot = await getDocs(q);
+
+    // Vérifier s'il y a plus de résultats que la limite demandée
+    const hasMore = querySnapshot.docs.length > limitCount;
+
+    // Stocker le dernier document visible pour la pagination suivante
+    const newLastVisible = hasMore 
+      ? querySnapshot.docs[limitCount - 1] 
+      : querySnapshot.docs.length > 0 
+        ? querySnapshot.docs[querySnapshot.docs.length - 1] 
+        : null;
+
+    // Convertir les documents en données avec ID
+    const docs = querySnapshot.docs
+      .slice(0, limitCount) // Limiter aux résultats demandés
+      .map(doc => ({
+        id: doc.id,
+        ...(doc.data() as T)
+      }));
+
+    return {
+      data: docs,
+      hasMore,
+      lastVisible: newLastVisible
+    };
+  } catch (error) {
+    console.error('Erreur lors de la récupération de la collection paginée:', error);
+    throw error;
+  }
+}
+
+/**
+ * Compte le nombre total d'éléments dans une collection avec filtres optionnels
+ * 
+ * @param collectionPath Chemin de la collection
+ * @param whereConditions Conditions de filtrage optionnelles
+ * @returns Nombre total d'éléments
+ */
+export async function getCollectionCount(
+  collectionPath: string,
+  whereConditions: Array<{
+    field: string;
+    operator: '==' | '!=' | '>' | '>=' | '<' | '<=';
+    value: unknown;
+  }> = []
+): Promise<number> {
+  try {
+    // Construire les contraintes de la requête
+    const queryConstraints: QueryConstraint[] = [];
+
+    // Ajouter les conditions where
+    whereConditions.forEach(condition => {
+      queryConstraints.push(where(condition.field, condition.operator, condition.value));
+    });
+
+    // Créer et exécuter la requête de comptage
+    const collectionRef = collection(db, collectionPath);
+    const q = query(collectionRef, ...queryConstraints);
+    const snapshot = await getCountFromServer(q);
+    
+    return snapshot.data().count;
+  } catch (error) {
+    console.error('Erreur lors du comptage des documents:', error);
+    throw error;
+  }
 } 

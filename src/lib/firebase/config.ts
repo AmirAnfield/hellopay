@@ -1,8 +1,18 @@
-import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app';
-import { getAuth, type Auth } from 'firebase/auth';
-import { getFirestore, type Firestore } from 'firebase/firestore';
-import { getStorage, type FirebaseStorage } from 'firebase/storage';
-import { getFunctions, type Functions } from 'firebase/functions';
+/**
+ * Configuration centralisée de Firebase
+ * 
+ * Ce fichier est le point d'entrée unique pour toutes les configurations Firebase.
+ * Toutes les autres parties du code doivent importer les services depuis ce fichier
+ * plutôt que d'initialiser leurs propres connexions.
+ */
+
+import { initializeApp, getApps } from 'firebase/app';
+import { getAuth } from 'firebase/auth';
+import { getFirestore } from 'firebase/firestore';
+import { getStorage } from 'firebase/storage';
+import { getFunctions } from 'firebase/functions';
+import { getAnalytics } from 'firebase/analytics';
+import { initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check';
 
 // Configuration Firebase
 const firebaseConfig = {
@@ -11,72 +21,42 @@ const firebaseConfig = {
   projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
   storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
   messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
 };
 
-// Types pour notre interface Firebase
-interface FirebaseServices {
-  firebaseApp: FirebaseApp;
-  auth: Auth;
-  firestore: Firestore;
-  storage: FirebaseStorage;
-  functions: Functions;
-}
+// Initialiser Firebase uniquement si ce n'est pas déjà fait
+const apps = getApps();
+export const app = apps.length ? apps[0] : initializeApp(firebaseConfig);
 
-// Interface minimale pour Firestore mock
-interface FirestoreMock {
-  collection: (collectionPath: string) => any;
-}
+// Initialiser les services Firebase
+export const auth = getAuth(app);
+export const firestore = getFirestore(app);
+export const storage = getStorage(app);
+export const functions = getFunctions(app);
 
-// Création de mock objects pour le SSR
-const createMockFirebaseServices = (): FirebaseServices => {
-  const mockServices = {} as unknown as FirebaseServices;
-  
-  // Ajouter les méthodes nécessaires à Firestore pour éviter les erreurs
-  const mockFirestore = {} as unknown as FirestoreMock;
-  mockServices.firestore = mockFirestore as any;
-  
-  mockFirestore.collection = () => ({
-    doc: () => ({
-      get: async () => ({
-        exists: () => false,
-        data: () => null
-      }),
-      set: async () => {}
-    }),
-    where: () => ({
-      get: async () => ({
-        empty: true,
-        docs: []
-      })
-    })
-  });
-  
-  return mockServices;
-};
+// Initialiser Analytics et AppCheck uniquement côté client en production
+let analytics = null;
+let appCheck = null;
 
-// Initialisation côté client OU utilisation de mocks côté serveur
-const services = createMockFirebaseServices();
-let { firebaseApp, auth, firestore, storage, functions } = services;
-
-// Initialisation réelle uniquement côté client
 if (typeof window !== 'undefined') {
-  try {
-    // Initialiser l'application Firebase
-    firebaseApp = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-
-    // Initialiser les services
-    auth = getAuth(firebaseApp);
-    firestore = getFirestore(firebaseApp);
-    storage = getStorage(firebaseApp);
-    functions = getFunctions(firebaseApp, 'europe-west1');
-
-    console.log('Firebase initialisé en mode client');
-  } catch (error) {
-    console.error('Erreur lors de l\'initialisation de Firebase:', error);
+  // Analytics uniquement en production
+  if (process.env.NODE_ENV === 'production') {
+    analytics = getAnalytics(app);
   }
-} else {
-  console.log('Firebase en mode SSR (mocks utilisés)');
+  
+  // AppCheck uniquement en production
+  if (process.env.NODE_ENV === 'production' && process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY) {
+    appCheck = initializeAppCheck(app, {
+      provider: new ReCaptchaV3Provider(process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY),
+      isTokenAutoRefreshEnabled: true
+    });
+  }
 }
 
-export { firebaseApp, auth, firestore, storage, functions }; 
+export { analytics, appCheck };
+
+// Log de debug pour le développement
+if (process.env.NODE_ENV === 'development') {
+  console.log('🔥 Firebase initialisé avec le projet:', firebaseConfig.projectId);
+} 

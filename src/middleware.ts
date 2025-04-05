@@ -15,6 +15,11 @@ const PUBLIC_ROUTES = [
   '/api/auth/logout',
   '/api/auth/verify',
   '/api/auth',
+  '/tarifs',
+  '/contact',
+  '/mentions-legales',
+  '/confidentialite',
+  '/faq'
 ];
 
 // Ressources statiques à ignorer
@@ -24,6 +29,17 @@ const STATIC_RESOURCES = [
   '/images',
   '/fonts',
   '/static',
+];
+
+// Chemins exemptés de la vérification d'email
+const EMAIL_VERIFICATION_EXEMPT = [
+  '/auth/verify-email',
+  '/auth/verify/pending',
+  '/auth/verify/send',
+  '/profile/settings',
+  '/api/auth/verify/send',
+  '/api/auth/send-verification',
+  '/api/auth/logout'
 ];
 
 /**
@@ -43,6 +59,41 @@ const logAuthProcess = (message: string, request: NextRequest, error?: unknown) 
 };
 
 /**
+ * Ajoute les en-têtes de sécurité à la réponse
+ */
+const addSecurityHeaders = (response: NextResponse): NextResponse => {
+  // Ajout d'en-têtes de sécurité de base
+  response.headers.set('X-Content-Type-Options', 'nosniff');
+  response.headers.set('X-Frame-Options', 'DENY');
+  response.headers.set('X-XSS-Protection', '1; mode=block');
+  
+  // Politique de référencement
+  response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+  
+  // Permissions
+  response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  
+  // Content Security Policy - uniquement en production
+  if (process.env.NODE_ENV === 'production') {
+    const cspDirectives = [
+      "default-src 'self'",
+      "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://js.stripe.com https://apis.google.com https://*.firebaseio.com",
+      "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com",
+      "img-src 'self' data: https://*.stripe.com https://*.firebaseio.com",
+      "font-src 'self' https://fonts.gstatic.com",
+      "connect-src 'self' https://api.stripe.com https://*.firebaseio.com https://*.googleapis.com",
+      "frame-src https://js.stripe.com https://*.firebaseapp.com",
+      "object-src 'none'",
+      "base-uri 'self'",
+      "form-action 'self'",
+    ];
+    response.headers.set('Content-Security-Policy', cspDirectives.join('; '));
+  }
+  
+  return response;
+};
+
+/**
  * Middleware Next.js pour gérer l'authentification
  * Vérifie les sessions et protège les routes qui nécessitent une authentification
  */
@@ -56,9 +107,10 @@ export async function middleware(request: NextRequest) {
     }
     
     // Autoriser l'accès aux routes publiques
-    if (PUBLIC_ROUTES.some(route => pathname === route || pathname.startsWith(route))) {
-      logAuthProcess("Accès à une route publique, autorisation accordée", request);
-      return NextResponse.next();
+    if (PUBLIC_ROUTES.some(route => pathname === route || pathname.startsWith(route)) || 
+        EMAIL_VERIFICATION_EXEMPT.some(route => pathname === route || pathname.startsWith(route))) {
+      logAuthProcess("Accès à une route publique ou exemptée, autorisation accordée", request);
+      return addSecurityHeaders(NextResponse.next());
     }
 
     // Récupérer le cookie de session
@@ -69,12 +121,12 @@ export async function middleware(request: NextRequest) {
       logAuthProcess("Cookie de session absent, redirection vers login", request);
       const loginUrl = new URL('/auth/login', request.url);
       loginUrl.searchParams.set('callbackUrl', encodeURIComponent(pathname));
-      return NextResponse.redirect(loginUrl);
+      return addSecurityHeaders(NextResponse.redirect(loginUrl));
     }
 
     // Session valide, continuer
     logAuthProcess(`Session validée`, request);
-    return NextResponse.next();
+    return addSecurityHeaders(NextResponse.next());
   
   } catch (error) {
     // Gérer toutes les erreurs imprévues
@@ -83,13 +135,13 @@ export async function middleware(request: NextRequest) {
     // En mode développement, on autorise malgré l'erreur
     if (process.env.NODE_ENV === 'development') {
       console.warn("Mode développement: autorisation accordée malgré l'erreur");
-      return NextResponse.next();
+      return addSecurityHeaders(NextResponse.next());
     } else {
       const loginUrl = new URL('/auth/login', request.url);
       loginUrl.searchParams.set('callbackUrl', encodeURIComponent(pathname));
       const response = NextResponse.redirect(loginUrl);
       response.cookies.delete('session');
-      return response;
+      return addSecurityHeaders(response);
     }
   }
 }

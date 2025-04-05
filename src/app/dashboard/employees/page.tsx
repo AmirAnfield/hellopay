@@ -1,254 +1,196 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
+import { PageContainer, PageHeader, NoDataMessage } from "@/components/shared/PageContainer";
 import { Button } from "@/components/ui/button";
-import { Plus, RefreshCw, LayoutList, LayoutGrid, PlusCircle } from "lucide-react";
-import EmployeeCard from "@/components/dashboard/EmployeeCard";
-import { PageContainer, EmptyState, PageHeader, LoadingState } from "@/components/shared/PageContainer";
-import { UserRound } from "lucide-react";
-import { useToast } from "@/components/ui/use-toast";
+import { Plus, Search, Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { collection, getDocs } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import EmployeeCard from "@/components/dashboard/EmployeeCard";
+import { useFirestorePagination } from "@/hooks";
+import { Employee } from "@/types/firebase";
+import { Pagination, PaginationInfo, PageSizeSelector } from "@/components/shared/Pagination";
+import { Input } from "@/components/ui/input";
 import EmployeeModal from "@/components/dashboard/EmployeeModal";
 
-interface Employee {
-  id: string;
-  firstName: string;
-  lastName: string;
-  position: string;
-  companyId: string;
-  companyName?: string;
-  isArchived?: boolean;
-  isLocked?: boolean;
-}
-
+/**
+ * Page de gestion des employés avec pagination optimisée
+ */
 export default function EmployeesPage() {
-  const [employees, setEmployees] = useState<Employee[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
-  const { toast } = useToast();
-  const [openEmployeeModal, setOpenEmployeeModal] = useState(false);
   const { user } = useAuth();
+  const [openEmployeeModal, setOpenEmployeeModal] = useState(false);
+  
+  // État pour la recherche
+  const [searchTerm, setSearchTerm] = useState("");
+  // État pour la pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const fetchEmployees = async () => {
-    setIsLoading(true);
-    
-    try {
-      if (!user || !user.uid) {
-        console.log("Utilisateur non authentifié");
-        setIsLoading(false);
-        setIsRefreshing(false);
-        return;
-      }
-      
-      const userId = user.uid;
-      const employeesData: Employee[] = [];
-      
-      // Récupérer les employés directement dans la collection employés
-      try {
-        const employeesRef = collection(db, `users/${userId}/employees`);
-        const employeesSnapshot = await getDocs(employeesRef);
-        
-        console.log(`Récupération des employés: ${employeesSnapshot.size} trouvés.`);
-        
-        employeesSnapshot.forEach((doc) => {
-          const data = doc.data();
-          employeesData.push({
-            id: doc.id,
-            firstName: data.firstName || '',
-            lastName: data.lastName || '',
-            position: data.position || '',
-            companyId: data.companyId || '',
-            companyName: data.companyName || '',
-            isArchived: data.isArchived || false,
-            isLocked: data.isLocked || false
-          });
-        });
-      } catch (error) {
-        console.error("Erreur lors de la récupération des employés:", error);
-      }
-      
-      // Filtrer les employés non archivés
-      const activeEmployees = employeesData.filter(employee => !employee.isArchived);
-      setEmployees(activeEmployees);
-      
-      if (isRefreshing) {
-        toast({
-          title: "Actualisé",
-          description: `${activeEmployees.length} employés récupérés.`
-        });
-      }
-    } catch (error) {
-      console.error('Erreur lors du chargement des employés:', error);
-      toast({
-        variant: "destructive",
-        title: "Erreur",
-        description: "Impossible de charger vos employés."
-      });
-    } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
+  // Utilisation du hook personnalisé pour la pagination Firestore
+  const {
+    data: employees,
+    loading,
+    error: firestoreError,
+    hasMore,
+    totalCount,
+    refresh,
+    loadMore
+  } = useFirestorePagination<Employee>(
+    "employees",
+    {
+      limit: pageSize,
+      sortBy: "lastName",
+      sortDirection: "asc",
+      whereConditions: searchTerm 
+        ? [{ field: "lastName", operator: ">=", value: searchTerm }] 
+        : undefined,
+      autoLoad: true,
+      fetchTotalCount: true
     }
-  };
+  );
 
+  // Synchroniser l'état de chargement
   useEffect(() => {
-    fetchEmployees();
-    
-    // Vérifier si l'utilisateur vient d'effectuer une action (ajout, modification, suppression)
-    const urlParams = new URLSearchParams(window.location.search);
-    const action = urlParams.get('action');
-    const name = urlParams.get('name');
-    
-    if (action) {
-      let title = '';
-      let description = '';
-      
-      switch (action) {
-        case 'created':
-          title = 'Employé créé';
-          description = name 
-            ? `L'employé "${name}" a été créé avec succès.` 
-            : 'L\'employé a été créé avec succès.';
-          break;
-        case 'updated':
-          title = 'Employé mis à jour';
-          description = name 
-            ? `Les informations de l'employé "${name}" ont été mises à jour avec succès.` 
-            : 'Les informations de l\'employé ont été mises à jour avec succès.';
-          break;
-        case 'deleted':
-          title = 'Employé supprimé';
-          description = name 
-            ? `L'employé "${name}" a été supprimé avec succès.` 
-            : 'L\'employé a été supprimé avec succès.';
-          break;
-        case 'archived':
-          title = 'Employé archivé';
-          description = name 
-            ? `L'employé "${name}" a été archivé avec succès.` 
-            : 'L\'employé a été archivé avec succès.';
-          break;
-      }
-      
-      if (title) {
-        toast({
-          title,
-          description,
-        });
-        
-        // Nettoyer l'URL pour éviter des notifications répétées lors des rechargements
-        window.history.replaceState({}, document.title, window.location.pathname);
-      }
-    }
-  }, [toast]);
-  
-  const handleRefresh = () => {
-    setIsRefreshing(true);
-    toast({
-      title: "Rafraîchissement",
-      description: "Mise à jour de la liste des employés...",
-    });
-    fetchEmployees();
-  };
-  
-  const toggleViewMode = () => {
-    setViewMode(prevMode => prevMode === 'grid' ? 'list' : 'grid');
-  };
-  
-  const handleEmployeeCreated = () => {
-    // Recharger les données
-    fetchEmployees();
-  };
-  
-  const handleEmployeeArchived = () => {
-    // Recharger les données après l'archivage
-    fetchEmployees();
-    
-    toast({
-      title: "Employé archivé",
-      description: "L'employé a été déplacé vers les archives."
-    });
+    setIsLoading(loading);
+  }, [loading]);
+
+  // Gérer le changement de page
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    // Pour la pagination côté client, on peut simplement mettre à jour currentPage
+    // Pour une vraie pagination côté serveur, on devrait appeler refresh() avec les bons paramètres
   };
 
-  if (isLoading) {
-    return <LoadingState message="Chargement des employés..." />;
+  // Gérer le changement de taille de page
+  const handlePageSizeChange = (size: number) => {
+    setPageSize(size);
+    setCurrentPage(1);
+    refresh();
+  };
+
+  // Gérer la soumission de la recherche
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    setCurrentPage(1);
+    refresh();
+  };
+
+  // Gérer la création d'un nouvel employé
+  const handleEmployeeCreated = () => {
+    refresh();
+  };
+
+  // Calculer le nombre total de pages
+  const totalPages = totalCount ? Math.ceil(totalCount / pageSize) : 0;
+
+  // Vérifier si l'utilisateur est connecté
+  if (!user) {
+    return null; // L'utilisateur sera redirigé par le middleware
   }
 
   return (
     <PageContainer>
-      <PageHeader 
-        title="Employés" 
-        description="Gérez vos différents employés"
+      <PageHeader
+        title="Gestion des employés"
+        description="Ajoutez et gérez les employés de votre entreprise"
         actions={
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={toggleViewMode} size="sm">
-              {viewMode === 'grid' ? (
-                <>
-                  <LayoutList className="mr-2 h-4 w-4" />
-                  Vue liste
-                </>
-              ) : (
-                <>
-                  <LayoutGrid className="mr-2 h-4 w-4" />
-                  Vue grille
-                </>
-              )}
-            </Button>
-            <Button variant="outline" onClick={handleRefresh} disabled={isRefreshing}>
-              <RefreshCw className={`mr-2 h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-              {isRefreshing ? 'Rafraîchissement...' : 'Rafraîchir'}
-            </Button>
-            <Button variant="secondary" onClick={() => setOpenEmployeeModal(true)}>
-              <Plus className="mr-2 h-4 w-4" /> Ajouter un employé
-            </Button>
-          </div>
+          <Button onClick={() => setOpenEmployeeModal(true)}>
+            <Plus className="mr-2 h-4 w-4" /> Ajouter un employé
+          </Button>
         }
       />
 
-      {employees.length === 0 ? (
-        <EmptyState
-          title="Aucun employé"
-          description="Vous n'avez pas encore créé d'employé. Commencez par en ajouter un."
-          icon={UserRound}
-          action={
-            <Button variant="secondary" onClick={() => setOpenEmployeeModal(true)}>
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Ajouter un employé
-            </Button>
-          }
-        />
-      ) : viewMode === 'grid' ? (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {employees.map((employee) => (
-            <EmployeeCard 
-              key={employee.id} 
-              employee={employee} 
-              layout="grid" 
-              onDelete={fetchEmployees} 
-              onArchive={handleEmployeeArchived}
-            />
-          ))}
+      {/* Filtres et recherche */}
+      <div className="mb-6">
+        <form onSubmit={handleSearch} className="flex gap-2">
+          <Input
+            placeholder="Rechercher par nom..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="max-w-sm"
+          />
+          <Button type="submit" variant="secondary">
+            <Search className="h-4 w-4 mr-2" />
+            Rechercher
+          </Button>
+        </form>
+      </div>
+
+      {isLoading ? (
+        <div className="flex justify-center items-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
       ) : (
-        <div className="space-y-4">
-          {employees.map((employee) => (
-            <EmployeeCard 
-              key={employee.id} 
-              employee={employee} 
-              layout="list" 
-              onDelete={fetchEmployees} 
-              onArchive={handleEmployeeArchived}
-            />
-          ))}
-        </div>
+        <>
+          {employees.length === 0 ? (
+            <NoDataMessage message="Aucun employé n'a été trouvé. Ajoutez un employé pour commencer." />
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {employees.map((employee) => (
+                <EmployeeCard
+                  key={employee.id}
+                  employee={employee}
+                  onEmployeeUpdated={refresh}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Contrôles de pagination */}
+          {employees.length > 0 && (
+            <div className="mt-8 flex flex-col sm:flex-row justify-between items-center gap-4">
+              {totalCount !== null && (
+                <PaginationInfo
+                  currentPage={currentPage}
+                  pageSize={pageSize}
+                  totalItems={totalCount}
+                />
+              )}
+              
+              <div className="flex flex-col sm:flex-row gap-4 items-center">
+                <PageSizeSelector
+                  pageSize={pageSize}
+                  onPageSizeChange={handlePageSizeChange}
+                />
+                
+                {totalPages > 0 && (
+                  <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    onPageChange={handlePageChange}
+                  />
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Bouton "Charger plus" pour l'alternative de pagination infinie */}
+          {hasMore && (
+            <div className="text-center pt-6">
+              <Button 
+                variant="outline" 
+                onClick={() => loadMore()}
+                disabled={loading}
+              >
+                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Charger plus
+              </Button>
+            </div>
+          )}
+
+          {/* Afficher une erreur si nécessaire */}
+          {firestoreError && (
+            <div className="mt-4 p-4 border border-destructive/50 rounded-md bg-destructive/10 text-destructive">
+              <p className="font-medium">Une erreur est survenue</p>
+              <p className="text-sm mt-1">{firestoreError.message}</p>
+            </div>
+          )}
+        </>
       )}
 
-      {/* Modale d'ajout d'employé */}
-      <EmployeeModal 
-        open={openEmployeeModal} 
-        onOpenChange={setOpenEmployeeModal} 
+      <EmployeeModal
+        open={openEmployeeModal}
+        onOpenChange={setOpenEmployeeModal}
         onEmployeeCreated={handleEmployeeCreated}
       />
     </PageContainer>

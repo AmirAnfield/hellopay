@@ -10,6 +10,7 @@
  * @param file Fichier à compresser
  * @param maxSizeMB Taille maximale en MB
  * @returns Fichier compressé (simulé)
+ * @deprecated Cette fonction de simulation devrait être remplacée par une implémentation réelle.
  */
 export async function compressFile(file: File, maxSizeMB: number): Promise<File> {
   // Simuler un délai de traitement
@@ -69,6 +70,7 @@ export function fileToBase64(file: File): Promise<string> {
  * @param bytes Taille en octets
  * @param decimals Nombre de décimales (par défaut: 2)
  * @returns Taille formatée (ex: "2.5 MB")
+ * @deprecated Utilisez formatFileSize de src/lib/utils.ts à la place.
  */
 export function formatFileSize(bytes: number, decimals: number = 2): string {
   if (bytes === 0) return '0 Bytes';

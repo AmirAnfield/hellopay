@@ -45,7 +45,7 @@ export function slugify(text: string): string {
     .replace(/-+$/, '');
 }
 
-export function debounce<T extends (...args: any[]) => any>(
+export function debounce<T extends (...args: unknown[]) => unknown>(
   func: T,
   wait: number
 ): (...args: Parameters<T>) => void {
@@ -58,16 +58,22 @@ export function debounce<T extends (...args: any[]) => any>(
 }
 
 /**
- * Formate la taille du fichier en unités lisibles
+ * Formate la taille d'un fichier en unité lisible
+ * ATTENTION: Fonction unique à utiliser dans tout le projet.
+ * La version dans src/lib/utils/file-utils.ts est dépréciée.
+ * 
  * @param bytes Taille en octets
- * @returns Chaîne formatée (ex: "2.5 MB")
+ * @param decimals Nombre de décimales (par défaut: 2)
+ * @returns Taille formatée (ex: "2.5 MB")
  */
-export function formatFileSize(bytes: number): string {
+export function formatFileSize(bytes: number, decimals: number = 2): string {
   if (bytes === 0) return '0 Bytes';
   
   const k = 1024;
-  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+  const dm = decimals < 0 ? 0 : decimals;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
+  
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
 }
