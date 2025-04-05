@@ -423,15 +423,15 @@ export default function GenerativeAIContractWizard() {
 
   // Gérer les étapes initiales
   useEffect(() => {
-    // Message de bienvenue
-    if (messages.length === 0) {
+    // Message de bienvenue seulement si les messages sont vides ET nous sommes à l'étape welcome
+    if (messages.length === 0 && currentStep === 'welcome') {
       addMessage(
         'assistant',
         "Bonjour ! Je suis votre assistant pour la création de contrat de travail. Je vais vous guider étape par étape pour générer un contrat personnalisé.",
         [{ text: "Commencer", value: "start" }]
       );
     }
-  }, []);
+  }, [messages.length, currentStep]);
 
   // Fonction de débogage
   const debugCompanies = () => {

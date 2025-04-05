@@ -88,22 +88,30 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const updateSession = async () => {
     try {
       const token = await auth.currentUser?.getIdToken(true);
-      if (!token) return;
-
-      // Envoyer le token au serveur pour créer un cookie de session
-      const response = await fetch('/api/auth/session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idToken: token }),
-      });
-
-      if (!response.ok) {
-        console.warn('Problème de mise à jour de session:', response.status, response.statusText);
-        // Ne pas lever d'erreur, juste logger
+      if (!token) {
+        console.warn('Pas de token disponible - utilisateur probablement déconnecté');
         return false;
       }
-      
-      return true;
+
+      // Envoyer le token au serveur pour créer un cookie de session
+      try {
+        const response = await fetch('/api/auth/session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ idToken: token }),
+        });
+
+        if (!response.ok) {
+          console.warn('Problème de mise à jour de session:', response.status, response.statusText);
+          // Ne pas lever d'erreur, juste logger
+          return false;
+        }
+        
+        return true;
+      } catch (fetchError) {
+        console.error('Erreur de communication avec le serveur:', fetchError);
+        return false;
+      }
     } catch (error) {
       console.error('Erreur lors de la mise à jour de la session:', error);
       // Ne pas afficher de toast systématiquement pour éviter de perturber l'expérience utilisateur
