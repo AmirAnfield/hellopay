@@ -450,7 +450,7 @@ export default function GenerativeAIContractWizard() {
   };
 
   // Gérer les réponses de l'assistant en fonction de l'étape
-  const handleAssistantResponse = (step: string) => {
+  const handleAssistantResponse = async (step: string) => {
     setCurrentStep(step);
     
     switch (step) {
@@ -474,30 +474,48 @@ export default function GenerativeAIContractWizard() {
           addMessage(
             'assistant',
             "Pour quelle entreprise souhaitez-vous créer ce contrat ? Vous pouvez sélectionner dans la liste ou saisir le nom d'une nouvelle entreprise.",
-            companies.map(company => ({
-              text: company.name,
-              value: company.id,
-              description: `ID: ${company.id}`
-            }))
+            getCompaniesOptions()
           );
         }
         break;
         
       case 'employee':
         if (formData.companyId) {
-          loadEmployees(formData.companyId);
-          addMessage(
-            'assistant',
-            `Très bien, le contrat sera établi pour ${formData.company}. Maintenant, sélectionnez l'employé concerné ou saisissez le nom d'un nouvel employé.`,
-            employees.map(employee => ({
-              text: employee.name,
-              value: employee.id
-            }))
-          );
+          // Assurer que les employés sont chargés avant de continuer
+          setIsLoading(true);
+          try {
+            await loadEmployees(formData.companyId);
+            
+            // Si aucun employé n'est trouvé, afficher un message différent
+            if (employees.length === 0) {
+              addMessage(
+                'assistant',
+                `Très bien, le contrat sera établi pour ${formData.company}. Aucun employé existant n'a été trouvé pour cette entreprise. Veuillez saisir le nom du nouvel employé.`
+              );
+            } else {
+              addMessage(
+                'assistant',
+                `Très bien, le contrat sera établi pour ${formData.company}. Maintenant, sélectionnez l'employé concerné ou saisissez le nom d'un nouvel employé.`,
+                employees.map(employee => ({
+                  text: employee.name,
+                  value: employee.id
+                }))
+              );
+            }
+          } catch (error) {
+            console.error("Erreur lors du chargement des employés:", error);
+            // En cas d'erreur, continuer sans liste d'employés
+            addMessage(
+              'assistant',
+              `Très bien, le contrat sera établi pour ${formData.company}. Veuillez saisir le nom de l'employé concerné.`
+            );
+          } finally {
+            setIsLoading(false);
+          }
         } else {
           addMessage(
             'assistant',
-            `Très bien, le contrat sera établi pour ${formData.company}. Veuillez saisir le nom de l'employé concerné.`
+            `Très bien, le contrat sera établi pour ${formData.company || "votre entreprise"}. Veuillez saisir le nom de l'employé concerné.`
           );
         }
         break;
@@ -689,9 +707,9 @@ Tout est-il correct ? Je peux générer le contrat maintenant ou modifier ces in
     
     // Simuler une légère latence pour l'assistant
     setIsLoading(true);
-    setTimeout(() => {
+    setTimeout(async () => {
       setIsLoading(false);
-      handleAssistantResponse(nextStep);
+      await handleAssistantResponse(nextStep);
     }, 1000);
   };
 
@@ -892,9 +910,9 @@ Tout est-il correct ? Je peux générer le contrat maintenant ou modifier ces in
     // Gérer le bouton "Commencer" sans ajouter de message utilisateur
     if (optionValue === 'start') {
       setIsLoading(true);
-      setTimeout(() => {
+      setTimeout(async () => {
         setIsLoading(false);
-        handleAssistantResponse('company');
+        await handleAssistantResponse('company');
       }, 1000);
       return;
     }
