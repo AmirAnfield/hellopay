@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Button } from './ui/button';
-import { Sparkles, ChevronDown, MessageSquare, Send, Save, ArrowLeft, ArrowRight, Check, Eye, Download } from 'lucide-react';
+import { Sparkles, Send, Save, Eye, Star } from 'lucide-react';
 import { useToast } from './ui/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { firestore } from '@/lib/firebase/config';
@@ -8,6 +8,9 @@ import { collection, query, where, getDocs, orderBy, limit } from 'firebase/fire
 import { addMessageToAIMemory } from '@/lib/ai/memory';
 import { Card } from './ui/card';
 import { Progress } from './ui/progress';
+import { useCompanyCache } from '@/hooks/useCompanyCache';
+import { isFavorite, toggleCompanyFavorite } from '@/services/favorites-service';
+import ContractPreview, { ContractData } from './ContractPreview';
 
 interface Company {
   id: string;
@@ -153,6 +156,12 @@ export default function GenerativeAIContractWizard() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [isPreviewMode, setIsPreviewMode] = useState(false);
   const [contractGenerated, setContractGenerated] = useState(false);
+  const [isRealtimePreview, setIsRealtimePreview] = useState(false);
+  const [favoriteCompanies, setFavoriteCompanies] = useState<Company[]>([]);
+  const [companyFavoriteStatus, setCompanyFavoriteStatus] = useState<{[key: string]: boolean}>({});
+
+  // Utiliser le hook de cache pour les entreprises
+  const { getCachedCompanies, updateCache, isCacheValid } = useCompanyCache();
 
   const chatRef = useRef<HTMLDivElement>(null);
   
@@ -164,46 +173,165 @@ export default function GenerativeAIContractWizard() {
   
   const progress = ((getCurrentStepIndex() + 1) / STEPS.length) * 100;
 
-  // Charger les entreprises depuis Firestore
+  // Charger les entreprises depuis Firestore avec cache
   const loadCompanies = async (search = '') => {
-    if (!currentUser) return;
+    if (!currentUser) {
+      console.error("Pas d'utilisateur connecté");
+      return;
+    }
     
     setIsLoading(true);
+    
     try {
-      let companiesQuery;
-      
-      if (search) {
-        companiesQuery = query(
-          collection(firestore, 'companies'),
-          where('name', '>=', search),
-          where('name', '<=', search + '\uf8ff'),
-          orderBy('name'),
-          limit(10)
-        );
-      } else {
-        companiesQuery = query(
-          collection(firestore, 'companies'),
-          orderBy('name'),
-          limit(10)
-        );
+      // Vérifier si les données sont en cache
+      if (isCacheValid(search)) {
+        console.log("Utilisation des données en cache pour les entreprises");
+        const cachedData = getCachedCompanies(search);
+        if (cachedData) {
+          setCompanies(cachedData);
+          console.log(`Entreprises chargées depuis le cache: ${cachedData.length}`);
+          return;
+        }
       }
       
-      const snapshot = await getDocs(companiesQuery);
-      const companiesData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        name: doc.data().name || 'Entreprise sans nom'
-      }));
+      // Si pas de cache valide, charger depuis Firestore
+      const userId = currentUser.uid;
+      const companiesResults: Company[] = [];
       
-      setCompanies(companiesData);
+      // 1. Charger les entreprises depuis la collection personnelle de l'utilisateur
+      console.log("Recherche dans la collection utilisateur:", `users/${userId}/companies`);
+      const userCompaniesRef = collection(firestore, `users/${userId}/companies`);
+      const userCompaniesSnap = await getDocs(userCompaniesRef);
+      
+      userCompaniesSnap.forEach(doc => {
+        const data = doc.data();
+        companiesResults.push({
+          id: doc.id,
+          name: data.name || 'Entreprise sans nom'
+        });
+      });
+      
+      console.log(`[1] Entreprises de l'utilisateur trouvées: ${userCompaniesSnap.size}`);
+      
+      // 2. Charger les entreprises depuis la collection globale où l'utilisateur est propriétaire
+      console.log("Recherche des entreprises possédées:", `companies où ownerId=${userId}`);
+      const ownedCompaniesRef = collection(firestore, 'companies');
+      const ownedCompaniesQuery = query(ownedCompaniesRef, where('ownerId', '==', userId));
+      const ownedCompaniesSnap = await getDocs(ownedCompaniesQuery);
+      
+      ownedCompaniesSnap.forEach(doc => {
+        // Éviter les doublons
+        if (!companiesResults.some(c => c.id === doc.id)) {
+          const data = doc.data();
+          companiesResults.push({
+            id: doc.id,
+            name: data.name || 'Entreprise sans nom'
+          });
+        }
+      });
+      
+      console.log(`[2] Entreprises possédées globalement: ${ownedCompaniesSnap.size}`);
+      
+      // 3. Si on a un terme de recherche, rechercher globalement
+      if (search) {
+        console.log(`Recherche globale pour: "${search}"`);
+        const searchCompaniesRef = collection(firestore, 'companies');
+        const searchQuery = query(
+          searchCompaniesRef,
+          where('name', '>=', search),
+          where('name', '<=', search + '\uf8ff'),
+          limit(10)
+        );
+        const searchResults = await getDocs(searchQuery);
+        
+        searchResults.forEach(doc => {
+          // Éviter les doublons
+          if (!companiesResults.some(c => c.id === doc.id)) {
+            const data = doc.data();
+            companiesResults.push({
+              id: doc.id,
+              name: data.name || 'Entreprise sans nom'
+            });
+          }
+        });
+        
+        console.log(`[3] Résultats de recherche: ${searchResults.size}`);
+      }
+      
+      // Mettre à jour le cache
+      updateCache(companiesResults, search);
+      
+      // Mettre à jour l'état
+      console.log(`Total des entreprises trouvées: ${companiesResults.length}`);
+      setCompanies(companiesResults);
+      
+      // Vérifier quelles entreprises sont des favoris
+      checkCompanyFavorites(companiesResults);
+      
+      // Débogage
+      if (companiesResults.length === 0) {
+        toast({
+          title: "Information",
+          description: "Aucune entreprise trouvée. Veuillez en créer une d'abord.",
+        });
+      }
     } catch (error) {
       console.error('Erreur lors du chargement des entreprises:', error);
       toast({
         variant: 'destructive',
         title: 'Erreur',
-        description: 'Impossible de charger les entreprises. Veuillez réessayer.'
+        description: 'Impossible de charger les entreprises: ' + (error instanceof Error ? error.message : 'Erreur inconnue')
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Vérifier quelles entreprises sont des favoris
+  const checkCompanyFavorites = async (companiesToCheck: Company[]) => {
+    if (!currentUser) return;
+    
+    const favoriteStatus: {[key: string]: boolean} = {};
+    
+    for (const company of companiesToCheck) {
+      favoriteStatus[company.id] = await isFavorite(company.id, 'company');
+    }
+    
+    setCompanyFavoriteStatus(favoriteStatus);
+    
+    // Filtrer et définir les entreprises favorites
+    const favorites = companiesToCheck.filter(company => favoriteStatus[company.id]);
+    setFavoriteCompanies(favorites);
+  };
+
+  // Basculer le statut de favori d'une entreprise
+  const handleToggleFavorite = async (company: Company) => {
+    try {
+      const newStatus = await toggleCompanyFavorite(company);
+      
+      setCompanyFavoriteStatus(prev => ({
+        ...prev,
+        [company.id]: newStatus
+      }));
+      
+      // Mettre à jour la liste des favoris
+      if (newStatus) {
+        setFavoriteCompanies(prev => [...prev, company]);
+      } else {
+        setFavoriteCompanies(prev => prev.filter(c => c.id !== company.id));
+      }
+      
+      toast({
+        title: newStatus ? "Ajouté aux favoris" : "Retiré des favoris",
+        description: `${company.name} a été ${newStatus ? 'ajouté à' : 'retiré de'} vos favoris.`
+      });
+    } catch (error) {
+      console.error("Erreur lors du changement de statut favori:", error);
+      toast({
+        variant: 'destructive',
+        title: 'Erreur',
+        description: 'Impossible de modifier le statut de favori.'
+      });
     }
   };
 
@@ -244,11 +372,21 @@ export default function GenerativeAIContractWizard() {
   const addMessage = (role: 'assistant' | 'user', content: string, options?: Option[]) => {
     // Pour les entreprises, s'assurer que les options sont bien formatées
     if (role === 'assistant' && currentStep === 'company' && companies.length > 0) {
-      options = companies.map(company => ({
-        text: company.name,
-        value: company.id,
-        description: `ID: ${company.id}`
-      }));
+      console.log("Préparation des options d'entreprises pour l'affichage:", companies.length);
+      
+      // Remplacer les options par la liste des entreprises
+      options = getCompaniesOptions();
+      
+      // Ajouter l'option pour voir la prévisualisation en temps réel
+      if (currentStep !== 'welcome' && formData.company) {
+        addExtraOptions(options);
+      }
+      
+      // Afficher un message de débogage
+      toast({
+        title: "Entreprises disponibles",
+        description: `${companies.length} entreprises chargées pour la sélection.`,
+      });
     }
 
     const newMessage: Message = {
@@ -289,11 +427,27 @@ export default function GenerativeAIContractWizard() {
     if (messages.length === 0) {
       addMessage(
         'assistant',
-        "Bonjour ! Je suis votre assistant pour la création de contrat de travail. Je vais vous guider étape par étape pour générer un contrat personnalisé. Commençons par l'entreprise concernée.",
+        "Bonjour ! Je suis votre assistant pour la création de contrat de travail. Je vais vous guider étape par étape pour générer un contrat personnalisé.",
         [{ text: "Commencer", value: "start" }]
       );
     }
   }, []);
+
+  // Fonction de débogage
+  const debugCompanies = () => {
+    console.log("=== DEBUG ENTREPRISES ===");
+    console.log("User ID:", currentUser?.uid);
+    console.log("Nombre d'entreprises chargées:", companies.length);
+    console.log("Liste des entreprises:", companies);
+    console.log("Entreprise sélectionnée:", formData.companyId);
+    console.log("========================");
+    
+    // Afficher un toast pour l'utilisateur
+    toast({
+      title: "Débogage entreprises",
+      description: `${companies.length} entreprises trouvées. Voir la console pour plus de détails.`,
+    });
+  };
 
   // Gérer les réponses de l'assistant en fonction de l'étape
   const handleAssistantResponse = (step: string) => {
@@ -301,15 +455,32 @@ export default function GenerativeAIContractWizard() {
     
     switch (step) {
       case 'company':
-        addMessage(
-          'assistant',
-          "Pour quelle entreprise souhaitez-vous créer ce contrat ? Vous pouvez sélectionner dans la liste ou saisir le nom d'une nouvelle entreprise.",
-          companies.map(company => ({
-            text: company.name,
-            value: company.id,
-            description: `ID: ${company.id}`
-          }))
-        );
+        // Vérifier si des entreprises sont disponibles
+        if (companies.length === 0) {
+          // Proposer de créer une entreprise si aucune n'est disponible
+          addMessage(
+            'assistant',
+            "Je ne trouve pas d'entreprise disponible dans votre compte. Vous devez d'abord créer ou ajouter une entreprise avant de pouvoir générer un contrat. Veuillez saisir le nom de l'entreprise pour laquelle vous souhaitez créer ce contrat.",
+            [{ 
+              text: "Créer une nouvelle entreprise", 
+              value: "new_company",
+              description: "Vous pourrez entrer les détails de l'entreprise" 
+            }]
+          );
+        } else {
+          // Débogage pour comprendre le problème
+          setTimeout(debugCompanies, 1000);
+          
+          addMessage(
+            'assistant',
+            "Pour quelle entreprise souhaitez-vous créer ce contrat ? Vous pouvez sélectionner dans la liste ou saisir le nom d'une nouvelle entreprise.",
+            companies.map(company => ({
+              text: company.name,
+              value: company.id,
+              description: `ID: ${company.id}`
+            }))
+          );
+        }
         break;
         
       case 'employee':
@@ -731,170 +902,74 @@ Tout est-il correct ? Je peux générer le contrat maintenant ou modifier ces in
     handleFormSubmit(new Event('submit') as any);
   };
 
-  // Rendu du contrat généré
-  const renderContractPreview = () => {
-    const contractType = CONTRACT_TYPES.find(t => t.id === formData.contractType)?.title || formData.contractType;
-    const templateId = formData.templateId || 'standard';
-    
-    // Appliquer le style selon le template choisi
-    let templateStyles: TemplateStyles = {
-      container: "",
-      title: "",
-      subtitle: "",
-      sectionTitle: "",
-      section: "",
-      signatures: ""
-    };
-    
-    switch (templateId) {
-      case 'moderne':
-        templateStyles = {
-          container: "bg-gradient-to-b from-gray-50 to-white rounded-xl shadow-lg border border-gray-200 p-8 max-w-4xl mx-auto",
-          title: "text-center text-2xl font-bold mb-8 text-indigo-700",
-          subtitle: "text-center font-medium mb-8 text-gray-500",
-          sectionTitle: "text-lg font-semibold mb-3 text-indigo-600 border-b border-indigo-100 pb-1",
-          section: "mb-6",
-          signatures: "mt-10 grid grid-cols-2 gap-10"
-        };
-        break;
-      case 'juridique':
-        templateStyles = {
-          container: "bg-white rounded-lg shadow border border-gray-300 p-8 max-w-5xl mx-auto font-serif",
-          title: "text-center text-xl font-bold mb-6 text-gray-800",
-          subtitle: "text-center font-medium mb-6 text-gray-600",
-          sectionTitle: "text-base font-bold mb-2 text-gray-800 uppercase tracking-wide",
-          section: "mb-5 text-sm",
-          signatures: "mt-12 flex justify-between"
-        };
-        break;
-      case 'standard':
-      default:
-        templateStyles = {
-          container: "bg-white rounded-lg shadow-sm border p-6 max-w-4xl mx-auto",
-          title: "text-center text-xl font-bold mb-6",
-          subtitle: "text-center font-semibold mb-6",
-          sectionTitle: "text-lg font-semibold mb-2",
-          section: "mb-4",
-          signatures: "flex justify-between mt-6"
-        };
-        break;
-    }
-    
+  // Gérer la fermeture des modes de prévisualisation
+  const handleClosePreview = () => {
+    setIsPreviewMode(false);
+    setIsRealtimePreview(false);
+  };
+
+  // Rendu de la prévisualisation en temps réel
+  const renderRealtimePreview = () => {
     return (
-      <div className={templateStyles.container}>
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="font-semibold text-lg">Aperçu du contrat</h3>
-          <Button variant="ghost" size="sm" onClick={() => setIsPreviewMode(false)}>
-            Retour
-          </Button>
-        </div>
-        
-        <div className="prose max-w-none">
-          <h1 className={templateStyles.title}>CONTRAT DE TRAVAIL</h1>
-          
-          <div className={templateStyles.subtitle}>
-            {contractType}
-          </div>
-          
-          <div className={templateStyles.section}>
-            <p>Entre les soussignés :</p>
-            <p><strong>L&apos;employeur :</strong> {formData.company}</p>
-            <p><strong>Convention collective applicable :</strong> {CONVENTIONS.find(c => c.id === formData.convention)?.name || 'Non spécifiée'}</p>
-            <p><strong>Et l&apos;employé(e) :</strong> {formData.employee}</p>
-          </div>
-          
-          <div className={templateStyles.section}>
-            <h2 className={templateStyles.sectionTitle}>Article 1 - Fonction</h2>
-            <p>Le/La salarié(e) est engagé(e) en qualité de {formData.position}.</p>
-          </div>
-          
-          <div className={templateStyles.section}>
-            <h2 className={templateStyles.sectionTitle}>Article 2 - Durée du contrat</h2>
-            {formData.contractType?.includes('CDD') || formData.contractType === 'apprentissage' || formData.contractType === 'professionnalisation' ? (
-              <p>Le présent contrat est conclu pour une durée déterminée. Il commence le {formData.startDate} et se termine le {formData.endDate}.</p>
-            ) : (
-              <p>Le présent contrat est conclu pour une durée indéterminée à compter du {formData.startDate}.</p>
-            )}
-          </div>
-          
-          <div className={templateStyles.section}>
-            <h2 className={templateStyles.sectionTitle}>Article 3 - Rémunération</h2>
-            <p>En contrepartie de son travail, le/la salarié(e) percevra une rémunération {formData.salaryUnit || 'mensuelle brute'} de {formData.salary} euros.</p>
-          </div>
-          
-          <div className={templateStyles.section}>
-            <h2 className={templateStyles.sectionTitle}>Article 4 - Durée du travail</h2>
-            {formData.contractType?.includes('temps_partiel') ? (
-              <p>Le/La salarié(e) est engagé(e) à temps partiel. L&apos;horaire hebdomadaire est fixé à {formData.workingHours || '24 heures'}.</p>
-            ) : (
-              <p>Le/La salarié(e) est engagé(e) à temps plein. L&apos;horaire hebdomadaire est fixé à 35 heures, conformément à la durée légale du travail.</p>
-            )}
-          </div>
-          
-          <div className={templateStyles.section}>
-            <h2 className={templateStyles.sectionTitle}>Article 5 - Période d&apos;essai</h2>
-            <p>Le présent contrat est soumis à une période d&apos;essai de {formData.trialPeriod || (formData.contractType?.includes('CDI') ? '2 mois' : '2 semaines')}.</p>
-          </div>
-          
-          {formData.specificClauses && formData.specificClauses.length > 0 && !formData.specificClauses.includes('aucune') && (
-            <div className={templateStyles.section}>
-              <h2 className={templateStyles.sectionTitle}>Article 6 - Clauses spécifiques</h2>
-              {formData.specificClauses.includes('non_concurrence') && (
-                <div className="mb-2">
-                  <h3 className="font-medium text-base">Clause de non-concurrence</h3>
-                  <p>Pendant la durée du présent contrat et après sa cessation, quelle qu'en soit la cause, le salarié s'interdit d'exercer une activité concurrente à celle de l'employeur, directement ou indirectement, pour son compte ou pour le compte d'un tiers. Cette interdiction est limitée à une durée de 12 mois et au territoire français. En contrepartie, le salarié percevra une indemnité mensuelle égale à 30% de son salaire moyen des 12 derniers mois.</p>
-                </div>
-              )}
-              
-              {formData.specificClauses.includes('confidentialite') && (
-                <div className="mb-2">
-                  <h3 className="font-medium text-base">Clause de confidentialité</h3>
-                  <p>Le salarié s'engage à observer une discrétion absolue sur l'ensemble des informations auxquelles il a accès dans le cadre de ses fonctions. Cette obligation persiste après la fin du contrat de travail.</p>
-                </div>
-              )}
-              
-              {formData.specificClauses.includes('mobilite') && (
-                <div className="mb-2">
-                  <h3 className="font-medium text-base">Clause de mobilité</h3>
-                  <p>Le lieu de travail actuel du salarié pourra être modifié dans la région {formData.workLocation?.split(',')[1] || 'Île-de-France'} selon les nécessités de l'entreprise. Le salarié en sera informé avec un préavis raisonnable.</p>
-                </div>
-              )}
-              
-              {formData.specificClauses.includes('propriete_intellectuelle') && (
-                <div className="mb-2">
-                  <h3 className="font-medium text-base">Clause de propriété intellectuelle</h3>
-                  <p>Les inventions, créations et développements réalisés par le salarié dans le cadre de ses fonctions appartiennent de plein droit à l'employeur, conformément aux dispositions du Code de la propriété intellectuelle.</p>
-                </div>
-              )}
-              
-              {formData.specificClauses.includes('renouvellement') && (
-                <div className="mb-2">
-                  <h3 className="font-medium text-base">Clause de renouvellement</h3>
-                  <p>Le présent contrat pourra être renouvelé une fois pour une durée maximale égale à la durée initiale, sans que la durée totale du contrat puisse excéder la durée maximale prévue par la loi.</p>
-                </div>
-              )}
-            </div>
-          )}
-          
-          <div className="mt-8">
-            <p>Fait à __________________, le __________________</p>
-            
-            <div className={templateStyles.signatures}>
-              <div>
-                <p>L&apos;employeur</p>
-                <p>(signature)</p>
-              </div>
-              
-              <div>
-                <p>Le/La salarié(e)</p>
-                <p>(signature précédée de la mention &quot;lu et approuvé&quot;)</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+      <ContractPreview 
+        data={formData as ContractData}
+        onClose={handleClosePreview}
+        templateId={formData.templateId as string}
+        realtime={true}
+        contractTypes={CONTRACT_TYPES}
+        conventions={CONVENTIONS}
+      />
     );
   };
+
+  // Rendu du contrat généré
+  const renderContractPreview = () => {
+    return (
+      <ContractPreview 
+        data={formData as ContractData}
+        onClose={handleClosePreview}
+        templateId={formData.templateId as string}
+        contractTypes={CONTRACT_TYPES}
+        conventions={CONVENTIONS}
+      />
+    );
+  };
+
+  // Gérer l'affichage des entreprises avec les favoris en premier
+  const getCompaniesOptions = () => {
+    // Trier les entreprises : favoris d'abord, puis ordre alphabétique
+    const sortedCompanies = [...companies].sort((a, b) => {
+      const aIsFavorite = companyFavoriteStatus[a.id] || false;
+      const bIsFavorite = companyFavoriteStatus[b.id] || false;
+      
+      if (aIsFavorite && !bIsFavorite) return -1;
+      if (!aIsFavorite && bIsFavorite) return 1;
+      
+      return a.name.localeCompare(b.name);
+    });
+    
+    return sortedCompanies.map(company => ({
+      text: company.name + (companyFavoriteStatus[company.id] ? ' ⭐' : ''),
+      value: company.id,
+      description: `ID: ${company.id}`
+    }));
+  };
+
+  // Ajouter des options supplémentaires
+  const addExtraOptions = (options: Option[]) => {
+    // Ajouter l'option de prévisualisation en temps réel
+    if (!options.some(o => o.value === 'realtime_preview')) {
+      options.push({
+        text: "Prévisualisation en temps réel",
+        value: "realtime_preview",
+        description: "Voir le contrat se construire au fur et à mesure"
+      });
+    }
+  };
+
+  if (isRealtimePreview) {
+    return renderRealtimePreview();
+  }
 
   if (isPreviewMode) {
     return renderContractPreview();
@@ -958,7 +1033,25 @@ Tout est-il correct ? Je peux générer le contrat maintenant ou modifier ces in
                           onClick={() => handleOptionClick(option.value)}
                           className="text-left w-full px-3 py-2 rounded border border-primary/20 bg-background hover:bg-primary/10 transition-colors"
                         >
-                          <div className="font-medium">{option.text}</div>
+                          <div className="font-medium flex items-center justify-between">
+                            <span>{option.text}</span>
+                            
+                            {/* Afficher un bouton de favori pour les entreprises */}
+                            {currentStep === 'company' && companies.some(c => c.id === option.value) && (
+                              <button 
+                                className="ml-2 p-1 rounded-full hover:bg-gray-200 transition-colors"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const company = companies.find(c => c.id === option.value);
+                                  if (company) handleToggleFavorite(company);
+                                }}
+                              >
+                                <Star 
+                                  className={`h-4 w-4 ${companyFavoriteStatus[option.value] ? 'fill-yellow-400 text-yellow-400' : 'text-gray-400'}`} 
+                                />
+                              </button>
+                            )}
+                          </div>
                           {option.description && (
                             <div className="text-xs text-muted-foreground mt-1">{option.description}</div>
                           )}
