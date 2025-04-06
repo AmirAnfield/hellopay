@@ -35,6 +35,7 @@ export interface ContractConfig {
   contractType?: ContractType;
   workingHours?: WorkingHours;
   isPartTime?: boolean;
+  isExecutive?: boolean;
   company?: Company;
   employee?: Employee;
   hasPreambule?: boolean;

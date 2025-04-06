@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, ArrowRight, Save, History, FileCheck } from 'lucide-react';
-import { ContractConfig } from '@/types/contract';
+import { ContractConfig, ContractType, WorkingHours, Company, Employee } from '@/types/contract';
 import {
   Sheet,
   SheetContent,
@@ -16,6 +16,7 @@ import {
 import { Progress } from "@/components/ui/progress";
 import { ContractPreviewStep } from './ContractPreviewStep';
 import { useToast } from '@/components/ui/use-toast';
+import { auth } from '@/lib/firebase';
 
 // Importation des services
 import { 
@@ -25,9 +26,31 @@ import {
   updateCompany, 
   updateEmployee, 
   updatePreambule, 
-  submitFinalContract
-} from '@/services/contractService';
-import { getContractArticles } from '@/services/contractFinalizeService';
+  submitFinalContract,
+  getContractArticles,
+  getArticle1Nature,
+  getArticle6Remuneration,
+  getArticle7Benefits,
+  getArticle8Leaves,
+  loadUserCompanies,
+  loadUserEmployees,
+  saveArticle1Nature,
+  saveArticle2EntryDate,
+  saveArticle2CDDEntry,
+  saveArticle3Functions,
+  saveArticle4Workplace,
+  saveArticle5WorkingSchedule,
+  saveArticle6Remuneration,
+  saveArticle7Benefits,
+  saveArticle8Leaves,
+  saveArticle9DataProtection,
+  saveArticle10Conduct,
+  saveArticle11Confidentiality,
+  saveArticle12NonCompete,
+  saveArticle13Teleworking,
+  saveArticle14Termination,
+  saveContractConfig
+} from '@/services';
 
 // Importation des étapes du contrat (composants)
 import {
@@ -53,11 +76,13 @@ import {
   Article14TerminationStep,
 } from '@/components/contract';
 
-// Services des articles
-import { getArticle1Nature, saveArticle1Nature } from '@/services/contractArticlesService';
-import { getArticle6Remuneration, saveArticle6Remuneration } from '@/services/article6RemunerationService';
-import { getArticle7Benefits, saveArticle7Benefits } from '@/services/article7BenefitsService';
-import { getArticle8Leaves, saveArticle8Leaves } from '@/services/article8LeavesService';
+// Importation des types des articles
+import { 
+  Article1Nature,
+  Article6Remuneration,
+  Article7Benefits,
+  Article8Leaves
+} from '@/types/contract-articles';
 
 // Type pour les sauvegardes
 interface SavedState {
@@ -77,11 +102,21 @@ export function ContractWizard() {
   const [savedStates, setSavedStates] = useState<SavedState[]>([]);
   const [viewMode, setViewMode] = useState<'edit' | 'preview'>('edit');
   
+  // États des données utilisateur
+  const [userCompanies, setUserCompanies] = useState<Company[]>([]);
+  const [userEmployees, setUserEmployees] = useState<Employee[]>([]);
+  
   // État des articles
-  const [article1Data, setArticle1Data] = useState<any>(null);
-  const [article6Data, setArticle6Data] = useState<any>(null);
-  const [article7Data, setArticle7Data] = useState<any>(null);
-  const [article8Data, setArticle8Data] = useState<any>(null);
+  const [article1Data, setArticle1Data] = useState<Article1Nature | null>(null);
+  const [article6Data, setArticle6Data] = useState<Article6Remuneration | null>(null);
+  const [article7Data, setArticle7Data] = useState<Article7Benefits | null>(null);
+  const [article8Data, setArticle8Data] = useState<Article8Leaves | null>(null);
+  
+  // État pour la navigation
+  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
+  
+  // Conversion step index (0-based) à step ID (1-based)
+  const stepId = currentStep + 1;
   
   // Services externes
   const { toast } = useToast();
@@ -89,26 +124,26 @@ export function ContractWizard() {
   // Configuration du wizard
   const totalSteps = 20;
   const steps = [
-    { id: 0, title: 'Type de contrat', category: 'Configuration de base' },
-    { id: 1, title: 'Heures de travail', category: 'Configuration de base' },
-    { id: 2, title: 'Entreprise', category: 'Configuration de base' },
-    { id: 3, title: 'Employé', category: 'Configuration de base' },
-    { id: 4, title: 'Préambule', category: 'Configuration de base' },
-    { id: 5, title: 'Article 1 - Nature du contrat', category: 'Contrat principal' },
-    { id: 6, title: 'Article 2 - Entrée en fonction', category: 'Contrat principal' },
-    { id: 7, title: 'Article 3 - Fonctions', category: 'Contrat principal' },
-    { id: 8, title: 'Article 4 - Lieu de travail', category: 'Contrat principal' },
-    { id: 9, title: 'Article 5 - Organisation du travail', category: 'Contrat principal' },
-    { id: 10, title: 'Article 6 - Rémunération', category: 'Contrat principal' },
-    { id: 11, title: 'Article 7 - Avantages', category: 'Contrat principal' },
-    { id: 12, title: 'Article 8 - Congés', category: 'Contrat principal' },
-    { id: 13, title: 'Article 9 - Données personnelles', category: 'Clauses additionnelles' },
-    { id: 14, title: 'Article 10 - Tenue et règles', category: 'Clauses additionnelles' },
-    { id: 15, title: 'Article 11 - Confidentialité', category: 'Clauses additionnelles' },
-    { id: 16, title: 'Article 12 - Non-concurrence', category: 'Clauses additionnelles' },
-    { id: 17, title: 'Article 13 - Télétravail', category: 'Clauses additionnelles' },
-    { id: 18, title: 'Article 14 - Rupture du contrat', category: 'Clauses additionnelles' },
-    { id: 19, title: 'Aperçu du contrat', category: 'Finalisation' },
+    { id: 1, title: 'Type de contrat', category: 'Configuration de base' },
+    { id: 2, title: 'Heures de travail', category: 'Configuration de base' },
+    { id: 3, title: 'Entreprise', category: 'Configuration de base' },
+    { id: 4, title: 'Employé', category: 'Configuration de base' },
+    { id: 5, title: 'Préambule', category: 'Configuration de base' },
+    { id: 6, title: 'Article 1 - Nature du contrat', category: 'Contrat principal' },
+    { id: 7, title: 'Article 2 - Entrée en fonction', category: 'Contrat principal' },
+    { id: 8, title: 'Article 3 - Fonctions', category: 'Contrat principal' },
+    { id: 9, title: 'Article 4 - Lieu de travail', category: 'Contrat principal' },
+    { id: 10, title: 'Article 5 - Organisation du travail', category: 'Contrat principal' },
+    { id: 11, title: 'Article 6 - Rémunération', category: 'Contrat principal' },
+    { id: 12, title: 'Article 7 - Avantages', category: 'Contrat principal' },
+    { id: 13, title: 'Article 8 - Congés', category: 'Contrat principal' },
+    { id: 14, title: 'Article 9 - Données personnelles', category: 'Clauses additionnelles' },
+    { id: 15, title: 'Article 10 - Tenue et règles', category: 'Clauses additionnelles' },
+    { id: 16, title: 'Article 11 - Confidentialité', category: 'Clauses additionnelles' },
+    { id: 17, title: 'Article 12 - Non-concurrence', category: 'Clauses additionnelles' },
+    { id: 18, title: 'Article 13 - Télétravail', category: 'Clauses additionnelles' },
+    { id: 19, title: 'Article 14 - Rupture du contrat', category: 'Clauses additionnelles' },
+    { id: 20, title: 'Aperçu du contrat', category: 'Finalisation' },
   ];
   
   // Regrouper les étapes par catégorie
@@ -126,8 +161,18 @@ export function ContractWizard() {
       try {
         setIsLoading(true);
         
-        // Simuler un utilisateur pour le développement
-        const userId = 'user123';
+        // Obtenir l'ID de l'utilisateur actuel
+        const userId = auth.currentUser?.uid || 'user123';
+        
+        console.log("Chargement des données de contrat pour l'utilisateur:", userId);
+        
+        // Charger les entreprises et employés de l'utilisateur
+        const companies = await loadUserCompanies(userId);
+        const employees = await loadUserEmployees(userId);
+        
+        console.log("Entreprises chargées:", companies.length);
+        setUserCompanies(companies);
+        setUserEmployees(employees);
         
         // Charger la configuration existante
         const config = await getContractConfig(userId);
@@ -136,39 +181,50 @@ export function ContractWizard() {
           setCurrentStep(config.progress);
           setProgress((config.progress / totalSteps) * 100);
           
+          // Déterminer la catégorie actuelle
+          const currentStepObj = steps.find(s => s.id === config.progress);
+          if (currentStepObj) {
+            // Initialiser les catégories dépliées (uniquement celle active par défaut)
+            const expandedState: Record<string, boolean> = {};
+            Object.keys(categories).forEach(category => {
+              expandedState[category] = category === currentStepObj.category;
+            });
+            setExpandedCategories(expandedState);
+          }
+          
           // Charger les articles selon l'étape
           if (config.progress >= 5) {
             const article1 = await getArticle1Nature(userId);
-            setArticle1Data(article1);
+            if (article1) setArticle1Data(article1 as unknown as Article1Nature);
           }
           
           if (config.progress >= 10) {
             const article6 = await getArticle6Remuneration(userId);
-            setArticle6Data(article6);
+            if (article6) setArticle6Data(article6 as unknown as Article6Remuneration);
           }
           
           if (config.progress >= 11) {
             const article7 = await getArticle7Benefits(userId);
-            setArticle7Data(article7);
+            if (article7) setArticle7Data(article7 as unknown as Article7Benefits);
           }
           
           if (config.progress >= 12) {
             const article8 = await getArticle8Leaves(userId);
-            setArticle8Data(article8);
+            if (article8) setArticle8Data(article8 as unknown as Article8Leaves);
           }
           
           // Si étape d'aperçu, charger tous les articles
-          if (config.progress === 19) {
+          if (config.progress === 20) {
             const allArticles = await getContractArticles(userId);
             setArticles(allArticles);
           }
         } else {
           // Création d'une nouvelle configuration
           setContractConfig({
-            userId: userId,
-            status: 'draft',
+            userId,
+            status: 'draft' as 'draft',
             progress: 0,
-            contractType: 'CDI',
+            contractType: 'CDI', // Valeur par défaut
             createdAt: new Date(),
             updatedAt: new Date(),
           });
@@ -212,7 +268,7 @@ export function ContractWizard() {
   
   const goToStep = (step: number) => {
     // Vérifier que l'étape demandée est accessible (si inférieure ou égale à l'étape maximale atteinte)
-    if (contractConfig && step <= contractConfig.progress) {
+    if (contractConfig && step >= 0 && step <= contractConfig.progress) {
       setCurrentStep(step);
       setProgress((step / totalSteps) * 100);
     } else {
@@ -223,6 +279,17 @@ export function ContractWizard() {
       });
     }
   };
+  
+  // S'assurer que les sections de navigation sont dépliées au chargement
+  useEffect(() => {
+    // On s'assure que toutes les sections sont visibles initialement
+    Object.keys(categories).forEach(category => {
+      const el = document.getElementById(`category-${category.replace(/\s+/g, '-').toLowerCase()}`);
+      if (el) {
+        el.classList.remove('hidden');
+      }
+    });
+  }, [categories]);
   
   // Sauvegarde et chargement
   const handleAutoSave = async () => {
@@ -263,15 +330,151 @@ export function ContractWizard() {
     }
   };
   
+  // Fonctions de mise à jour des données
+  const handleUpdateContractType = async (companyId: string, employeeId: string) => {
+    try {
+      setIsLoading(true);
+      
+      // Récupérer les données complètes de l'entreprise et de l'employé
+      const company = userCompanies.find(c => c.id === companyId);
+      const employee = userEmployees.find(e => e.id === employeeId);
+      
+      if (!company || !employee) {
+        throw new Error("Entreprise ou employé introuvable");
+      }
+      
+      // 1. Créer un nouveau contrat en base
+      const userId = auth.currentUser?.uid || 'user123';
+      console.log(`Création d'un nouveau contrat pour l'utilisateur: ${userId}`);
+      
+      // Créer une configuration de base pour le contrat
+      const newContractConfig = {
+        userId,
+        status: 'draft' as 'draft',
+        progress: 0,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        company: { ...company },
+        employee: { ...employee },
+      };
+      
+      // 2. Sauvegarder cette configuration dans Firestore
+      const savedConfig = await saveContractConfig(userId, newContractConfig);
+      
+      // 3. Créer une collection de documents si elle n'existe pas déjà
+      // Cette partie serait gérée côté backend
+      
+      console.log("Nouveau contrat créé:", savedConfig);
+      setContractConfig(savedConfig);
+      
+      // 4. Passer à l'étape suivante
+      handleNextStep();
+      
+      // Notification de succès
+      toast({
+        title: 'Contrat créé',
+        description: 'Le contrat a été créé avec succès',
+      });
+    } catch (error) {
+      console.error('Erreur lors de la création du contrat:', error);
+      toast({
+        title: 'Erreur',
+        description: error instanceof Error ? error.message : 'Impossible de créer le contrat',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  const handleUpdateWorkingHours = async (hours: WorkingHours) => {
+    if (!contractConfig) return;
+    
+    try {
+      setIsLoading(true);
+      const updatedConfig = await updateWorkingHours(contractConfig.userId, hours);
+      setContractConfig(updatedConfig);
+      handleNextStep();
+    } catch (error) {
+      console.error('Erreur lors de la mise à jour des heures de travail:', error);
+      toast({
+        title: 'Erreur',
+        description: 'Impossible de mettre à jour les heures de travail',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  const handleUpdateCompany = async (company: Company) => {
+    if (!contractConfig) return;
+    
+    try {
+      setIsLoading(true);
+      const updatedConfig = await updateCompany(contractConfig.userId, company);
+      setContractConfig(updatedConfig);
+      handleNextStep();
+    } catch (error) {
+      console.error('Erreur lors de la mise à jour de l\'entreprise:', error);
+      toast({
+        title: 'Erreur',
+        description: 'Impossible de mettre à jour l\'entreprise',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  const handleUpdateEmployee = async (employee: Employee) => {
+    if (!contractConfig) return;
+    
+    try {
+      setIsLoading(true);
+      const updatedConfig = await updateEmployee(contractConfig.userId, employee);
+      setContractConfig(updatedConfig);
+      handleNextStep();
+    } catch (error) {
+      console.error('Erreur lors de la mise à jour de l\'employé:', error);
+      toast({
+        title: 'Erreur',
+        description: 'Impossible de mettre à jour l\'employé',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  const handleUpdatePreambule = async (hasPreambule: boolean) => {
+    if (!contractConfig) return;
+    
+    try {
+      setIsLoading(true);
+      const updatedConfig = await updatePreambule(contractConfig.userId, hasPreambule);
+      setContractConfig(updatedConfig);
+      handleNextStep();
+    } catch (error) {
+      console.error('Erreur lors de la mise à jour du préambule:', error);
+      toast({
+        title: 'Erreur',
+        description: 'Impossible de mettre à jour le préambule',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
   // Finalisation du contrat
   const handleFinalizeContract = async () => {
     try {
       setIsLoading(true);
       
-      // Simuler un utilisateur pour le développement
-      const userId = 'user123';
+      if (!contractConfig) return;
       
-      await submitFinalContract(userId);
+      await submitFinalContract(contractConfig.userId);
       
       toast({
         title: 'Contrat finalisé',
@@ -287,6 +490,92 @@ export function ContractWizard() {
         description: 'Impossible de finaliser le contrat',
         variant: 'destructive',
       });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  // Implémentation générique pour les articles qui utilisent onSaveArticle
+  const handleSaveArticle = async (data: any) => {
+    try {
+      if (!contractConfig) return;
+      
+      setIsLoading(true);
+      const userId = contractConfig.userId;
+      
+      // Sauvegarder les données selon l'étape actuelle
+      switch (currentStep) {
+        case 6: // Article 1 - Nature du contrat
+          await saveArticle1Nature(userId, data);
+          break;
+        case 7: // Article 2 - Date d'entrée en fonction
+          if (contractConfig.contractType === 'CDD') {
+            await saveArticle2CDDEntry(userId, data);
+          } else {
+            await saveArticle2EntryDate(userId, data);
+          }
+          break;
+        case 8: // Article 3 - Fonctions
+          await saveArticle3Functions(userId, data);
+          break;
+        case 9: // Article 4 - Lieu de travail
+          await saveArticle4Workplace(userId, data);
+          break;
+        case 10: // Article 5 - Organisation du travail
+          await saveArticle5WorkingSchedule(userId, data);
+          break;
+        case 11: // Article 6 - Rémunération
+          await saveArticle6Remuneration(userId, data);
+          break;
+        case 12: // Article 7 - Avantages
+          await saveArticle7Benefits(userId, data);
+          break;
+        case 13: // Article 8 - Congés
+          await saveArticle8Leaves(userId, data);
+          break;
+        case 14: // Article 9 - Données personnelles
+          await saveArticle9DataProtection(userId, data);
+          break;
+        case 15: // Article 10 - Tenue et règles
+          await saveArticle10Conduct(userId, data);
+          break;
+        case 16: // Article 11 - Confidentialité
+          await saveArticle11Confidentiality(userId, data);
+          break;
+        case 17: // Article 12 - Non-concurrence
+          await saveArticle12NonCompete(userId, data);
+          break;
+        case 18: // Article 13 - Télétravail
+          await saveArticle13Teleworking(userId, data);
+          break;
+        case 19: // Article 14 - Rupture du contrat
+          await saveArticle14Termination(userId, data);
+          break;
+      }
+      
+      // Notification de succès
+      toast({
+        title: 'Article sauvegardé',
+        description: 'Votre article a été sauvegardé avec succès',
+      });
+      
+      // Passer à l'étape suivante
+      handleNextStep();
+    } catch (error) {
+      if (error instanceof Error) {
+        toast({
+          title: 'Erreur',
+          description: error.message,
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Erreur',
+          description: 'Une erreur est survenue lors de la sauvegarde',
+          variant: 'destructive',
+        });
+      }
+      console.error('Erreur lors de la sauvegarde de l\'article:', error);
     } finally {
       setIsLoading(false);
     }
@@ -309,34 +598,218 @@ export function ContractWizard() {
       );
     }
     
+    // Log pour le débogage
+    console.log(`Affichage de l'étape: index=${currentStep}, id=${stepId}`);
+    
     // Sinon, afficher l'étape en cours
     switch (currentStep) {
-      case 0:
+      case 0: // Création d'un nouveau contrat
         return (
           <ContractTypeStep
-            onSelectType={(type) => console.log('Type sélectionné:', type)}
-            selectedType={contractConfig.contractType}
+            onCreateContract={handleUpdateContractType}
             isLoading={isLoading}
           />
         );
-      case 1:
+        
+      case 1: // Heures hebdomadaires (24/28/30/35)
         return (
           <WorkingHoursStep
-            onSelectHours={(hours) => console.log('Heures sélectionnées:', hours)}
+            onSelectHours={handleUpdateWorkingHours}
             selectedHours={contractConfig.workingHours}
             isLoading={isLoading}
             onBack={handlePreviousStep}
           />
         );
-      // Autres étapes...
-      case 19:
+        
+      case 2: // Sélection de l'entreprise
+        return (
+          <CompanyStep
+            onSelectCompany={handleUpdateCompany}
+            companies={userCompanies}
+            selectedCompanyId={contractConfig.company?.id}
+            isLoading={isLoading}
+            isLoadingCompanies={isLoading}
+            onBack={handlePreviousStep}
+          />
+        );
+        
+      case 3: // Sélection de l'employé
+        return (
+          <EmployeeStep
+            onSelectEmployee={handleUpdateEmployee}
+            employees={userEmployees}
+            selectedEmployeeId={contractConfig.employee?.id}
+            isLoading={isLoading}
+            isLoadingEmployees={isLoading}
+            onBack={handlePreviousStep}
+          />
+        );
+        
+      case 4: // Préambule (optionnel)
+        return (
+          <PreambuleStep
+            onSelectPreambule={handleUpdatePreambule}
+            hasPreambule={contractConfig.hasPreambule}
+            isLoading={isLoading}
+            onBack={handlePreviousStep}
+          />
+        );
+        
+      case 5: // Article 1 - Nature du contrat
+        return (
+          <Article1NatureStep
+            contractType={contractConfig.contractType || 'CDI'}
+            onSaveArticle={handleSaveArticle}
+            initialData={article1Data || undefined}
+            isLoading={isLoading}
+            onBack={handlePreviousStep}
+          />
+        );
+        
+      case 6: // Article 2 - Date d'entrée en fonction
+        return contractConfig.contractType === 'CDD' ? (
+          <Article2CDDEntryStep 
+            onSaveArticle={handleSaveArticle}
+            isLoading={isLoading}
+            onBack={handlePreviousStep}
+          />
+        ) : (
+          <Article2EntryDateStep
+            onSaveArticle={handleSaveArticle}
+            isLoading={isLoading}
+            onBack={handlePreviousStep}
+          />
+        );
+        
+      // Autres étapes pour les articles 3 à 14...
+      case 7:
+        return (
+          <Article3FunctionsStep
+            onSaveArticle={handleSaveArticle}
+            isLoading={isLoading}
+            onBack={handlePreviousStep}
+          />
+        );
+        
+      case 8:
+        return (
+          <Article4WorkplaceStep
+            onSaveArticle={handleSaveArticle}
+            isLoading={isLoading}
+            onBack={handlePreviousStep}
+          />
+        );
+        
+      case 9:
+        return (
+          <Article5WorkingScheduleStep
+            contractType={contractConfig.contractType || 'CDI'}
+            workingHours={contractConfig.workingHours || 35}
+            isPartTime={contractConfig.isPartTime || false}
+            onSaveArticle={handleSaveArticle}
+            isLoading={isLoading}
+            onBack={handlePreviousStep}
+          />
+        );
+        
+      case 10:
+        return (
+          <Article6RemunerationStep
+            contractType={contractConfig.contractType || 'CDI'}
+            workingHours={contractConfig.workingHours || 35}
+            isPartTime={contractConfig.isPartTime || false}
+            onSaveArticle={handleSaveArticle}
+            initialData={article6Data || undefined}
+            isLoading={isLoading}
+            onBack={handlePreviousStep}
+          />
+        );
+        
+      case 11:
+        return (
+          <Article7BenefitsStep
+            onSaveArticle={handleSaveArticle}
+            initialData={article7Data || undefined}
+            isLoading={isLoading}
+            onBack={handlePreviousStep}
+          />
+        );
+        
+      case 12:
+        return (
+          <Article8LeavesStep
+            contractType={contractConfig.contractType || 'CDI'}
+            onSaveArticle={handleSaveArticle}
+            initialData={article8Data || undefined}
+            isLoading={isLoading}
+            onBack={handlePreviousStep}
+          />
+        );
+        
+      case 13:
+        return (
+          <Article9DataProtectionStep
+            onSaveArticle={handleSaveArticle}
+            isLoading={isLoading}
+            onBack={handlePreviousStep}
+          />
+        );
+        
+      case 14:
+        return (
+          <Article10ConductStep
+            onSaveArticle={handleSaveArticle}
+            isLoading={isLoading}
+            onBack={handlePreviousStep}
+          />
+        );
+        
+      case 15:
+        return (
+          <Article11ConfidentialityStep
+            onSaveArticle={handleSaveArticle}
+            isLoading={isLoading}
+            onBack={handlePreviousStep}
+          />
+        );
+        
+      case 16:
+        return (
+          <Article12NonCompeteStep
+            contractType={contractConfig.contractType || 'CDI'}
+            onSaveArticle={handleSaveArticle}
+            isLoading={isLoading}
+            onBack={handlePreviousStep}
+          />
+        );
+        
+      case 17:
+        return (
+          <Article13TeleworkingStep
+            onSaveArticle={handleSaveArticle}
+            isLoading={isLoading}
+            onBack={handlePreviousStep}
+          />
+        );
+        
+      case 18:
+        return (
+          <Article14TerminationStep
+            contractType={contractConfig.contractType || 'CDI'}
+            onSaveArticle={handleSaveArticle}
+            isLoading={isLoading}
+            onBack={handlePreviousStep}
+          />
+        );
+        
+      case 19: // Aperçu final
         // À l'étape 19, charger les articles si pas déjà fait
         if (Object.keys(articles).length === 0) {
           const loadArticles = async () => {
             try {
               setIsLoading(true);
-              const userId = 'user123';
-              const allArticles = await getContractArticles(userId);
+              if (!contractConfig) return;
+              const allArticles = await getContractArticles(contractConfig.userId);
               setArticles(allArticles);
             } catch (error) {
               console.error('Erreur lors du chargement des articles:', error);
@@ -356,10 +829,11 @@ export function ContractWizard() {
             onValidateContract={handleFinalizeContract}
           />
         );
+        
       default:
         return (
           <div className="p-8 text-center">
-            <p>Étape {currentStep} en construction</p>
+            <p>Étape {stepId} en construction</p>
             <div className="flex justify-center gap-4 mt-6">
               <Button variant="outline" onClick={handlePreviousStep}>
                 <ArrowLeft className="mr-2 h-4 w-4" />
@@ -433,7 +907,7 @@ export function ContractWizard() {
       <div className="mb-8">
         <div className="flex justify-between items-center mb-2">
           <span className="text-sm font-medium">Progression ({Math.round(progress)}%)</span>
-          <span className="text-sm">{currentStep}/{totalSteps-1}</span>
+          <span className="text-sm">{stepId}/{totalSteps-1}</span>
         </div>
         <Progress value={progress} className="h-2" />
       </div>
@@ -441,47 +915,97 @@ export function ContractWizard() {
       <div className="flex gap-6">
         {/* Sidebar de navigation */}
         <div className="hidden lg:block w-64 shrink-0">
-          <div className="bg-white border rounded-lg p-4">
-            <h2 className="font-semibold mb-4">Navigation</h2>
+          <div className="bg-white border rounded-lg shadow-sm overflow-hidden">
+            <div className="px-4 py-3 bg-slate-50 border-b">
+              <h2 className="font-semibold text-sm">Navigation du contrat</h2>
+            </div>
             
-            {Object.entries(categories).map(([category, categorySteps]) => (
-              <div key={category} className="mb-4">
-                <h3 className="text-xs uppercase tracking-wider text-slate-500 mb-2">{category}</h3>
-                <ul className="space-y-1">
-                  {categorySteps.map(step => {
-                    const isCompleted = contractConfig?.progress >= step.id;
-                    const isCurrent = currentStep === step.id;
-                    
-                    return (
-                      <li 
-                        key={step.id}
-                        className={`
-                          p-2 rounded-md text-sm cursor-pointer flex items-center
-                          ${isCurrent ? 'bg-blue-50 text-blue-700' : ''}
-                          ${!isCurrent && isCompleted ? 'text-slate-700 hover:bg-slate-50' : ''}
-                          ${!isCompleted ? 'text-slate-400 cursor-not-allowed' : ''}
-                        `}
-                        onClick={() => isCompleted && goToStep(step.id)}
+            <div className="p-2">
+              {Object.entries(categories).map(([category, categorySteps], idx) => {
+                const isExpanded = expandedCategories[category] !== false; // par défaut ouvert si non défini
+                
+                return (
+                  <div key={category} className={idx > 0 ? "mt-3" : ""}>
+                    <div 
+                      className="flex items-center justify-between px-2 py-1.5 text-xs font-semibold rounded-md cursor-pointer bg-slate-50 hover:bg-slate-100 transition-colors"
+                      onClick={() => {
+                        setExpandedCategories({
+                          ...expandedCategories,
+                          [category]: !isExpanded
+                        });
+                      }}
+                    >
+                      <h3 className="uppercase tracking-wider text-slate-600">{category}</h3>
+                      <svg 
+                        xmlns="http://www.w3.org/2000/svg" 
+                        width="16" 
+                        height="16" 
+                        viewBox="0 0 24 24" 
+                        fill="none" 
+                        stroke="currentColor" 
+                        strokeWidth="2" 
+                        strokeLinecap="round" 
+                        strokeLinejoin="round" 
+                        className={`text-slate-400 transition-transform duration-200 ${isExpanded ? 'transform rotate-180' : ''}`}
                       >
-                        {isCompleted ? (
-                          <svg 
-                            className={`mr-2 h-4 w-4 ${isCurrent ? 'text-blue-500' : 'text-green-500'}`} 
-                            fill="none" 
-                            viewBox="0 0 24 24" 
-                            stroke="currentColor"
-                          >
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                          </svg>
-                        ) : (
-                          <div className="h-4 w-4 mr-2 rounded-full border border-slate-300"></div>
-                        )}
-                        {step.title}
-                      </li>
-                    );
-                  })}
-                </ul>
+                        <polyline points="6 9 12 15 18 9"></polyline>
+                      </svg>
+                    </div>
+                    {isExpanded && (
+                      <ul className="space-y-0.5 mt-1 pl-1">
+                        {categorySteps.map(step => {
+                          const isCompleted = contractConfig && contractConfig.progress >= step.id;
+                          const isCurrent = currentStep === step.id-1;
+                          
+                          return (
+                            <li 
+                              key={step.id}
+                              className={`
+                                py-1.5 px-2 rounded-md text-xs cursor-pointer flex items-center
+                                ${isCurrent ? 'bg-blue-50 text-blue-800 font-medium' : ''}
+                                ${!isCurrent && isCompleted ? 'text-slate-700 hover:bg-slate-50' : ''}
+                                ${!isCompleted ? 'text-slate-400 cursor-not-allowed' : ''}
+                                transition-colors duration-150
+                              `}
+                              onClick={() => isCompleted && goToStep(step.id-1)}
+                            >
+                              <div className={`
+                                flex items-center justify-center w-5 h-5 rounded-full mr-2 text-[10px] font-bold
+                                ${isCurrent ? 'bg-red-100 text-red-600 border border-red-300' : ''}
+                                ${!isCurrent && isCompleted ? 'bg-green-100 text-green-600 border border-green-300' : ''}
+                                ${!isCompleted ? 'bg-gray-100 text-gray-400 border border-gray-200' : ''}
+                              `}>
+                                {step.id}
+                              </div>
+                              <span className="truncate leading-tight">{step.title}</span>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </div>
+                );
+              })}
+              
+              {/* Légende */}
+              <div className="mt-6 pt-4 border-t border-slate-200">
+                <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold px-2 mb-2">Légende</p>
+                <div className="px-2 space-y-1.5">
+                  <div className="flex items-center text-xs">
+                    <div className="w-4 h-4 rounded-full bg-green-100 text-green-600 border border-green-300 mr-2"></div>
+                    <span className="text-slate-700">Étape complétée</span>
+                  </div>
+                  <div className="flex items-center text-xs">
+                    <div className="w-4 h-4 rounded-full bg-red-100 text-red-600 border border-red-300 mr-2"></div>
+                    <span className="text-slate-700">Étape en cours</span>
+                  </div>
+                  <div className="flex items-center text-xs">
+                    <div className="w-4 h-4 rounded-full bg-gray-100 text-gray-400 border border-gray-200 mr-2"></div>
+                    <span className="text-slate-700">Étape à venir</span>
+                  </div>
+                </div>
               </div>
-            ))}
+            </div>
           </div>
         </div>
         

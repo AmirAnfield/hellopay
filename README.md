@@ -261,3 +261,139 @@ Cette version introduit plusieurs améliorations importantes pour renforcer l'ar
 - ✅ Consolidation des schémas de validation
 
 Cette version pose les bases d'une architecture solide et maintenable pour le développement futur.
+
+## Générateur de Contrat HelloPay
+
+Le générateur de contrat est un assistant étape par étape (wizard) qui permet de créer des contrats de travail personnalisés en suivant un processus guidé.
+
+### Structure du Contrat
+Le contrat est organisé en sections:
+- Introduction optionnelle (préambule)
+- Articles obligatoires (Section 1)
+- Modules recommandés par défaut (Section 2)
+- Modules avancés facultatifs (Section 3)
+
+### Processus du Wizard
+Le wizard suit le processus suivant:
+1. **Configuration de base**
+   - Type de contrat (CDI/CDD)
+   - Heures hebdomadaires (24h, 28h, 30h ou 35h)
+   - Sélection de l'entreprise (via Firestore)
+   - Sélection de l'employé (via Firestore)
+   - Choix d'inclure le préambule
+
+2. **Articles Obligatoires**
+   - Article 1: Nature du contrat
+   - Article 2: Date d'entrée en fonction
+   - Article 3: Fonctions
+   - Article 4: Lieu de travail
+   - Article 5: Durée et organisation du travail
+   - Article 6: Rémunération
+   - Article 7: Avantages
+   - Article 8: Congés et absences
+
+3. **Clauses Additionnelles**
+   - Article 9: Données personnelles et droit à l'image
+   - Article 10: Tenue et règles internes
+   - Article 11: Confidentialité et propriété intellectuelle
+   - Article 12: Non-concurrence (CDI uniquement)
+   - Article 13: Télétravail
+   - Article 14: Rupture du contrat et préavis
+
+4. **Finalisation**
+   - Aperçu du contrat complet
+   - Validation finale
+
+### Stockage des Données
+- Les données du contrat sont stockées dans Firestore
+- Chemins: `users/{userId}/contracts/config` pour la configuration
+- Chaque article est stocké séparément dans une collection appropriée
+- Les entreprises sont stockées dans `users/{userId}/companies`
+- Les employés sont stockés dans `users/{userId}/employees`
+
+### Fonctionnalités Supplémentaires
+- Sauvegarde automatique de la progression
+- Possibilité de sauvegarder différentes versions
+- Chargement des sauvegardes précédentes
+- Mode aperçu pour prévisualiser le contrat à tout moment
+
+## Générateur de Contrat HelloPay - Améliorations
+
+### Fonctionnalités implémentées
+1. **Structure complète du wizard**
+   - Processus étape par étape pour créer un contrat
+   - Navigation entre les différentes sections
+   - Sauvegarde de la progression
+   - Prévisualisation du contrat
+
+2. **Types d'articles normalisés**
+   - Interfaces TypeScript pour tous les articles du contrat
+   - Support pour les différents types de contrat (CDI/CDD)
+   - Gestion des options conditionnelles selon le type de contrat
+
+3. **Services de sauvegarde**
+   - Fonctions de sauvegarde spécifiques à chaque article
+   - Validation des données obligatoires pour chaque article
+   - Stockage structuré dans Firestore
+
+4. **Cohérence des données**
+   - Vérification des champs requis avant sauvegarde
+   - Validation spécifique selon le type de contrat
+   - Gestion des erreurs avec feedback utilisateur
+
+### Améliorations à venir
+1. **Harmonisation des interfaces de composants**
+   - Aligner les props de tous les composants d'étape
+   - Résoudre les conflits de typage entre les services et les composants
+   - Standardiser les validations côté client
+
+2. **Optimisation des performances**
+   - Mise en cache des données pour réduire les appels à Firestore
+   - Chargement asynchrone des composants d'étape
+   - Préchargement des données des prochaines étapes
+
+3. **Tests et débogage**
+   - Tests unitaires pour les services
+   - Tests d'intégration pour le flux complet
+   - Gestion avancée des erreurs
+
+4. **Fonctionnalités additionnelles**
+   - Exportation du contrat en PDF
+   - Templates prédéfinis pour accélérer la création
+   - Système de révision et commentaires
+   - Signature électronique
+
+## Générateur de Contrat HelloPay - Fonctionnalités d'exportation
+
+### Export PDF
+Le générateur de contrat inclut maintenant une fonctionnalité d'exportation PDF qui permet de générer un document professionnel à partir des données saisies. Cette fonctionnalité offre:
+
+1. **Génération dynamique de contrat**
+   - Création automatique d'un document formaté selon les standards professionnels
+   - Intégration des données spécifiques de l'entreprise et de l'employé
+   - Adaptation du contenu selon le type de contrat (CDI/CDD)
+
+2. **Documents prêts à l'emploi**
+   - Format standardisé avec mise en page professionnelle
+   - Contenu juridiquement valide basé sur le Code du travail
+   - Signature électronique à venir dans les prochaines versions
+
+3. **Personnalisation avancée**
+   - Adaptation en fonction des articles remplis
+   - Clause conditionnelles qui s'affichent uniquement si nécessaires
+   - Structure claire et organisée par sections
+
+### Comment utiliser l'export PDF
+1. Remplissez le contrat en suivant toutes les étapes du wizard
+2. À l'étape de prévisualisation, cliquez sur "Exporter en PDF"
+3. Le document s'ouvre dans un nouvel onglet pour impression ou sauvegarde
+
+### Exportations supplémentaires (à venir)
+- Export au format Word (.docx) pour modification supplémentaire
+- Export des annexes et pièces jointes
+- Génération de documents associés (attestations, avenants)
+
+### Sécurité et confidentialité
+- Les documents générés sont privés et ne sont pas stockés sur nos serveurs
+- Le processus de génération se fait entièrement côté client
+- Les informations sensibles ne transitent pas par Internet lors de l'export

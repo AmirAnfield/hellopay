@@ -3,7 +3,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
-import { FileText, HelpCircle } from 'lucide-react';
+import { FileText, HelpCircle, CheckCircle } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 
 interface PreambuleStepProps {
   onSelectPreambule: (hasPreambule: boolean) => Promise<void>;
@@ -46,6 +47,9 @@ export function PreambuleStep({
             <Label htmlFor="preambule-yes" className="font-medium cursor-pointer">
               Oui, inclure un préambule
             </Label>
+            <Badge className="ml-2 bg-green-100 text-green-800 hover:bg-green-200">
+              <CheckCircle className="h-3 w-3 mr-1" /> Recommandé
+            </Badge>
           </div>
           
           {hasPreambule === true && (

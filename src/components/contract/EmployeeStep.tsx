@@ -59,6 +59,28 @@ export function EmployeeStep({
     }
   };
 
+  // Obtenir le nom complet de l'employé
+  const getEmployeeFullName = (employee: Employee) => {
+    if (employee.fullName) return employee.fullName;
+    if (employee.firstName && employee.lastName) return `${employee.firstName} ${employee.lastName}`;
+    if (employee.firstName) return employee.firstName;
+    if (employee.lastName) return employee.lastName;
+    return `Employé ${employee.id.substring(0, 4)}`;
+  };
+
+  // Afficher les détails du nom de l'employé
+  const renderEmployeeNameDetails = (employee: Employee) => {
+    if (employee.fullName) {
+      return employee.fullName;
+    }
+    
+    if (employee.firstName || employee.lastName) {
+      return `${employee.firstName || ''} ${employee.lastName || ''}`.trim();
+    }
+    
+    return `Employé ${employee.id.substring(0, 4)}`;
+  };
+
   return (
     <div className="space-y-6">
       <div className="text-center">
@@ -101,7 +123,7 @@ export function EmployeeStep({
               <SelectContent>
                 {employees.map((employee) => (
                   <SelectItem key={employee.id} value={employee.id}>
-                    {employee.fullName || `Employé ${employee.id.substring(0, 4)}`}
+                    {getEmployeeFullName(employee)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -116,7 +138,7 @@ export function EmployeeStep({
                     <User className="h-6 w-6 text-primary" />
                   </div>
                   <div className="space-y-2">
-                    <h3 className="font-semibold text-lg">{selectedEmployee.fullName}</h3>
+                    <h3 className="font-semibold text-lg">{renderEmployeeNameDetails(selectedEmployee)}</h3>
                     
                     {(selectedEmployee.birthDate || selectedEmployee.birthPlace) && (
                       <p className="text-sm text-gray-600">

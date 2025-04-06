@@ -92,7 +92,29 @@ export async function saveContractConfig(
 /**
  * Met à jour le type de contrat
  */
-export async function updateContractType(userId: string, contractType: ContractType): Promise<ContractConfig> {
+export async function updateContractType(
+  userId: string, 
+  contractType: ContractType,
+  company?: Company,
+  employee?: Employee,
+  isExecutive?: boolean
+): Promise<ContractConfig> {
+  // Si les informations complètes sont fournies, mettre à jour en une seule fois
+  if (company && employee && isExecutive !== undefined) {
+    // Nettoyer les objets avant de les enregistrer
+    const cleanedCompany = cleanObject(company);
+    const cleanedEmployee = cleanObject(employee);
+    
+    return await saveContractConfig(userId, {
+      contractType,
+      company: cleanedCompany,
+      employee: cleanedEmployee,
+      isExecutive,
+      progress: 3 // Passer directement à l'étape du préambule
+    });
+  }
+  
+  // Sinon, mise à jour simple du type de contrat
   return await saveContractConfig(userId, { contractType, progress: 1 });
 }
 

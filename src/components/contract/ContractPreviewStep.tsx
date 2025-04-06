@@ -10,6 +10,9 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { Spinner } from '@/components/ui/spinner';
+import { loadFullContract } from '@/services/contractLoadService';
+import { exportContractToPDF } from '@/services/contractExportService';
 
 interface PreviewArticle {
   title: string;
@@ -532,6 +535,22 @@ export function ContractPreviewStep({
     },
   ];
 
+  // Fonction pour exporter le contrat en PDF
+  const handleExportPDF = async () => {
+    try {
+      // Charger toutes les données du contrat
+      const contractData = await loadFullContract(contractConfig.userId);
+      
+      if (contractData) {
+        // Exporter le contrat en PDF
+        await exportContractToPDF(contractData);
+      }
+    } catch (error) {
+      console.error('Erreur lors de l\'export du contrat:', error);
+      // Afficher une notification d'erreur (à implémenter)
+    }
+  };
+
   return (
     <div className="space-y-6 w-full">
       <div className="text-center mb-4">
@@ -610,9 +629,9 @@ export function ContractPreviewStep({
             Retour
           </Button>
           
-          <Button variant="outline" className="flex items-center">
+          <Button variant="outline" onClick={handleExportPDF} disabled={isLoading} className="flex items-center">
             <Download className="mr-2 h-4 w-4" />
-            Télécharger
+            Exporter en PDF
           </Button>
           
           <Button variant="outline" className="flex items-center">
@@ -627,8 +646,14 @@ export function ContractPreviewStep({
           className="flex items-center bg-green-600 hover:bg-green-700"
           title={hasMissingImportantArticles ? "Veuillez compléter toutes les sections importantes du contrat avant de le valider" : ""}
         >
-          {isLoading ? 'Validation en cours...' : 'Valider le contrat'}
-          {!isLoading && <Check className="ml-2 h-4 w-4" />}
+          {isLoading ? (
+            <Spinner className="mr-2" />
+          ) : (
+            <>
+              <Check className="mr-2 h-4 w-4" />
+              Valider le contrat
+            </>
+          )}
         </Button>
       </div>
     </div>
