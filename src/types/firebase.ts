@@ -70,6 +70,8 @@ export interface Employee extends FirestoreDocument {
   photoUrl?: string;
   phone?: string;
   department?: string;
+  isLocked?: boolean;
+  isArchived?: boolean;
   documents?: {
     contractUrl?: string;
     idCardUrl?: string;

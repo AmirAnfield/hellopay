@@ -28,7 +28,7 @@ export default function EmployeesPage() {
 
   // Utilisation du hook personnalisé pour la pagination Firestore
   const {
-    data: employees,
+    data: employeesRaw,
     loading,
     error: firestoreError,
     hasMore,
@@ -36,7 +36,7 @@ export default function EmployeesPage() {
     refresh,
     loadMore
   } = useFirestorePagination<Employee>(
-    "employees",
+    user ? `users/${user.uid}/employees` : "employees",
     {
       limit: pageSize,
       sortBy: "lastName",
@@ -48,6 +48,46 @@ export default function EmployeesPage() {
       fetchTotalCount: true
     }
   );
+  
+  // Filtrer les faux employés et les doublons
+  const employees = employeesRaw.filter((emp, index, self) => {
+    // Vérifier si c'est un vrai employé avec des données valides
+    
+    // 1. Rejeter toute valeur qui contient "confirm_company"
+    if (
+      emp.firstName === 'confirm_company' || 
+      emp.lastName === 'confirm_company' ||
+      (emp.id && emp.id.includes('confirm_company'))
+    ) {
+      return false;
+    }
+    
+    // 2. Rejeter les employés sans nom ou prénom valides
+    if (
+      !emp.firstName || 
+      !emp.lastName || 
+      emp.firstName.trim() === '' || 
+      emp.lastName.trim() === ''
+    ) {
+      return false;
+    }
+    
+    // 3. Rejeter les employés qui semblent être des valeurs temporaires de l'assistant
+    // (par exemple, des chaînes JSON, des identifiants techniques, etc.)
+    const suspiciousValues = ['start', 'cancel_company', 'new_company', 'realtime_preview'];
+    for (const value of suspiciousValues) {
+      if (
+        (emp.firstName && emp.firstName.includes(value)) || 
+        (emp.lastName && emp.lastName.includes(value)) ||
+        (emp.id && emp.id.includes(value))
+      ) {
+        return false;
+      }
+    }
+    
+    // 4. Éliminer les doublons (garder la première occurrence uniquement)
+    return index === self.findIndex(e => e.id === emp.id);
+  });
 
   // Synchroniser l'état de chargement
   useEffect(() => {
@@ -125,10 +165,10 @@ export default function EmployeesPage() {
           {employees.length === 0 ? (
             <NoDataMessage message="Aucun employé n'a été trouvé. Ajoutez un employé pour commencer." />
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {employees.map((employee) => (
+            <div className="flex flex-col space-y-3">
+              {employees.map((employee, index) => (
                 <EmployeeCard
-                  key={employee.id}
+                  key={`${employee.id}-${index}`}
                   employee={employee}
                   onEmployeeUpdated={refresh}
                 />

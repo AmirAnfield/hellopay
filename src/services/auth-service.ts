@@ -16,6 +16,7 @@ import {
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
+import { initAIContractMemory } from '@/lib/ai/memory';
 
 /**
  * Interface pour les données utilisateur
@@ -59,6 +60,15 @@ export const registerUser = async (email: string, password: string, userData: Pa
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp()
   });
+  
+  // Initialiser la mémoire IA pour le nouvel utilisateur
+  try {
+    await initAIContractMemory(user.uid);
+    console.log("Mémoire IA initialisée pour le nouvel utilisateur");
+  } catch (error) {
+    console.error("Erreur lors de l'initialisation de la mémoire IA:", error);
+    // On continue sans bloquer l'inscription
+  }
 
   return userCredential;
 };
@@ -73,6 +83,16 @@ export const loginUser = async (email: string, password: string): Promise<UserCr
   try {
     const result = await signInWithEmailAndPassword(auth, email, password);
     console.log("✅ Connexion réussie pour:", email);
+    
+    // Initialiser la mémoire IA pour l'utilisateur connecté
+    try {
+      await initAIContractMemory(result.user.uid);
+      console.log("Mémoire IA initialisée/vérifiée pour l'utilisateur connecté");
+    } catch (error) {
+      console.error("Erreur lors de l'initialisation de la mémoire IA:", error);
+      // On continue sans bloquer la connexion
+    }
+    
     return result;
   } catch (error: any) {
     console.error("❌ Erreur de connexion:", error);
@@ -113,6 +133,23 @@ export const loginWithGoogle = async (): Promise<UserCredential> => {
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     });
+    
+    // Initialiser la mémoire IA pour le nouvel utilisateur Google
+    try {
+      await initAIContractMemory(result.user.uid);
+      console.log("Mémoire IA initialisée pour le nouvel utilisateur Google");
+    } catch (error) {
+      console.error("Erreur lors de l'initialisation de la mémoire IA:", error);
+      // On continue sans bloquer l'inscription
+    }
+  } else {
+    // Pour un utilisateur existant, vérifier/initialiser la mémoire IA
+    try {
+      await initAIContractMemory(result.user.uid);
+      console.log("Mémoire IA vérifiée pour l'utilisateur Google existant");
+    } catch (error) {
+      console.error("Erreur lors de la vérification de la mémoire IA:", error);
+    }
   }
 
   return result;

@@ -150,9 +150,45 @@ export async function addMessageToAIMemory(
   // Vérifier si la mémoire existe
   const docSnap = await getDoc(docRef);
   if (!docSnap.exists()) {
-    throw new Error("La mémoire IA n'existe pas. Veuillez l'initialiser d'abord.");
+    // Initialiser automatiquement la mémoire si elle n'existe pas
+    console.log("Initialisation automatique de la mémoire IA");
+    await initAIContractMemory(userId);
+    
+    // Récupérer la nouvelle mémoire
+    const newMemorySnap = await getDoc(docRef);
+    if (!newMemorySnap.exists()) {
+      throw new Error("Impossible d'initialiser la mémoire IA.");
+    }
+    
+    // Continuer avec la nouvelle mémoire
+    const currentMemory = newMemorySnap.data() as AIContractMemory;
+    const currentHistory = currentMemory.history || [];
+    
+    // Ajouter le nouveau message avec timestamp
+    const newMessage = {
+      ...message,
+      timestamp: Timestamp.now()
+    };
+    
+    // Conservation de tous les messages de l'historique
+    const updatedHistory = [...currentHistory, newMessage];
+    
+    // Mettre à jour l'historique
+    await updateDoc(docRef, {
+      history: updatedHistory,
+      updatedAt: serverTimestamp()
+    });
+    
+    // Récupérer les données mises à jour
+    const updatedDoc = await getDoc(docRef);
+    
+    return {
+      id: updatedDoc.id,
+      ...updatedDoc.data()
+    } as AIContractMemory;
   }
   
+  // Si la mémoire existe déjà, continuer normalement
   // Récupérer l'historique actuel
   const currentMemory = docSnap.data() as AIContractMemory;
   const currentHistory = currentMemory.history || [];
