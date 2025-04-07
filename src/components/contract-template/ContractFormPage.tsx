@@ -29,6 +29,25 @@ import {
   Check
 } from 'lucide-react';
 import { ContractTemplate } from './ContractTemplate';
+import { auth } from '@/lib/firebase';
+import { firestore } from '@/lib/firebase/config';
+import { collection, getDocs, doc, getDoc, addDoc, setDoc } from 'firebase/firestore';
+import { useToast } from '@/components/ui/use-toast';
+import { Button } from '@/components/ui/button';
+
+// Type pour les entreprises
+interface CompanyOption {
+  value: string;
+  label: string;
+  data: {
+    name: string;
+    address: string;
+    siret: string;
+    representant: string;
+    conventionCollective?: string;
+    sector?: string;
+  };
+}
 
 // Schéma de validation Zod pour les données du formulaire
 const contractFormSchema = z.object({
@@ -186,6 +205,10 @@ const defaultValues: ContractFormValues = {
 
 export function ContractFormPage() {
   const [activeTab, setActiveTab] = useState('company');
+  const [companies, setCompanies] = useState<CompanyOption[]>([]);
+  const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const { toast } = useToast();
   
   // Configuration du formulaire
   const form = useForm<ContractFormValues>({
@@ -195,6 +218,100 @@ export function ContractFormPage() {
   
   // Observer les changements du formulaire en temps réel
   const formValues = form.watch();
+  
+  // Fonction pour charger les entreprises
+  const loadCompanies = async () => {
+    setIsLoading(true);
+    try {
+      // Vérifier si l'utilisateur est connecté
+      console.log("Auth state:", auth);
+      console.log("User:", auth.currentUser);
+      
+      const userId = auth.currentUser?.uid;
+      
+      if (!userId) {
+        console.error("Utilisateur non connecté");
+        toast({
+          variant: "destructive",
+          title: "Non connecté",
+          description: "Vous devez être connecté pour voir vos entreprises",
+        });
+        return;
+      }
+      
+      console.log("Chargement des entreprises pour l'utilisateur:", userId);
+      
+      const companiesRef = collection(firestore, `users/${userId}/companies`);
+      console.log("Chemin Firestore:", `users/${userId}/companies`);
+      
+      const snapshot = await getDocs(companiesRef);
+      console.log("Nombre de documents:", snapshot.size);
+      
+      const companyOptions: CompanyOption[] = [];
+      
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        console.log("Entreprise trouvée:", doc.id, data);
+        companyOptions.push({
+          value: doc.id,
+          label: data.name || "Entreprise sans nom",
+          data: {
+            name: data.name || "",
+            address: data.address || "",
+            siret: data.siret || "",
+            representant: data.legalRepresentative || data.representant || "",
+            conventionCollective: data.collectiveAgreement || data.conventionCollective || "",
+            sector: data.activityCode || data.sector || "",
+          }
+        });
+      });
+      
+      setCompanies(companyOptions);
+      
+      if (companyOptions.length > 0) {
+        toast({
+          title: "Entreprises chargées",
+          description: `${companyOptions.length} entreprises disponibles`,
+        });
+      } else {
+        console.log("Aucune entreprise trouvée");
+        toast({
+          title: "Aucune entreprise",
+          description: "Vous n'avez pas encore créé d'entreprise",
+        });
+      }
+    } catch (error) {
+      console.error("Erreur lors du chargement des entreprises:", error);
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: "Impossible de charger les entreprises. Veuillez réessayer."
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  // Charger les entreprises au chargement du composant
+  useEffect(() => {
+    loadCompanies();
+  }, []);  // Supprimer toast des dépendances pour éviter des rechargements inutiles
+  
+  // Fonction pour sélectionner une entreprise et remplir les champs
+  const handleCompanySelect = (companyId: string) => {
+    setSelectedCompany(companyId);
+    
+    const selectedCompanyData = companies.find(company => company.value === companyId);
+    
+    if (selectedCompanyData) {
+      form.setValue('company.name', selectedCompanyData.data.name);
+      form.setValue('company.address', selectedCompanyData.data.address);
+      form.setValue('company.siret', selectedCompanyData.data.siret);
+      form.setValue('company.representant', selectedCompanyData.data.representant);
+      form.setValue('company.conventionCollective', selectedCompanyData.data.conventionCollective || '');
+      form.setValue('company.sector', selectedCompanyData.data.sector || '');
+    }
+  };
   
   // Fonction de soumission du formulaire
   const onSubmit = (data: ContractFormValues) => {
@@ -282,6 +399,130 @@ export function ContractFormPage() {
         <div className="flex flex-row flex-1">
           {/* Menu de configuration à gauche - Design amélioré */}
           <div className="w-[400px] min-w-[400px] border-r p-3 h-[calc(100vh-60px)] overflow-y-auto bg-gray-50/50">
+            <div className="mb-4 flex space-x-2">
+              <Button 
+                size="sm" 
+                variant="outline" 
+                className="text-xs"
+                onClick={async () => {
+                  try {
+                    if (!auth.currentUser) {
+                      console.error("Utilisateur non connecté");
+                      return;
+                    }
+                    
+                    const userId = auth.currentUser.uid;
+                    console.log("User ID:", userId);
+                    
+                    // Tester l'accès au document utilisateur
+                    const userDoc = doc(firestore, `users/${userId}`);
+                    const userSnapshot = await getDoc(userDoc);
+                    
+                    if (userSnapshot.exists()) {
+                      console.log("Document utilisateur trouvé:", userSnapshot.data());
+                    } else {
+                      console.log("Document utilisateur introuvable");
+                    }
+                    
+                    // Tester l'accès à la collection companies
+                    const companiesRef = collection(firestore, `users/${userId}/companies`);
+                    const companiesSnapshot = await getDocs(companiesRef);
+                    
+                    console.log("Collection companies accessible, docs trouvés:", companiesSnapshot.size);
+                    
+                    toast({
+                      title: "Test Firestore",
+                      description: `User document: ${userSnapshot.exists() ? "OK" : "Non trouvé"}, Companies: ${companiesSnapshot.size} trouvées`,
+                    });
+                  } catch (error) {
+                    console.error("Erreur lors du test Firestore:", error);
+                    toast({
+                      variant: "destructive",
+                      title: "Erreur Firestore",
+                      description: "Impossible d'accéder à la base de données. Voir console pour détails.",
+                    });
+                  }
+                }}
+              >
+                Tester accès Firestore
+              </Button>
+              
+              <Button 
+                size="sm" 
+                variant="outline" 
+                className="text-xs"
+                onClick={async () => {
+                  try {
+                    if (!auth.currentUser) {
+                      console.error("Utilisateur non connecté");
+                      return;
+                    }
+                    
+                    const userId = auth.currentUser.uid;
+                    console.log("Création d'une entreprise de test pour user:", userId);
+                    
+                    // Créer le document utilisateur s'il n'existe pas
+                    const userDoc = doc(firestore, `users/${userId}`);
+                    const userSnapshot = await getDoc(userDoc);
+                    
+                    if (!userSnapshot.exists()) {
+                      await setDoc(userDoc, {
+                        displayName: auth.currentUser.displayName || "Utilisateur sans nom",
+                        email: auth.currentUser.email,
+                        createdAt: new Date().toISOString()
+                      });
+                      console.log("Document utilisateur créé");
+                    }
+                    
+                    // Créer une entreprise de test
+                    const companyData = {
+                      name: "HelloPay SAS",
+                      siret: "12345678901234",
+                      address: "1 rue de la Paix",
+                      city: "Paris",
+                      postalCode: "75001",
+                      country: "France",
+                      legalRepresentative: "John Doe",
+                      createdAt: new Date().toISOString(),
+                      updatedAt: new Date().toISOString(),
+                      ownerId: userId
+                    };
+                    
+                    const companiesRef = collection(firestore, `users/${userId}/companies`);
+                    const newCompanyRef = await addDoc(companiesRef, companyData);
+                    
+                    console.log("Entreprise de test créée avec ID:", newCompanyRef.id);
+                    
+                    toast({
+                      title: "Entreprise créée",
+                      description: "Une entreprise de test a été créée dans votre compte",
+                    });
+                    
+                    // Recharger les entreprises
+                    loadCompanies();
+                  } catch (error) {
+                    console.error("Erreur lors de la création de l'entreprise:", error);
+                    toast({
+                      variant: "destructive",
+                      title: "Erreur",
+                      description: "Impossible de créer l'entreprise de test. Voir console pour détails.",
+                    });
+                  }
+                }}
+              >
+                Créer entreprise test
+              </Button>
+              
+              <Button 
+                size="sm" 
+                variant="outline" 
+                className="text-xs"
+                onClick={() => loadCompanies()}
+              >
+                Rafraîchir
+              </Button>
+            </div>
+            
             <Form {...form}>
               <form id="contract-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-3 overflow-hidden">
                 <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -307,6 +548,31 @@ export function ContractFormPage() {
                   {/* Contenu des onglets avec style amélioré et espaces réduits */}
                   <TabsContent value="company" className="space-y-2 mt-0">
                     <div className="space-y-2">
+                      {/* Sélecteur d'entreprise */}
+                      <div className="space-y-1 mb-4">
+                        <FormLabel className="text-xs">Sélectionner une entreprise existante</FormLabel>
+                        <Select
+                          value={selectedCompany || ""}
+                          onValueChange={handleCompanySelect}
+                          disabled={isLoading}
+                        >
+                          <FormControl>
+                            <SelectTrigger className="h-7 text-sm">
+                              <SelectValue 
+                                placeholder={isLoading ? "Chargement..." : "Sélectionner une entreprise"} 
+                              />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {companies.map((company) => (
+                              <SelectItem key={company.value} value={company.value}>
+                                {company.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
                       <FormField
                         control={form.control}
                         name="company.name"
