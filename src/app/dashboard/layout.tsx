@@ -5,6 +5,7 @@ import { SideNav } from "@/components/dashboard/side-nav";
 import { Toaster } from "sonner";
 import { PropsWithChildren } from "react";
 import AuthGuard from "@/components/auth/AuthGuard";
+import { usePathname } from "next/navigation";
 
 // Note: Les métadonnées doivent être définies dans un fichier de composant serveur, pas dans un composant client
 // export const metadata = {
@@ -15,6 +16,13 @@ import AuthGuard from "@/components/auth/AuthGuard";
 export default function DashboardLayout({
   children,
 }: PropsWithChildren) {
+  const pathname = usePathname();
+  
+  // Si nous sommes sur la page de création de contrat, ne pas afficher le menu latéral
+  if (pathname === '/dashboard/contracts/create') {
+    return <>{children}</>;
+  }
+  
   return (
     <AuthGuard>
       <div className="flex min-h-screen flex-col">

@@ -1,13 +1,13 @@
 'use client';
 
 import React from 'react';
-import { ContractWizard } from '@/components/contract/ContractWizard';
-import { ContractStateProvider } from '@/hooks/useContractState';
+import { ContractFormPage } from '@/components/contract-template';
+import AuthGuard from "@/components/auth/AuthGuard";
 
 export default function CreateContractPage() {
   return (
-    <ContractStateProvider>
-      <ContractWizard />
-    </ContractStateProvider>
+    <AuthGuard>
+      <ContractFormPage />
+    </AuthGuard>
   );
 } 
