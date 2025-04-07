@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { 
   Select, 
@@ -24,13 +23,10 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { 
-  Download, 
-  Save, 
   Building, 
   User, 
   ClipboardList,
-  Check,
-  ArrowLeft 
+  Check
 } from 'lucide-react';
 import { ContractTemplate } from './ContractTemplate';
 
@@ -111,6 +107,7 @@ const contractFormSchema = z.object({
   })
 });
 
+// Type défini à partir du schéma
 type ContractFormValues = z.infer<typeof contractFormSchema>;
 
 // Valeurs par défaut pour le formulaire
@@ -201,8 +198,22 @@ export function ContractFormPage() {
     // Ici, vous pourriez sauvegarder les données ou générer le PDF
   };
   
-  // État pour suivre si le formulaire est prêt à être validé
-  const isFormValid = form.formState.isValid;
+  // Observer l'état de validité du formulaire pour mettre à jour le style du bouton Valider
+  useEffect(() => {
+    const isFormValid = form.formState.isValid;
+    
+    // Trouver le bouton Valider dans le layout et mettre à jour son style
+    const validateButton = document.querySelector('button[form="contract-form"][type="submit"]');
+    if (validateButton) {
+      if (isFormValid) {
+        validateButton.classList.remove('bg-transparent', 'hover:bg-accent', 'hover:text-accent-foreground');
+        validateButton.classList.add('bg-green-500', 'text-white', 'hover:bg-green-600');
+      } else {
+        validateButton.classList.remove('bg-green-500', 'text-white', 'hover:bg-green-600');
+        validateButton.classList.add('bg-transparent', 'hover:bg-accent', 'hover:text-accent-foreground');
+      }
+    }
+  }, [form.formState.isValid]);
   
   // Détection des changements conditionnels
   useEffect(() => {
@@ -264,66 +275,42 @@ export function ContractFormPage() {
   return (
     <div className="overflow-x-hidden w-full max-w-full">
       <div className="min-h-screen overflow-x-hidden flex flex-col">
-        <div className="mb-2">
-          {/* Barre d'outils simplifiée */}
-          <div className="flex items-center gap-2 px-4 py-2">
-            <Button type="button" variant="outline" size="sm" className="h-7 text-xs">
-              <ArrowLeft className="h-3 w-3 mr-1" />
-              Retour
-            </Button>
-            <Button type="button" variant="outline" size="sm" className="h-7 text-xs">
-              <Save className="h-3 w-3 mr-1" />
-              Sauvegarder
-            </Button>
-            <Button 
-              type="submit" 
-              form="contract-form"
-              size="sm" 
-              className="h-7 text-xs"
-              disabled={!isFormValid}
-            >
-              <Check className="h-3 w-3 mr-1" />
-              Valider
-            </Button>
-          </div>
-        </div>
-        
         <div className="flex flex-row flex-1">
           {/* Menu de configuration à gauche - Design amélioré */}
-          <div className="w-[400px] min-w-[400px] border-r p-3 h-[calc(100vh-80px)] overflow-y-auto bg-gray-50/50">
+          <div className="w-[400px] min-w-[400px] border-r p-3 h-[calc(100vh-60px)] overflow-y-auto bg-gray-50/50">
             <Form {...form}>
-              <form id="contract-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 overflow-hidden">
+              <form id="contract-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-3 overflow-hidden">
                 <Tabs value={activeTab} onValueChange={setActiveTab}>
-                  <TabsList className="grid grid-cols-4 mb-4 h-8">
-                    <TabsTrigger value="company" onClick={() => setActiveTab('company')} className="text-xs py-1">
+                  <TabsList className="grid grid-cols-4 mb-2 h-7">
+                    <TabsTrigger value="company" onClick={() => setActiveTab('company')} className="text-xs py-0.5">
                       <Building className="h-3 w-3 mr-1" />
                       Entreprise
                     </TabsTrigger>
-                    <TabsTrigger value="employee" onClick={() => setActiveTab('employee')} className="text-xs py-1">
+                    <TabsTrigger value="employee" onClick={() => setActiveTab('employee')} className="text-xs py-0.5">
                       <User className="h-3 w-3 mr-1" />
                       Salarié
                     </TabsTrigger>
-                    <TabsTrigger value="contract" onClick={() => setActiveTab('contract')} className="text-xs py-1">
+                    <TabsTrigger value="contract" onClick={() => setActiveTab('contract')} className="text-xs py-0.5">
                       <ClipboardList className="h-3 w-3 mr-1" />
                       Contrat
                     </TabsTrigger>
-                    <TabsTrigger value="options" onClick={() => setActiveTab('options')} className="text-xs py-1">
+                    <TabsTrigger value="options" onClick={() => setActiveTab('options')} className="text-xs py-0.5">
                       <Check className="h-3 w-3 mr-1" />
                       Options
                     </TabsTrigger>
                   </TabsList>
                   
-                  {/* Contenu des onglets avec style amélioré */}
-                  <TabsContent value="company" className="space-y-3 mt-0">
-                    <div className="space-y-3">
+                  {/* Contenu des onglets avec style amélioré et espaces réduits */}
+                  <TabsContent value="company" className="space-y-2 mt-0">
+                    <div className="space-y-2">
                       <FormField
                         control={form.control}
                         name="company.name"
                         render={({ field }) => (
-                          <FormItem className="space-y-1">
+                          <FormItem className="space-y-0.5">
                             <FormLabel className="text-xs">Nom de l&apos;entreprise</FormLabel>
                             <FormControl>
-                              <Input className="h-8 text-sm" placeholder="HelloPay SAS" {...field} />
+                              <Input className="h-7 text-sm" placeholder="HelloPay SAS" {...field} />
                             </FormControl>
                             <FormMessage className="text-xs" />
                           </FormItem>
@@ -334,10 +321,10 @@ export function ContractFormPage() {
                         control={form.control}
                         name="company.address"
                         render={({ field }) => (
-                          <FormItem className="space-y-1">
+                          <FormItem className="space-y-0.5">
                             <FormLabel className="text-xs">Adresse</FormLabel>
                             <FormControl>
-                              <Input className="h-8 text-sm" placeholder="1 rue de la Paix, 75001 Paris" {...field} />
+                              <Input className="h-7 text-sm" placeholder="1 rue de la Paix, 75001 Paris" {...field} />
                             </FormControl>
                             <FormMessage className="text-xs" />
                           </FormItem>
@@ -348,10 +335,10 @@ export function ContractFormPage() {
                         control={form.control}
                         name="company.siret"
                         render={({ field }) => (
-                          <FormItem className="space-y-1">
+                          <FormItem className="space-y-0.5">
                             <FormLabel className="text-xs">SIRET</FormLabel>
                             <FormControl>
-                              <Input className="h-8 text-sm" placeholder="123 456 789 00012" {...field} />
+                              <Input className="h-7 text-sm" placeholder="123 456 789 00012" {...field} />
                             </FormControl>
                             <FormMessage className="text-xs" />
                           </FormItem>
@@ -362,10 +349,10 @@ export function ContractFormPage() {
                         control={form.control}
                         name="company.representant"
                         render={({ field }) => (
-                          <FormItem className="space-y-1">
+                          <FormItem className="space-y-0.5">
                             <FormLabel className="text-xs">Représentant</FormLabel>
                             <FormControl>
-                              <Input className="h-8 text-sm" placeholder="John Doe, Directeur Général" {...field} />
+                              <Input className="h-7 text-sm" placeholder="John Doe, Directeur Général" {...field} />
                             </FormControl>
                             <FormMessage className="text-xs" />
                           </FormItem>
@@ -376,10 +363,10 @@ export function ContractFormPage() {
                         control={form.control}
                         name="company.conventionCollective"
                         render={({ field }) => (
-                          <FormItem className="space-y-1">
+                          <FormItem className="space-y-0.5">
                             <FormLabel className="text-xs">Convention collective (optionnel)</FormLabel>
                             <FormControl>
-                              <Input className="h-8 text-sm" placeholder="Ex: Convention collective nationale des bureaux d&apos;études techniques" {...field} />
+                              <Input className="h-7 text-sm" placeholder="Ex: Convention collective nationale des bureaux d&apos;études techniques" {...field} />
                             </FormControl>
                             <FormMessage className="text-xs" />
                           </FormItem>
@@ -389,16 +376,16 @@ export function ContractFormPage() {
                   </TabsContent>
                   
                   {/* Onglet Salarié */}
-                  <TabsContent value="employee" className="space-y-3 mt-0">
-                    <div className="space-y-3">
+                  <TabsContent value="employee" className="space-y-2 mt-0">
+                    <div className="space-y-2">
                       <FormField
                         control={form.control}
                         name="employee.firstName"
                         render={({ field }) => (
-                          <FormItem className="space-y-1">
+                          <FormItem className="space-y-0.5">
                             <FormLabel className="text-xs">Prénom</FormLabel>
                             <FormControl>
-                              <Input className="h-8 text-sm" placeholder="Jane" {...field} />
+                              <Input className="h-7 text-sm" placeholder="Jane" {...field} />
                             </FormControl>
                             <FormMessage className="text-xs" />
                           </FormItem>
@@ -409,10 +396,10 @@ export function ContractFormPage() {
                         control={form.control}
                         name="employee.lastName"
                         render={({ field }) => (
-                          <FormItem className="space-y-1">
+                          <FormItem className="space-y-0.5">
                             <FormLabel className="text-xs">Nom</FormLabel>
                             <FormControl>
-                              <Input className="h-8 text-sm" placeholder="Doe" {...field} />
+                              <Input className="h-7 text-sm" placeholder="Doe" {...field} />
                             </FormControl>
                             <FormMessage className="text-xs" />
                           </FormItem>
@@ -424,10 +411,10 @@ export function ContractFormPage() {
                       control={form.control}
                       name="employee.address"
                       render={({ field }) => (
-                        <FormItem className="space-y-1">
+                        <FormItem className="space-y-0.5">
                           <FormLabel className="text-xs">Adresse</FormLabel>
                           <FormControl>
-                            <Input className="h-8 text-sm" placeholder="10 avenue des Champs-Élysées, 75008 Paris" {...field} />
+                            <Input className="h-7 text-sm" placeholder="10 avenue des Champs-Élysées, 75008 Paris" {...field} />
                           </FormControl>
                           <FormMessage className="text-xs" />
                         </FormItem>
@@ -438,10 +425,10 @@ export function ContractFormPage() {
                       control={form.control}
                       name="employee.birthDate"
                       render={({ field }) => (
-                        <FormItem className="space-y-1">
+                        <FormItem className="space-y-0.5">
                           <FormLabel className="text-xs">Date de naissance</FormLabel>
                           <FormControl>
-                            <Input type="date" className="h-8 text-sm" {...field} />
+                            <Input type="date" className="h-7 text-sm" {...field} />
                           </FormControl>
                           <FormMessage className="text-xs" />
                         </FormItem>
@@ -452,10 +439,10 @@ export function ContractFormPage() {
                       control={form.control}
                       name="employee.nationality"
                       render={({ field }) => (
-                        <FormItem className="space-y-1">
+                        <FormItem className="space-y-0.5">
                           <FormLabel className="text-xs">Nationalité</FormLabel>
                           <FormControl>
-                            <Input className="h-8 text-sm" placeholder="Française" {...field} />
+                            <Input className="h-7 text-sm" placeholder="Française" {...field} />
                           </FormControl>
                           <FormMessage className="text-xs" />
                         </FormItem>
@@ -466,10 +453,10 @@ export function ContractFormPage() {
                       control={form.control}
                       name="employee.socialSecurityNumber"
                       render={({ field }) => (
-                        <FormItem className="space-y-1">
+                        <FormItem className="space-y-0.5">
                           <FormLabel className="text-xs">Numéro de sécurité sociale</FormLabel>
                           <FormControl>
-                            <Input className="h-8 text-sm" placeholder="1 85 12 34 567 890 12" {...field} />
+                            <Input className="h-7 text-sm" placeholder="1 85 12 34 567 890 12" {...field} />
                           </FormControl>
                           <FormMessage className="text-xs" />
                         </FormItem>
@@ -478,13 +465,13 @@ export function ContractFormPage() {
                   </TabsContent>
                   
                   {/* Onglet Contrat */}
-                  <TabsContent value="contract" className="space-y-3 mt-0">
-                    <div className="space-y-3">
+                  <TabsContent value="contract" className="space-y-2 mt-0">
+                    <div className="space-y-2">
                       <FormField
                         control={form.control}
                         name="contractDetails.type"
                         render={({ field }) => (
-                          <FormItem className="space-y-1">
+                          <FormItem className="space-y-0.5">
                             <FormLabel className="text-xs">Type de contrat</FormLabel>
                             <Select 
                               value={field.value} 
@@ -509,7 +496,7 @@ export function ContractFormPage() {
                         control={form.control}
                         name="contractDetails.workingHours"
                         render={({ field }) => (
-                          <FormItem className="space-y-1">
+                          <FormItem className="space-y-0.5">
                             <FormLabel className="text-xs">Durée hebdomadaire</FormLabel>
                             <Select 
                               value={field.value.toString()} 
@@ -537,10 +524,10 @@ export function ContractFormPage() {
                       control={form.control}
                       name="contractDetails.position"
                       render={({ field }) => (
-                        <FormItem className="space-y-1">
+                        <FormItem className="space-y-0.5">
                           <FormLabel className="text-xs">Poste</FormLabel>
                           <FormControl>
-                            <Input className="h-8 text-sm" placeholder="Développeur web" {...field} />
+                            <Input className="h-7 text-sm" placeholder="Développeur web" {...field} />
                           </FormControl>
                           <FormMessage className="text-xs" />
                         </FormItem>
@@ -551,25 +538,25 @@ export function ContractFormPage() {
                       control={form.control}
                       name="contractDetails.classification"
                       render={({ field }) => (
-                        <FormItem className="space-y-1">
+                        <FormItem className="space-y-0.5">
                           <FormLabel className="text-xs">Classification</FormLabel>
                           <FormControl>
-                            <Input className="h-8 text-sm" placeholder="Cadre - Niveau III" {...field} />
+                            <Input className="h-7 text-sm" placeholder="Cadre - Niveau III" {...field} />
                           </FormControl>
                           <FormMessage className="text-xs" />
                         </FormItem>
                       )}
                     />
                     
-                    <div className="space-y-3">
+                    <div className="space-y-2">
                       <FormField
                         control={form.control}
                         name="contractDetails.startDate"
                         render={({ field }) => (
-                          <FormItem className="space-y-1">
+                          <FormItem className="space-y-0.5">
                             <FormLabel className="text-xs">Date de début</FormLabel>
                             <FormControl>
-                              <Input type="date" className="h-8 text-sm" {...field} />
+                              <Input type="date" className="h-7 text-sm" {...field} />
                             </FormControl>
                             <FormMessage className="text-xs" />
                           </FormItem>
@@ -581,10 +568,10 @@ export function ContractFormPage() {
                           control={form.control}
                           name="contractDetails.endDate"
                           render={({ field }) => (
-                            <FormItem className="space-y-1">
+                            <FormItem className="space-y-0.5">
                               <FormLabel className="text-xs">Date de fin (CDD)</FormLabel>
                               <FormControl>
-                                <Input type="date" className="h-8 text-sm" {...field} />
+                                <Input type="date" className="h-7 text-sm" {...field} />
                               </FormControl>
                               <FormMessage className="text-xs" />
                             </FormItem>
@@ -597,14 +584,14 @@ export function ContractFormPage() {
                       control={form.control}
                       name="contractDetails.trialPeriod"
                       render={({ field }) => (
-                        <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                        <FormItem className="flex flex-row items-start space-x-2 space-y-0">
                           <FormControl>
                             <Checkbox
                               checked={field.value}
                               onCheckedChange={field.onChange}
                             />
                           </FormControl>
-                          <div className="space-y-1 leading-none">
+                          <div className="space-y-0.5 leading-none">
                             <FormLabel className="text-xs">
                               Inclure une période d&apos;essai
                             </FormLabel>
@@ -618,10 +605,10 @@ export function ContractFormPage() {
                         control={form.control}
                         name="contractDetails.trialPeriodDuration"
                         render={({ field }) => (
-                          <FormItem className="space-y-1">
+                          <FormItem className="space-y-0.5">
                             <FormLabel className="text-xs">Durée de la période d&apos;essai</FormLabel>
                             <FormControl>
-                              <Input className="h-8 text-sm" placeholder="Ex: 2 mois" {...field} />
+                              <Input className="h-7 text-sm" placeholder="Ex: 2 mois" {...field} />
                             </FormControl>
                             <FormMessage className="text-xs" />
                           </FormItem>
@@ -633,10 +620,10 @@ export function ContractFormPage() {
                       control={form.control}
                       name="contractDetails.workplace"
                       render={({ field }) => (
-                        <FormItem className="space-y-1">
+                        <FormItem className="space-y-0.5">
                           <FormLabel className="text-xs">Lieu de travail</FormLabel>
                           <FormControl>
-                            <Input className="h-8 text-sm" placeholder="1 rue de la Paix, 75001 Paris" {...field} />
+                            <Input className="h-7 text-sm" placeholder="1 rue de la Paix, 75001 Paris" {...field} />
                           </FormControl>
                           <FormMessage className="text-xs" />
                         </FormItem>
@@ -647,12 +634,12 @@ export function ContractFormPage() {
                       control={form.control}
                       name="contractDetails.salary"
                       render={({ field }) => (
-                        <FormItem className="space-y-1">
+                        <FormItem className="space-y-0.5">
                           <FormLabel className="text-xs">Salaire brut mensuel (€)</FormLabel>
                           <FormControl>
                             <Input 
                               type="number" 
-                              className="h-8 text-sm" 
+                              className="h-7 text-sm" 
                               placeholder="3000" 
                               {...field}
                               onChange={(e) => field.onChange(parseFloat(e.target.value))}
@@ -668,10 +655,10 @@ export function ContractFormPage() {
                         control={form.control}
                         name="contractDetails.motifCDD"
                         render={({ field }) => (
-                          <FormItem className="space-y-1">
+                          <FormItem className="space-y-0.5">
                             <FormLabel className="text-xs">Motif du CDD</FormLabel>
                             <FormControl>
-                              <Input className="h-8 text-sm" placeholder="Ex: Remplacement d&apos;un salarié absent" {...field} />
+                              <Input className="h-7 text-sm" placeholder="Ex: Remplacement d&apos;un salarié absent" {...field} />
                             </FormControl>
                             <FormMessage className="text-xs" />
                           </FormItem>
@@ -683,14 +670,14 @@ export function ContractFormPage() {
                       control={form.control}
                       name="contractDetails.mobilityClause"
                       render={({ field }) => (
-                        <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                        <FormItem className="flex flex-row items-start space-x-2 space-y-0">
                           <FormControl>
                             <Checkbox
                               checked={field.value}
                               onCheckedChange={field.onChange}
                             />
                           </FormControl>
-                          <div className="space-y-1 leading-none">
+                          <div className="space-y-0.5 leading-none">
                             <FormLabel className="text-xs">
                               Inclure une clause de mobilité
                             </FormLabel>
@@ -704,12 +691,12 @@ export function ContractFormPage() {
                         control={form.control}
                         name="contractDetails.mobilityRadius"
                         render={({ field }) => (
-                          <FormItem className="space-y-1">
+                          <FormItem className="space-y-0.5">
                             <FormLabel className="text-xs">Rayon de mobilité (km)</FormLabel>
                             <FormControl>
                               <Input 
                                 type="number" 
-                                className="h-8 text-sm" 
+                                className="h-7 text-sm" 
                                 placeholder="Ex: 50" 
                                 {...field}
                                 onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
@@ -725,7 +712,7 @@ export function ContractFormPage() {
                       control={form.control}
                       name="contractDetails.scheduleType"
                       render={({ field }) => (
-                        <FormItem className="space-y-1">
+                        <FormItem className="space-y-0.5">
                           <FormLabel className="text-xs">Type d&apos;horaires</FormLabel>
                           <Select 
                             value={field.value} 
@@ -752,10 +739,10 @@ export function ContractFormPage() {
                         control={form.control}
                         name="contractDetails.workingDays"
                         render={({ field }) => (
-                          <FormItem className="space-y-1">
+                          <FormItem className="space-y-0.5">
                             <FormLabel className="text-xs">Répartition des horaires (temps partiel)</FormLabel>
                             <FormControl>
-                              <Input className="h-8 text-sm" placeholder="Ex: Lundi, Mardi, Mercredi matin" {...field} />
+                              <Input className="h-7 text-sm" placeholder="Ex: Lundi, Mardi, Mercredi matin" {...field} />
                             </FormControl>
                             <FormMessage className="text-xs" />
                           </FormItem>
@@ -767,10 +754,10 @@ export function ContractFormPage() {
                       control={form.control}
                       name="contractDetails.paymentDate"
                       render={({ field }) => (
-                        <FormItem className="space-y-1">
+                        <FormItem className="space-y-0.5">
                           <FormLabel className="text-xs">Date de paiement du salaire</FormLabel>
                           <FormControl>
-                            <Input className="h-8 text-sm" placeholder="Ex: 25" {...field} />
+                            <Input className="h-7 text-sm" placeholder="Ex: 25" {...field} />
                           </FormControl>
                           <FormMessage className="text-xs" />
                         </FormItem>
@@ -782,7 +769,7 @@ export function ContractFormPage() {
                         control={form.control}
                         name="contractDetails.noticePeriod"
                         render={({ field }) => (
-                          <FormItem className="space-y-1">
+                          <FormItem className="space-y-0.5">
                             <FormLabel className="text-xs">Période de préavis</FormLabel>
                             <Select 
                               value={field.value} 
@@ -808,19 +795,19 @@ export function ContractFormPage() {
                     )}
                     
                     {form.watch('contractDetails.type') === 'CDI' && (
-                      <div className="space-y-3">
+                      <div className="space-y-2">
                         <FormField
                           control={form.control}
                           name="contractDetails.nonCompete"
                           render={({ field }) => (
-                            <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                            <FormItem className="flex flex-row items-start space-x-2 space-y-0">
                               <FormControl>
                                 <Checkbox
                                   checked={field.value}
                                   onCheckedChange={field.onChange}
                                 />
                               </FormControl>
-                              <div className="space-y-1 leading-none">
+                              <div className="space-y-0.5 leading-none">
                                 <FormLabel className="text-xs">
                                   Inclure une clause de non-concurrence
                                 </FormLabel>
@@ -830,15 +817,15 @@ export function ContractFormPage() {
                         />
                         
                         {form.watch('contractDetails.nonCompete') && (
-                          <div className="space-y-3 pl-6">
+                          <div className="space-y-2 pl-5">
                             <FormField
                               control={form.control}
                               name="contractDetails.nonCompeteDuration"
                               render={({ field }) => (
-                                <FormItem className="space-y-1">
+                                <FormItem className="space-y-0.5">
                                   <FormLabel className="text-xs">Durée</FormLabel>
                                   <FormControl>
-                                    <Input className="h-8 text-sm" placeholder="12 mois" {...field} />
+                                    <Input className="h-7 text-sm" placeholder="12 mois" {...field} />
                                   </FormControl>
                                   <FormMessage className="text-xs" />
                                 </FormItem>
@@ -849,10 +836,10 @@ export function ContractFormPage() {
                               control={form.control}
                               name="contractDetails.nonCompeteArea"
                               render={({ field }) => (
-                                <FormItem className="space-y-1">
+                                <FormItem className="space-y-0.5">
                                   <FormLabel className="text-xs">Zone géographique</FormLabel>
                                   <FormControl>
-                                    <Input className="h-8 text-sm" placeholder="100 km autour de Paris" {...field} />
+                                    <Input className="h-7 text-sm" placeholder="100 km autour de Paris" {...field} />
                                   </FormControl>
                                   <FormMessage className="text-xs" />
                                 </FormItem>
@@ -863,10 +850,10 @@ export function ContractFormPage() {
                               control={form.control}
                               name="contractDetails.nonCompeteCompensation"
                               render={({ field }) => (
-                                <FormItem className="space-y-1">
+                                <FormItem className="space-y-0.5">
                                   <FormLabel className="text-xs">Indemnité (%)</FormLabel>
                                   <FormControl>
-                                    <Input className="h-8 text-sm" placeholder="30" {...field} />
+                                    <Input className="h-7 text-sm" placeholder="30" {...field} />
                                   </FormControl>
                                   <FormMessage className="text-xs" />
                                 </FormItem>
@@ -879,19 +866,19 @@ export function ContractFormPage() {
                   </TabsContent>
                   
                   {/* Onglet Options */}
-                  <TabsContent value="options" className="space-y-3 mt-0">
+                  <TabsContent value="options" className="space-y-2 mt-0">
                     <FormField
                       control={form.control}
                       name="displayOptions.hasPreambule"
                       render={({ field }) => (
-                        <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                        <FormItem className="flex flex-row items-start space-x-2 space-y-0">
                           <FormControl>
                             <Checkbox
                               checked={field.value}
                               onCheckedChange={field.onChange}
                             />
                           </FormControl>
-                          <div className="space-y-1 leading-none">
+                          <div className="space-y-0.5 leading-none">
                             <FormLabel className="text-xs">
                               Inclure un préambule
                             </FormLabel>
@@ -904,14 +891,14 @@ export function ContractFormPage() {
                       control={form.control}
                       name="displayOptions.includeDataProtection"
                       render={({ field }) => (
-                        <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                        <FormItem className="flex flex-row items-start space-x-2 space-y-0">
                           <FormControl>
                             <Checkbox
                               checked={field.value}
                               onCheckedChange={field.onChange}
                             />
                           </FormControl>
-                          <div className="space-y-1 leading-none">
+                          <div className="space-y-0.5 leading-none">
                             <FormLabel className="text-xs">
                               Inclure l&apos;article &quot;Données personnelles et droit à l&apos;image&quot;
                             </FormLabel>
@@ -924,14 +911,14 @@ export function ContractFormPage() {
                       control={form.control}
                       name="displayOptions.includeImageRights"
                       render={({ field }) => (
-                        <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                        <FormItem className="flex flex-row items-start space-x-2 space-y-0">
                           <FormControl>
                             <Checkbox
                               checked={field.value}
                               onCheckedChange={field.onChange}
                             />
                           </FormControl>
-                          <div className="space-y-1 leading-none">
+                          <div className="space-y-0.5 leading-none">
                             <FormLabel className="text-xs">
                               Inclure une clause de droit à l&apos;image
                             </FormLabel>
@@ -944,14 +931,14 @@ export function ContractFormPage() {
                       control={form.control}
                       name="displayOptions.includeWorkRules"
                       render={({ field }) => (
-                        <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                        <FormItem className="flex flex-row items-start space-x-2 space-y-0">
                           <FormControl>
                             <Checkbox
                               checked={field.value}
                               onCheckedChange={field.onChange}
                             />
                           </FormControl>
-                          <div className="space-y-1 leading-none">
+                          <div className="space-y-0.5 leading-none">
                             <FormLabel className="text-xs">
                               Inclure l&apos;article &quot;Tenue et règles internes&quot;
                             </FormLabel>
@@ -964,14 +951,14 @@ export function ContractFormPage() {
                       control={form.control}
                       name="displayOptions.includeWorkClothes"
                       render={({ field }) => (
-                        <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                        <FormItem className="flex flex-row items-start space-x-2 space-y-0">
                           <FormControl>
                             <Checkbox
                               checked={field.value}
                               onCheckedChange={field.onChange}
                             />
                           </FormControl>
-                          <div className="space-y-1 leading-none">
+                          <div className="space-y-0.5 leading-none">
                             <FormLabel className="text-xs">
                               Inclure des règles sur la tenue vestimentaire
                             </FormLabel>
@@ -984,14 +971,14 @@ export function ContractFormPage() {
                       control={form.control}
                       name="displayOptions.includeInternalRules"
                       render={({ field }) => (
-                        <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                        <FormItem className="flex flex-row items-start space-x-2 space-y-0">
                           <FormControl>
                             <Checkbox
                               checked={field.value}
                               onCheckedChange={field.onChange}
                             />
                           </FormControl>
-                          <div className="space-y-1 leading-none">
+                          <div className="space-y-0.5 leading-none">
                             <FormLabel className="text-xs">
                               Référencer le règlement intérieur
                             </FormLabel>
@@ -1004,14 +991,14 @@ export function ContractFormPage() {
                       control={form.control}
                       name="displayOptions.includeConfidentiality"
                       render={({ field }) => (
-                        <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                        <FormItem className="flex flex-row items-start space-x-2 space-y-0">
                           <FormControl>
                             <Checkbox
                               checked={field.value}
                               onCheckedChange={field.onChange}
                             />
                           </FormControl>
-                          <div className="space-y-1 leading-none">
+                          <div className="space-y-0.5 leading-none">
                             <FormLabel className="text-xs">
                               Inclure une clause de confidentialité
                             </FormLabel>
@@ -1024,14 +1011,14 @@ export function ContractFormPage() {
                       control={form.control}
                       name="displayOptions.includeIntellectualProperty"
                       render={({ field }) => (
-                        <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                        <FormItem className="flex flex-row items-start space-x-2 space-y-0">
                           <FormControl>
                             <Checkbox
                               checked={field.value}
                               onCheckedChange={field.onChange}
                             />
                           </FormControl>
-                          <div className="space-y-1 leading-none">
+                          <div className="space-y-0.5 leading-none">
                             <FormLabel className="text-xs">
                               Inclure une clause de propriété intellectuelle
                             </FormLabel>
@@ -1044,14 +1031,14 @@ export function ContractFormPage() {
                       control={form.control}
                       name="displayOptions.includeTeleworking"
                       render={({ field }) => (
-                        <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                        <FormItem className="flex flex-row items-start space-x-2 space-y-0">
                           <FormControl>
                             <Checkbox
                               checked={field.value}
                               onCheckedChange={field.onChange}
                             />
                           </FormControl>
-                          <div className="space-y-1 leading-none">
+                          <div className="space-y-0.5 leading-none">
                             <FormLabel className="text-xs">
                               Inclure l&apos;article &quot;Télétravail&quot;
                             </FormLabel>
@@ -1061,12 +1048,12 @@ export function ContractFormPage() {
                     />
                     
                     {form.watch('displayOptions.includeTeleworking') && (
-                      <div className="space-y-3 pl-6">
+                      <div className="space-y-2 pl-5">
                         <FormField
                           control={form.control}
                           name="displayOptions.teleworkingType"
                           render={({ field }) => (
-                            <FormItem className="space-y-1">
+                            <FormItem className="space-y-0.5">
                               <FormLabel className="text-xs">Type de télétravail</FormLabel>
                               <Select 
                                 value={field.value} 
@@ -1092,14 +1079,14 @@ export function ContractFormPage() {
                           control={form.control}
                           name="displayOptions.employerProvidesEquipment"
                           render={({ field }) => (
-                            <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                            <FormItem className="flex flex-row items-start space-x-2 space-y-0">
                               <FormControl>
                                 <Checkbox
                                   checked={field.value}
                                   onCheckedChange={field.onChange}
                                 />
                               </FormControl>
-                              <div className="space-y-1 leading-none">
+                              <div className="space-y-0.5 leading-none">
                                 <FormLabel className="text-xs">
                                   L&apos;employeur fournit l&apos;équipement
                                 </FormLabel>
@@ -1114,14 +1101,14 @@ export function ContractFormPage() {
                       control={form.control}
                       name="displayOptions.showSignatures"
                       render={({ field }) => (
-                        <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                        <FormItem className="flex flex-row items-start space-x-2 space-y-0">
                           <FormControl>
                             <Checkbox
                               checked={field.value}
                               onCheckedChange={field.onChange}
                             />
                           </FormControl>
-                          <div className="space-y-1 leading-none">
+                          <div className="space-y-0.5 leading-none">
                             <FormLabel className="text-xs">
                               Afficher les blocs de signature
                             </FormLabel>
@@ -1131,20 +1118,12 @@ export function ContractFormPage() {
                     />
                   </TabsContent>
                 </Tabs>
-                
-                {/* Bouton d'export PDF */}
-                <div className="flex items-center pt-2 justify-end">
-                  <Button type="button" onClick={() => form.handleSubmit(onSubmit)()} size="sm" className="h-7 text-xs">
-                    <Download className="h-3 w-3 mr-1" />
-                    Exporter PDF
-                  </Button>
-                </div>
               </form>
             </Form>
           </div>
           
           {/* Aperçu du contrat - Ajusté pour voir le début */}
-          <div className="flex-1 p-2 overflow-auto h-[calc(100vh-80px)] flex items-start justify-center">
+          <div className="flex-1 p-2 overflow-auto h-[calc(100vh-60px)] flex items-start justify-center">
             <div className="shadow-xl transform scale-[0.8] origin-top mt-0">
               <ContractTemplate 
                 company={formValues.company}
