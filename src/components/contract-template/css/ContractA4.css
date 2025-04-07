@@ -16,6 +16,7 @@
   }
 }
 
+/* Styles de base pour le contrat */
 .contract-a4-page {
   background-color: white;
   width: 210mm;
@@ -31,6 +32,31 @@
   overflow: hidden;
   word-wrap: break-word;
   overflow-wrap: break-word;
+}
+
+/* Styles conditionnels selon le type de contrat */
+.contract-cdi {
+  border-top: 4px solid #4a6da7; /* Bleu pour les CDI */
+}
+
+.contract-cdd {
+  border-top: 4px solid #d97706; /* Orange pour les CDD */
+}
+
+.contract-cadre {
+  font-family: 'Times New Roman', Times, serif; /* Police plus "professionnelle" pour les cadres */
+}
+
+.contract-temps-partiel {
+  background: linear-gradient(to right, white 95%, #f0f0f0 5%);
+  background-size: 100% 100%;
+}
+
+/* Mise en évidence des clauses importantes */
+.contract-key-clause {
+  background-color: #fef9c3;
+  padding: 8px;
+  border-left: 3px solid #ca8a04;
 }
 
 .contract-header {

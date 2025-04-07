@@ -38,7 +38,8 @@ const contractFormSchema = z.object({
     address: z.string().min(1, { message: 'L\'adresse est requise' }),
     siret: z.string().min(1, { message: 'Le SIRET est requis' }),
     representant: z.string().min(1, { message: 'Le représentant est requis' }),
-    conventionCollective: z.string().optional()
+    conventionCollective: z.string().optional(),
+    sector: z.string().optional()
   }),
   
   // Données de l'employé
@@ -48,7 +49,8 @@ const contractFormSchema = z.object({
     address: z.string().min(1, { message: 'L\'adresse est requise' }),
     birthDate: z.string().optional(),
     nationality: z.string().optional(),
-    socialSecurityNumber: z.string().optional()
+    socialSecurityNumber: z.string().optional(),
+    gender: z.enum(['M', 'F', 'U']).optional()
   }),
   
   // Détails du contrat
@@ -117,7 +119,8 @@ const defaultValues: ContractFormValues = {
     address: '',
     siret: '',
     representant: '',
-    conventionCollective: ''
+    conventionCollective: '',
+    sector: ''
   },
   employee: {
     firstName: '',
@@ -125,7 +128,8 @@ const defaultValues: ContractFormValues = {
     address: '',
     birthDate: '',
     nationality: '',
-    socialSecurityNumber: ''
+    socialSecurityNumber: '',
+    gender: 'U'
   },
   contractDetails: {
     type: 'CDI',
@@ -283,7 +287,7 @@ export function ContractFormPage() {
                 <Tabs value={activeTab} onValueChange={setActiveTab}>
                   <TabsList className="grid grid-cols-4 mb-2 h-7">
                     <TabsTrigger value="company" onClick={() => setActiveTab('company')} className="text-xs py-0.5">
-                      <Building className="h-3 w-3 mr-1" />
+                      <Building className="h-4 w-4 mr-1" />
                       Entreprise
                     </TabsTrigger>
                     <TabsTrigger value="employee" onClick={() => setActiveTab('employee')} className="text-xs py-0.5">
@@ -378,14 +382,70 @@ export function ContractFormPage() {
                   {/* Onglet Salarié */}
                   <TabsContent value="employee" className="space-y-2 mt-0">
                     <div className="space-y-2">
+                      <div className="grid grid-cols-3 gap-2">
+                        <FormField
+                          control={form.control}
+                          name="employee.firstName"
+                          render={({ field }) => (
+                            <FormItem className="space-y-0.5">
+                              <FormLabel className="text-xs">Prénom</FormLabel>
+                              <FormControl>
+                                <Input className="h-7 text-sm" placeholder="Jane" {...field} />
+                              </FormControl>
+                              <FormMessage className="text-xs" />
+                            </FormItem>
+                          )}
+                        />
+                        
+                        <FormField
+                          control={form.control}
+                          name="employee.lastName"
+                          render={({ field }) => (
+                            <FormItem className="space-y-0.5">
+                              <FormLabel className="text-xs">Nom</FormLabel>
+                              <FormControl>
+                                <Input className="h-7 text-sm" placeholder="Doe" {...field} />
+                              </FormControl>
+                              <FormMessage className="text-xs" />
+                            </FormItem>
+                          )}
+                        />
+                        
+                        <FormField
+                          control={form.control}
+                          name="employee.gender"
+                          render={({ field }) => (
+                            <FormItem className="space-y-0.5">
+                              <FormLabel className="text-xs">Genre</FormLabel>
+                              <Select
+                                value={field.value}
+                                onValueChange={(value) => field.onChange(value as 'M' | 'F' | 'U')}
+                              >
+                                <FormControl>
+                                  <SelectTrigger className="h-7 text-sm">
+                                    <SelectValue placeholder="Sélectionner" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="U">Inclusif (L&apos;employé·e)</SelectItem>
+                                  <SelectItem value="M">Masculin (Le salarié)</SelectItem>
+                                  <SelectItem value="F">Féminin (La salariée)</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <FormMessage className="text-xs" />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                      
                       <FormField
                         control={form.control}
-                        name="employee.firstName"
+                        name="employee.address"
                         render={({ field }) => (
                           <FormItem className="space-y-0.5">
-                            <FormLabel className="text-xs">Prénom</FormLabel>
+                            <FormLabel className="text-xs">Adresse</FormLabel>
                             <FormControl>
-                              <Input className="h-7 text-sm" placeholder="Jane" {...field} />
+                              <Input className="h-7 text-sm" placeholder="10 avenue des Champs-Élysées, 75008 Paris" {...field} />
                             </FormControl>
                             <FormMessage className="text-xs" />
                           </FormItem>
@@ -394,74 +454,46 @@ export function ContractFormPage() {
                       
                       <FormField
                         control={form.control}
-                        name="employee.lastName"
+                        name="employee.birthDate"
                         render={({ field }) => (
                           <FormItem className="space-y-0.5">
-                            <FormLabel className="text-xs">Nom</FormLabel>
+                            <FormLabel className="text-xs">Date de naissance</FormLabel>
                             <FormControl>
-                              <Input className="h-7 text-sm" placeholder="Doe" {...field} />
+                              <Input type="date" className="h-7 text-sm" {...field} />
+                            </FormControl>
+                            <FormMessage className="text-xs" />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={form.control}
+                        name="employee.nationality"
+                        render={({ field }) => (
+                          <FormItem className="space-y-0.5">
+                            <FormLabel className="text-xs">Nationalité</FormLabel>
+                            <FormControl>
+                              <Input className="h-7 text-sm" placeholder="Française" {...field} />
+                            </FormControl>
+                            <FormMessage className="text-xs" />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={form.control}
+                        name="employee.socialSecurityNumber"
+                        render={({ field }) => (
+                          <FormItem className="space-y-0.5">
+                            <FormLabel className="text-xs">Numéro de sécurité sociale</FormLabel>
+                            <FormControl>
+                              <Input className="h-7 text-sm" placeholder="1 85 12 34 567 890 12" {...field} />
                             </FormControl>
                             <FormMessage className="text-xs" />
                           </FormItem>
                         )}
                       />
                     </div>
-                    
-                    <FormField
-                      control={form.control}
-                      name="employee.address"
-                      render={({ field }) => (
-                        <FormItem className="space-y-0.5">
-                          <FormLabel className="text-xs">Adresse</FormLabel>
-                          <FormControl>
-                            <Input className="h-7 text-sm" placeholder="10 avenue des Champs-Élysées, 75008 Paris" {...field} />
-                          </FormControl>
-                          <FormMessage className="text-xs" />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={form.control}
-                      name="employee.birthDate"
-                      render={({ field }) => (
-                        <FormItem className="space-y-0.5">
-                          <FormLabel className="text-xs">Date de naissance</FormLabel>
-                          <FormControl>
-                            <Input type="date" className="h-7 text-sm" {...field} />
-                          </FormControl>
-                          <FormMessage className="text-xs" />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={form.control}
-                      name="employee.nationality"
-                      render={({ field }) => (
-                        <FormItem className="space-y-0.5">
-                          <FormLabel className="text-xs">Nationalité</FormLabel>
-                          <FormControl>
-                            <Input className="h-7 text-sm" placeholder="Française" {...field} />
-                          </FormControl>
-                          <FormMessage className="text-xs" />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={form.control}
-                      name="employee.socialSecurityNumber"
-                      render={({ field }) => (
-                        <FormItem className="space-y-0.5">
-                          <FormLabel className="text-xs">Numéro de sécurité sociale</FormLabel>
-                          <FormControl>
-                            <Input className="h-7 text-sm" placeholder="1 85 12 34 567 890 12" {...field} />
-                          </FormControl>
-                          <FormMessage className="text-xs" />
-                        </FormItem>
-                      )}
-                    />
                   </TabsContent>
                   
                   {/* Onglet Contrat */}
@@ -657,9 +689,35 @@ export function ContractFormPage() {
                         render={({ field }) => (
                           <FormItem className="space-y-0.5">
                             <FormLabel className="text-xs">Motif du CDD</FormLabel>
-                            <FormControl>
-                              <Input className="h-7 text-sm" placeholder="Ex: Remplacement d&apos;un salarié absent" {...field} />
-                            </FormControl>
+                            <Select
+                              value={field.value || ""}
+                              onValueChange={field.onChange}
+                            >
+                              <FormControl>
+                                <SelectTrigger className="h-7 text-sm">
+                                  <SelectValue placeholder="Sélectionner un motif" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="Remplacement d'un salarié absent">Remplacement d&apos;un salarié absent</SelectItem>
+                                <SelectItem value="Accroissement temporaire d'activité">Accroissement temporaire d&apos;activité</SelectItem>
+                                <SelectItem value="Emploi saisonnier">Emploi saisonnier</SelectItem>
+                                <SelectItem value="Contrat à objet défini">Contrat à objet défini</SelectItem>
+                                <SelectItem value="Attente recrutement CDI">Attente de l&apos;entrée en service d&apos;un CDI</SelectItem>
+                                <SelectItem value="CDD d'usage">CDD d&apos;usage (secteurs spécifiques)</SelectItem>
+                                <SelectItem value="CDD à terme imprécis">CDD à terme imprécis</SelectItem>
+                                <SelectItem value="custom">Autre motif (à préciser)</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            {field.value === "custom" && (
+                              <div className="mt-1">
+                                <Input 
+                                  className="h-7 text-sm" 
+                                  placeholder="Précisez le motif" 
+                                  onChange={(e) => field.onChange(e.target.value)}
+                                />
+                              </div>
+                            )}
                             <FormMessage className="text-xs" />
                           </FormItem>
                         )}
@@ -880,7 +938,7 @@ export function ContractFormPage() {
                           </FormControl>
                           <div className="space-y-0.5 leading-none">
                             <FormLabel className="text-xs">
-                              Inclure un préambule
+                              Inclure un préambule au contrat
                             </FormLabel>
                           </div>
                         </FormItem>
