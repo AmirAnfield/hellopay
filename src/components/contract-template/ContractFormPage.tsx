@@ -24,16 +24,14 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { 
   Building, 
-  User, 
   ClipboardList,
   Check
 } from 'lucide-react';
 import { ContractTemplate } from './ContractTemplate';
 import { auth } from '@/lib/firebase';
 import { firestore } from '@/lib/firebase/config';
-import { collection, getDocs, doc, getDoc, addDoc, setDoc } from 'firebase/firestore';
+import { collection, getDocs } from 'firebase/firestore';
 import { useToast } from '@/components/ui/use-toast';
-import { Button } from '@/components/ui/button';
 
 // Type pour les entreprises
 interface CompanyOption {
@@ -46,6 +44,21 @@ interface CompanyOption {
     representant: string;
     conventionCollective?: string;
     sector?: string;
+  };
+}
+
+// Type pour les employés
+interface EmployeeOption {
+  value: string;
+  label: string;
+  data: {
+    firstName: string;
+    lastName: string;
+    address: string;
+    birthDate?: string;
+    nationality?: string;
+    socialSecurityNumber?: string;
+    gender?: 'M' | 'F' | 'U';
   };
 }
 
@@ -77,6 +90,7 @@ const contractFormSchema = z.object({
     type: z.enum(['CDI', 'CDD']),
     workingHours: z.number().min(1).max(35),
     position: z.string().min(1, { message: 'Le poste est requis' }),
+    isExecutive: z.boolean().default(false),
     classification: z.string().optional(),
     startDate: z.string().min(1, { message: 'La date de début est requise' }),
     endDate: z.string().optional(),
@@ -114,6 +128,7 @@ const contractFormSchema = z.object({
   // Options d'affichage
   displayOptions: z.object({
     hasPreambule: z.boolean().default(true),
+    showConventionCollective: z.boolean().default(true),
     includeDataProtection: z.boolean().default(true),
     includeImageRights: z.boolean().default(false),
     includeWorkRules: z.boolean().default(false),
@@ -124,7 +139,8 @@ const contractFormSchema = z.object({
     includeTeleworking: z.boolean().default(false),
     teleworkingType: z.enum(['regular', 'occasional', 'mixed']).optional(),
     employerProvidesEquipment: z.boolean().default(false),
-    showSignatures: z.boolean().default(true)
+    showSignatures: z.boolean().default(true),
+    addConventionCollective: z.boolean().default(false)
   })
 });
 
@@ -154,6 +170,7 @@ const defaultValues: ContractFormValues = {
     type: 'CDI',
     workingHours: 35,
     position: '',
+    isExecutive: false,
     classification: '',
     startDate: '',
     endDate: '',
@@ -189,6 +206,7 @@ const defaultValues: ContractFormValues = {
   },
   displayOptions: {
     hasPreambule: true,
+    showConventionCollective: true,
     includeDataProtection: true,
     includeImageRights: false,
     includeWorkRules: false,
@@ -199,14 +217,17 @@ const defaultValues: ContractFormValues = {
     includeTeleworking: false,
     teleworkingType: 'regular',
     employerProvidesEquipment: false,
-    showSignatures: true
+    showSignatures: true,
+    addConventionCollective: false
   }
 };
 
 export function ContractFormPage() {
-  const [activeTab, setActiveTab] = useState('company');
+  const [activeTab, setActiveTab] = useState('identification');
   const [companies, setCompanies] = useState<CompanyOption[]>([]);
   const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
+  const [employees, setEmployees] = useState<EmployeeOption[]>([]);
+  const [selectedEmployee, setSelectedEmployee] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
   
@@ -292,10 +313,75 @@ export function ContractFormPage() {
     }
   };
   
-  // Charger les entreprises au chargement du composant
+  // Fonction pour charger les employés
+  const loadEmployees = async () => {
+    setIsLoading(true);
+    try {
+      // Vérifier si l'utilisateur est connecté
+      console.log("Chargement des employés...");
+      
+      const userId = auth.currentUser?.uid;
+      
+      if (!userId) {
+        console.error("Utilisateur non connecté");
+        return;
+      }
+      
+      console.log("Chargement des employés pour l'utilisateur:", userId);
+      
+      const employeesRef = collection(firestore, `users/${userId}/employees`);
+      console.log("Chemin Firestore:", `users/${userId}/employees`);
+      
+      const snapshot = await getDocs(employeesRef);
+      console.log("Nombre d'employés:", snapshot.size);
+      
+      const employeeOptions: EmployeeOption[] = [];
+      
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        console.log("Employé trouvé:", doc.id, data);
+        employeeOptions.push({
+          value: doc.id,
+          label: `${data.firstName || ""} ${data.lastName || ""}`.trim() || "Employé sans nom",
+          data: {
+            firstName: data.firstName || "",
+            lastName: data.lastName || "",
+            address: data.address || "",
+            birthDate: data.birthDate || "",
+            nationality: data.nationality || "",
+            socialSecurityNumber: data.socialSecurityNumber || "",
+            gender: data.gender || "U",
+          }
+        });
+      });
+      
+      setEmployees(employeeOptions);
+      
+      if (employeeOptions.length > 0) {
+        toast({
+          title: "Employés chargés",
+          description: `${employeeOptions.length} employés disponibles`,
+        });
+      } else {
+        console.log("Aucun employé trouvé");
+      }
+    } catch (error) {
+      console.error("Erreur lors du chargement des employés:", error);
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: "Impossible de charger les employés. Veuillez réessayer."
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  // Charger les entreprises et les employés au chargement du composant
   useEffect(() => {
     loadCompanies();
-  }, []);  // Supprimer toast des dépendances pour éviter des rechargements inutiles
+    loadEmployees();
+  }, []);  
   
   // Fonction pour sélectionner une entreprise et remplir les champs
   const handleCompanySelect = (companyId: string) => {
@@ -310,6 +396,35 @@ export function ContractFormPage() {
       form.setValue('company.representant', selectedCompanyData.data.representant);
       form.setValue('company.conventionCollective', selectedCompanyData.data.conventionCollective || '');
       form.setValue('company.sector', selectedCompanyData.data.sector || '');
+    }
+  };
+  
+  // Fonction pour sélectionner un employé et remplir les champs
+  const handleEmployeeSelect = (employeeId: string) => {
+    setSelectedEmployee(employeeId);
+    
+    const selectedEmployeeData = employees.find(employee => employee.value === employeeId);
+    
+    if (selectedEmployeeData) {
+      form.setValue('employee.firstName', selectedEmployeeData.data.firstName);
+      form.setValue('employee.lastName', selectedEmployeeData.data.lastName);
+      form.setValue('employee.address', selectedEmployeeData.data.address);
+      
+      if (selectedEmployeeData.data.birthDate) {
+        form.setValue('employee.birthDate', selectedEmployeeData.data.birthDate);
+      }
+      
+      if (selectedEmployeeData.data.nationality) {
+        form.setValue('employee.nationality', selectedEmployeeData.data.nationality);
+      }
+      
+      if (selectedEmployeeData.data.socialSecurityNumber) {
+        form.setValue('employee.socialSecurityNumber', selectedEmployeeData.data.socialSecurityNumber);
+      }
+      
+      if (selectedEmployeeData.data.gender) {
+        form.setValue('employee.gender', selectedEmployeeData.data.gender);
+      }
     }
   };
   
@@ -399,141 +514,13 @@ export function ContractFormPage() {
         <div className="flex flex-row flex-1">
           {/* Menu de configuration à gauche - Design amélioré */}
           <div className="w-[400px] min-w-[400px] border-r p-3 h-[calc(100vh-60px)] overflow-y-auto bg-gray-50/50">
-            <div className="mb-4 flex space-x-2">
-              <Button 
-                size="sm" 
-                variant="outline" 
-                className="text-xs"
-                onClick={async () => {
-                  try {
-                    if (!auth.currentUser) {
-                      console.error("Utilisateur non connecté");
-                      return;
-                    }
-                    
-                    const userId = auth.currentUser.uid;
-                    console.log("User ID:", userId);
-                    
-                    // Tester l'accès au document utilisateur
-                    const userDoc = doc(firestore, `users/${userId}`);
-                    const userSnapshot = await getDoc(userDoc);
-                    
-                    if (userSnapshot.exists()) {
-                      console.log("Document utilisateur trouvé:", userSnapshot.data());
-                    } else {
-                      console.log("Document utilisateur introuvable");
-                    }
-                    
-                    // Tester l'accès à la collection companies
-                    const companiesRef = collection(firestore, `users/${userId}/companies`);
-                    const companiesSnapshot = await getDocs(companiesRef);
-                    
-                    console.log("Collection companies accessible, docs trouvés:", companiesSnapshot.size);
-                    
-                    toast({
-                      title: "Test Firestore",
-                      description: `User document: ${userSnapshot.exists() ? "OK" : "Non trouvé"}, Companies: ${companiesSnapshot.size} trouvées`,
-                    });
-                  } catch (error) {
-                    console.error("Erreur lors du test Firestore:", error);
-                    toast({
-                      variant: "destructive",
-                      title: "Erreur Firestore",
-                      description: "Impossible d'accéder à la base de données. Voir console pour détails.",
-                    });
-                  }
-                }}
-              >
-                Tester accès Firestore
-              </Button>
-              
-              <Button 
-                size="sm" 
-                variant="outline" 
-                className="text-xs"
-                onClick={async () => {
-                  try {
-                    if (!auth.currentUser) {
-                      console.error("Utilisateur non connecté");
-                      return;
-                    }
-                    
-                    const userId = auth.currentUser.uid;
-                    console.log("Création d'une entreprise de test pour user:", userId);
-                    
-                    // Créer le document utilisateur s'il n'existe pas
-                    const userDoc = doc(firestore, `users/${userId}`);
-                    const userSnapshot = await getDoc(userDoc);
-                    
-                    if (!userSnapshot.exists()) {
-                      await setDoc(userDoc, {
-                        displayName: auth.currentUser.displayName || "Utilisateur sans nom",
-                        email: auth.currentUser.email,
-                        createdAt: new Date().toISOString()
-                      });
-                      console.log("Document utilisateur créé");
-                    }
-                    
-                    // Créer une entreprise de test
-                    const companyData = {
-                      name: "HelloPay SAS",
-                      siret: "12345678901234",
-                      address: "1 rue de la Paix",
-                      city: "Paris",
-                      postalCode: "75001",
-                      country: "France",
-                      legalRepresentative: "John Doe",
-                      createdAt: new Date().toISOString(),
-                      updatedAt: new Date().toISOString(),
-                      ownerId: userId
-                    };
-                    
-                    const companiesRef = collection(firestore, `users/${userId}/companies`);
-                    const newCompanyRef = await addDoc(companiesRef, companyData);
-                    
-                    console.log("Entreprise de test créée avec ID:", newCompanyRef.id);
-                    
-                    toast({
-                      title: "Entreprise créée",
-                      description: "Une entreprise de test a été créée dans votre compte",
-                    });
-                    
-                    // Recharger les entreprises
-                    loadCompanies();
-                  } catch (error) {
-                    console.error("Erreur lors de la création de l'entreprise:", error);
-                    toast({
-                      variant: "destructive",
-                      title: "Erreur",
-                      description: "Impossible de créer l'entreprise de test. Voir console pour détails.",
-                    });
-                  }
-                }}
-              >
-                Créer entreprise test
-              </Button>
-              
-              <Button 
-                size="sm" 
-                variant="outline" 
-                className="text-xs"
-                onClick={() => loadCompanies()}
-              >
-                Rafraîchir
-              </Button>
-            </div>
-            
             <Form {...form}>
               <form id="contract-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-3 overflow-hidden">
                 <Tabs value={activeTab} onValueChange={setActiveTab}>
-                  <TabsList className="grid grid-cols-4 mb-2 h-7">
-                    <TabsTrigger value="company" onClick={() => setActiveTab('company')} className="text-xs py-0.5">
+                  <TabsList className="grid grid-cols-3 mb-2 h-7">
+                    <TabsTrigger value="identification" onClick={() => setActiveTab('identification')} className="text-xs py-0.5">
                       <Building className="h-4 w-4 mr-1" />
-                      Entreprise
-                    </TabsTrigger>
-                    <TabsTrigger value="employee" onClick={() => setActiveTab('employee')} className="text-xs py-0.5">
-                      <User className="h-3 w-3 mr-1" />
-                      Salarié
+                      Identification
                     </TabsTrigger>
                     <TabsTrigger value="contract" onClick={() => setActiveTab('contract')} className="text-xs py-0.5">
                       <ClipboardList className="h-3 w-3 mr-1" />
@@ -545,220 +532,205 @@ export function ContractFormPage() {
                     </TabsTrigger>
                   </TabsList>
                   
-                  {/* Contenu des onglets avec style amélioré et espaces réduits */}
-                  <TabsContent value="company" className="space-y-2 mt-0">
-                    <div className="space-y-2">
-                      {/* Sélecteur d'entreprise */}
-                      <div className="space-y-1 mb-4">
-                        <FormLabel className="text-xs">Sélectionner une entreprise existante</FormLabel>
-                        <Select
-                          value={selectedCompany || ""}
-                          onValueChange={handleCompanySelect}
-                          disabled={isLoading}
-                        >
-                          <FormControl>
-                            <SelectTrigger className="h-7 text-sm">
-                              <SelectValue 
-                                placeholder={isLoading ? "Chargement..." : "Sélectionner une entreprise"} 
+                  {/* Nouvelle section fusionnée Identification (Entreprise + Employé) */}
+                  <TabsContent value="identification" className="space-y-4 mt-0">
+                    {/* Section Entreprise */}
+                    <div className="border rounded-md p-3 pb-4 space-y-3 bg-white">
+                      <h3 className="font-medium text-sm">Entreprise</h3>
+                      <div className="space-y-3">
+                        {/* Sélecteur d'entreprise */}
+                        <div className="space-y-1">
+                          <FormLabel className="text-xs">Sélectionner une entreprise</FormLabel>
+                          <Select
+                            value={selectedCompany || ""}
+                            onValueChange={handleCompanySelect}
+                            disabled={isLoading}
+                          >
+                            <FormControl>
+                              <SelectTrigger className="h-7 text-sm">
+                                <SelectValue 
+                                  placeholder={isLoading ? "Chargement..." : "Sélectionner une entreprise"} 
+                                />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {companies.map((company) => (
+                                <SelectItem key={company.value} value={company.value}>
+                                  {company.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        
+                        {/* Gestion de la convention collective */}
+                        <div className="space-y-1">
+                          {form.watch('company.conventionCollective') ? (
+                            <div className="space-y-2">
+                              <FormLabel className="text-xs flex items-center justify-between">
+                                <span>Convention collective détectée</span>
+                                <span className="text-green-600 text-[10px]">✓ Trouvée</span>
+                              </FormLabel>
+                              <div className="bg-slate-50 p-2 rounded border text-xs">
+                                {form.watch('company.conventionCollective')}
+                              </div>
+                              <FormField
+                                control={form.control}
+                                name="displayOptions.showConventionCollective"
+                                render={({ field }) => (
+                                  <FormItem className="flex flex-row items-start space-x-2 space-y-0 mt-1">
+                                    <FormControl>
+                                      <Checkbox
+                                        checked={field.value}
+                                        onCheckedChange={field.onChange}
+                                        defaultChecked={true}
+                                      />
+                                    </FormControl>
+                                    <div className="space-y-0.5 leading-none">
+                                      <FormLabel className="text-xs">
+                                        Inclure dans le contrat
+                                      </FormLabel>
+                                    </div>
+                                  </FormItem>
+                                )}
                               />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {companies.map((company) => (
-                              <SelectItem key={company.value} value={company.value}>
-                                {company.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                            </div>
+                          ) : (
+                            <div className="space-y-2">
+                              <FormField
+                                control={form.control}
+                                name="displayOptions.addConventionCollective"
+                                render={({ field }) => (
+                                  <FormItem className="flex flex-row items-start space-x-2 space-y-0">
+                                    <FormControl>
+                                      <Checkbox
+                                        checked={field.value}
+                                        onCheckedChange={field.onChange}
+                                      />
+                                    </FormControl>
+                                    <div className="space-y-0.5 leading-none">
+                                      <FormLabel className="text-xs">
+                                        Ajouter une convention collective
+                                      </FormLabel>
+                                    </div>
+                                  </FormItem>
+                                )}
+                              />
+                              
+                              {form.watch('displayOptions.addConventionCollective') && (
+                                <FormField
+                                  control={form.control}
+                                  name="company.conventionCollective"
+                                  render={({ field }) => (
+                                    <FormItem className="space-y-0.5">
+                                      <Select
+                                        value={field.value || ""}
+                                        onValueChange={field.onChange}
+                                      >
+                                        <FormControl>
+                                          <SelectTrigger className="h-7 text-xs">
+                                            <SelectValue placeholder="Sélectionner une convention" />
+                                          </SelectTrigger>
+                                        </FormControl>
+                                        <SelectContent>
+                                          <SelectItem value="Convention collective nationale des bureaux d'études techniques (SYNTEC)">SYNTEC - Bureaux d&apos;études techniques</SelectItem>
+                                          <SelectItem value="Convention collective nationale de la métallurgie">Métallurgie</SelectItem>
+                                          <SelectItem value="Convention collective nationale du bâtiment">Bâtiment</SelectItem>
+                                          <SelectItem value="Convention collective nationale du commerce et de la distribution">Commerce et distribution</SelectItem>
+                                          <SelectItem value="Convention collective nationale de l'hôtellerie et de la restauration">Hôtellerie et restauration</SelectItem>
+                                          <SelectItem value="Convention collective nationale des transports routiers">Transports routiers</SelectItem>
+                                          <SelectItem value="Convention collective nationale des télécommunications">Télécommunications</SelectItem>
+                                          <SelectItem value="Convention collective nationale des entreprises de propreté">Entreprises de propreté</SelectItem>
+                                          <SelectItem value="Convention collective nationale des industries chimiques">Industries chimiques</SelectItem>
+                                          <SelectItem value="Convention collective nationale de la banque">Banque</SelectItem>
+                                          <SelectItem value="Convention collective nationale des sociétés d'assurances">Assurances</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                      <FormMessage className="text-xs" />
+                                    </FormItem>
+                                  )}
+                                />
+                              )}
+                            </div>
+                          )}
+                        </div>
                       </div>
-                      
-                      <FormField
-                        control={form.control}
-                        name="company.name"
-                        render={({ field }) => (
-                          <FormItem className="space-y-0.5">
-                            <FormLabel className="text-xs">Nom de l&apos;entreprise</FormLabel>
-                            <FormControl>
-                              <Input className="h-7 text-sm" placeholder="HelloPay SAS" {...field} />
-                            </FormControl>
-                            <FormMessage className="text-xs" />
-                          </FormItem>
-                        )}
-                      />
-                      
-                      <FormField
-                        control={form.control}
-                        name="company.address"
-                        render={({ field }) => (
-                          <FormItem className="space-y-0.5">
-                            <FormLabel className="text-xs">Adresse</FormLabel>
-                            <FormControl>
-                              <Input className="h-7 text-sm" placeholder="1 rue de la Paix, 75001 Paris" {...field} />
-                            </FormControl>
-                            <FormMessage className="text-xs" />
-                          </FormItem>
-                        )}
-                      />
-                      
-                      <FormField
-                        control={form.control}
-                        name="company.siret"
-                        render={({ field }) => (
-                          <FormItem className="space-y-0.5">
-                            <FormLabel className="text-xs">SIRET</FormLabel>
-                            <FormControl>
-                              <Input className="h-7 text-sm" placeholder="123 456 789 00012" {...field} />
-                            </FormControl>
-                            <FormMessage className="text-xs" />
-                          </FormItem>
-                        )}
-                      />
-                      
-                      <FormField
-                        control={form.control}
-                        name="company.representant"
-                        render={({ field }) => (
-                          <FormItem className="space-y-0.5">
-                            <FormLabel className="text-xs">Représentant</FormLabel>
-                            <FormControl>
-                              <Input className="h-7 text-sm" placeholder="John Doe, Directeur Général" {...field} />
-                            </FormControl>
-                            <FormMessage className="text-xs" />
-                          </FormItem>
-                        )}
-                      />
-                      
-                      <FormField
-                        control={form.control}
-                        name="company.conventionCollective"
-                        render={({ field }) => (
-                          <FormItem className="space-y-0.5">
-                            <FormLabel className="text-xs">Convention collective (optionnel)</FormLabel>
-                            <FormControl>
-                              <Input className="h-7 text-sm" placeholder="Ex: Convention collective nationale des bureaux d&apos;études techniques" {...field} />
-                            </FormControl>
-                            <FormMessage className="text-xs" />
-                          </FormItem>
-                        )}
-                      />
                     </div>
-                  </TabsContent>
-                  
-                  {/* Onglet Salarié */}
-                  <TabsContent value="employee" className="space-y-2 mt-0">
-                    <div className="space-y-2">
-                      <div className="grid grid-cols-3 gap-2">
-                        <FormField
-                          control={form.control}
-                          name="employee.firstName"
-                          render={({ field }) => (
-                            <FormItem className="space-y-0.5">
-                              <FormLabel className="text-xs">Prénom</FormLabel>
-                              <FormControl>
-                                <Input className="h-7 text-sm" placeholder="Jane" {...field} />
-                              </FormControl>
-                              <FormMessage className="text-xs" />
-                            </FormItem>
-                          )}
-                        />
+                    
+                    {/* Section Employé */}
+                    <div className="border rounded-md p-3 pb-4 space-y-3 bg-white">
+                      <h3 className="font-medium text-sm">Salarié</h3>
+                      <div className="space-y-3">
+                        {/* Sélecteur d'employé */}
+                        <div className="space-y-1">
+                          <FormLabel className="text-xs">Sélectionner un employé</FormLabel>
+                          <Select
+                            value={selectedEmployee || ""}
+                            onValueChange={handleEmployeeSelect}
+                            disabled={isLoading}
+                          >
+                            <FormControl>
+                              <SelectTrigger className="h-7 text-sm">
+                                <SelectValue 
+                                  placeholder={isLoading ? "Chargement..." : "Sélectionner un employé"} 
+                                />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {employees.map((employee) => (
+                                <SelectItem key={employee.value} value={employee.value}>
+                                  {employee.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
                         
-                        <FormField
-                          control={form.control}
-                          name="employee.lastName"
-                          render={({ field }) => (
-                            <FormItem className="space-y-0.5">
-                              <FormLabel className="text-xs">Nom</FormLabel>
-                              <FormControl>
-                                <Input className="h-7 text-sm" placeholder="Doe" {...field} />
-                              </FormControl>
-                              <FormMessage className="text-xs" />
-                            </FormItem>
-                          )}
-                        />
-                        
-                        <FormField
-                          control={form.control}
-                          name="employee.gender"
-                          render={({ field }) => (
-                            <FormItem className="space-y-0.5">
-                              <FormLabel className="text-xs">Genre</FormLabel>
-                              <Select
-                                value={field.value}
-                                onValueChange={(value) => field.onChange(value as 'M' | 'F' | 'U')}
-                              >
-                                <FormControl>
-                                  <SelectTrigger className="h-7 text-sm">
-                                    <SelectValue placeholder="Sélectionner" />
-                                  </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                  <SelectItem value="U">Inclusif (L&apos;employé·e)</SelectItem>
-                                  <SelectItem value="M">Masculin (Le salarié)</SelectItem>
-                                  <SelectItem value="F">Féminin (La salariée)</SelectItem>
-                                </SelectContent>
-                              </Select>
-                              <FormMessage className="text-xs" />
-                            </FormItem>
-                          )}
-                        />
+                        {/* Sélection du genre grammatical */}
+                        <div className="space-y-1">
+                          <FormLabel className="text-xs">Forme grammaticale</FormLabel>
+                          <FormField
+                            control={form.control}
+                            name="employee.gender"
+                            render={({ field }) => (
+                              <div className="grid grid-cols-3 gap-1">
+                                <div 
+                                  className={`border rounded p-2 text-center text-xs cursor-pointer ${field.value === 'M' ? 'bg-primary text-white' : 'bg-slate-50 hover:bg-slate-100'}`}
+                                  onClick={() => field.onChange('M')}
+                                >
+                                  <div>Masculin</div>
+                                  <div className="font-semibold mt-1">Le salarié</div>
+                                </div>
+                                <div 
+                                  className={`border rounded p-2 text-center text-xs cursor-pointer ${field.value === 'F' ? 'bg-primary text-white' : 'bg-slate-50 hover:bg-slate-100'}`}
+                                  onClick={() => field.onChange('F')}
+                                >
+                                  <div>Féminin</div>
+                                  <div className="font-semibold mt-1">La salariée</div>
+                                </div>
+                                <div 
+                                  className={`border rounded p-2 text-center text-xs cursor-pointer ${field.value === 'U' ? 'bg-primary text-white' : 'bg-slate-50 hover:bg-slate-100'}`}
+                                  onClick={() => field.onChange('U')}
+                                >
+                                  <div>Inclusif</div>
+                                  <div className="font-semibold mt-1">L&apos;employé·e</div>
+                                </div>
+                              </div>
+                            )}
+                          />
+                        </div>
                       </div>
-                      
-                      <FormField
-                        control={form.control}
-                        name="employee.address"
-                        render={({ field }) => (
-                          <FormItem className="space-y-0.5">
-                            <FormLabel className="text-xs">Adresse</FormLabel>
-                            <FormControl>
-                              <Input className="h-7 text-sm" placeholder="10 avenue des Champs-Élysées, 75008 Paris" {...field} />
-                            </FormControl>
-                            <FormMessage className="text-xs" />
-                          </FormItem>
-                        )}
-                      />
-                      
-                      <FormField
-                        control={form.control}
-                        name="employee.birthDate"
-                        render={({ field }) => (
-                          <FormItem className="space-y-0.5">
-                            <FormLabel className="text-xs">Date de naissance</FormLabel>
-                            <FormControl>
-                              <Input type="date" className="h-7 text-sm" {...field} />
-                            </FormControl>
-                            <FormMessage className="text-xs" />
-                          </FormItem>
-                        )}
-                      />
-                      
-                      <FormField
-                        control={form.control}
-                        name="employee.nationality"
-                        render={({ field }) => (
-                          <FormItem className="space-y-0.5">
-                            <FormLabel className="text-xs">Nationalité</FormLabel>
-                            <FormControl>
-                              <Input className="h-7 text-sm" placeholder="Française" {...field} />
-                            </FormControl>
-                            <FormMessage className="text-xs" />
-                          </FormItem>
-                        )}
-                      />
-                      
-                      <FormField
-                        control={form.control}
-                        name="employee.socialSecurityNumber"
-                        render={({ field }) => (
-                          <FormItem className="space-y-0.5">
-                            <FormLabel className="text-xs">Numéro de sécurité sociale</FormLabel>
-                            <FormControl>
-                              <Input className="h-7 text-sm" placeholder="1 85 12 34 567 890 12" {...field} />
-                            </FormControl>
-                            <FormMessage className="text-xs" />
-                          </FormItem>
-                        )}
-                      />
+                    </div>
+                    
+                    {/* Bouton de validation */}
+                    <div className="mt-4 text-center">
+                      <button
+                        type="button"
+                        className="w-full bg-primary text-white py-2 rounded-md font-medium hover:bg-primary/90"
+                        onClick={() => setActiveTab('contract')}
+                      >
+                        Suivant - Configurer le contrat
+                      </button>
                     </div>
                   </TabsContent>
                   
@@ -816,6 +788,55 @@ export function ContractFormPage() {
                           </FormItem>
                         )}
                       />
+                      
+                      <FormField
+                        control={form.control}
+                        name="contractDetails.isExecutive"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-start space-x-2 space-y-0">
+                            <FormControl>
+                              <Checkbox
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                              />
+                            </FormControl>
+                            <div className="space-y-0.5 leading-none">
+                              <FormLabel className="text-xs">
+                                Statut cadre
+                              </FormLabel>
+                              <p className="text-[10px] text-muted-foreground">
+                                Le salarié bénéficie du statut cadre
+                              </p>
+                            </div>
+                          </FormItem>
+                        )}
+                      />
+                      
+                      {/* Options pour le préambule et la convention collective */}
+                      <div className="border-t pt-2 mt-2">
+                        <FormField
+                          control={form.control}
+                          name="displayOptions.hasPreambule"
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-start space-x-2 space-y-0">
+                              <FormControl>
+                                <Checkbox
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                />
+                              </FormControl>
+                              <div className="space-y-0.5 leading-none">
+                                <FormLabel className="text-xs">
+                                  Inclure un préambule
+                                </FormLabel>
+                                <p className="text-[10px] text-muted-foreground">
+                                  Recommandé pour contextualiser la relation de travail
+                                </p>
+                              </div>
+                            </FormItem>
+                          )}
+                        />
+                      </div>
                     </div>
                     
                     <FormField
@@ -837,9 +858,9 @@ export function ContractFormPage() {
                       name="contractDetails.classification"
                       render={({ field }) => (
                         <FormItem className="space-y-0.5">
-                          <FormLabel className="text-xs">Classification</FormLabel>
+                          <FormLabel className="text-xs">Classification / Niveau</FormLabel>
                           <FormControl>
-                            <Input className="h-7 text-sm" placeholder="Cadre - Niveau III" {...field} />
+                            <Input className="h-7 text-sm" placeholder="Ex: Niveau III, Échelon 2, Coefficient 300" {...field} />
                           </FormControl>
                           <FormMessage className="text-xs" />
                         </FormItem>
@@ -1191,26 +1212,6 @@ export function ContractFormPage() {
                   
                   {/* Onglet Options */}
                   <TabsContent value="options" className="space-y-2 mt-0">
-                    <FormField
-                      control={form.control}
-                      name="displayOptions.hasPreambule"
-                      render={({ field }) => (
-                        <FormItem className="flex flex-row items-start space-x-2 space-y-0">
-                          <FormControl>
-                            <Checkbox
-                              checked={field.value}
-                              onCheckedChange={field.onChange}
-                            />
-                          </FormControl>
-                          <div className="space-y-0.5 leading-none">
-                            <FormLabel className="text-xs">
-                              Inclure un préambule au contrat
-                            </FormLabel>
-                          </div>
-                        </FormItem>
-                      )}
-                    />
-                    
                     <FormField
                       control={form.control}
                       name="displayOptions.includeDataProtection"

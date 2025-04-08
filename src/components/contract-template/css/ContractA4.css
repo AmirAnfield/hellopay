@@ -44,7 +44,7 @@
 }
 
 .contract-cadre {
-  font-family: 'Times New Roman', Times, serif; /* Police plus "professionnelle" pour les cadres */
+  border-left: 4px solid #4a6da7; /* Bordure latérale pour indiquer statut cadre */
 }
 
 .contract-temps-partiel {

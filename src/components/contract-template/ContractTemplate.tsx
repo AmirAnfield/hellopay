@@ -31,6 +31,7 @@ interface ContractTemplateProps {
     type: 'CDI' | 'CDD';
     workingHours: number;
     position: string;
+    isExecutive?: boolean;
     classification?: string;
     startDate: string;
     endDate?: string; // Pour les CDD
@@ -84,6 +85,7 @@ interface ContractTemplateProps {
     teleworkingType?: 'regular' | 'occasional' | 'mixed';
     employerProvidesEquipment?: boolean; 
     showSignatures?: boolean;
+    showConventionCollective?: boolean;
   };
 }
 
@@ -95,7 +97,7 @@ export function ContractTemplate({
 }: ContractTemplateProps) {
   const isCDI = contractDetails.type === 'CDI';
   const isPartTime = contractDetails.workingHours < 35;
-  const isCadre = contractDetails.classification?.toLowerCase().includes('cadre') || false;
+  const isCadre = contractDetails.isExecutive || false;
   
   // Fonction d'adaptation au genre grammatical
   const genreFlex = (masc: string, fem: string, univ?: string): string => {
@@ -234,9 +236,6 @@ export function ContractTemplate({
             Siège social : {company.address}<br />
             SIRET : {company.siret}<br />
             Représenté par : {company.representant}
-            {company.conventionCollective && (
-              <><br />Convention collective : {company.conventionCollective}</>
-            )}
           </p>
         </div>
         
@@ -247,7 +246,7 @@ export function ContractTemplate({
           <p>
             <strong>{employee.firstName} {employee.lastName}</strong><br />
             Demeurant : {employee.address}<br />
-            {employee.birthDate && <>Né${genreAccord("é")} le : {formatDate(employee.birthDate)}<br /></>}
+            {employee.birthDate && <>Né{genreAccord("e")} le : {formatDate(employee.birthDate)}<br /></>}
             {employee.nationality && <>Nationalité : {employee.nationality}<br /></>}
             {employee.socialSecurityNumber && <>N° SS : {employee.socialSecurityNumber}</>}
           </p>
@@ -256,16 +255,20 @@ export function ContractTemplate({
       
       {displayOptions.hasPreambule && (
         <div className="contract-article avoid-break">
-          <div className="contract-article-title">PRÉAMBULE</div>
-          <div className="contract-article-content">
+          <div className="contract-article-title" style={{ fontSize: '0.85rem' }}>PRÉAMBULE</div>
+          <div className="contract-article-content" style={{ fontSize: '0.85rem', lineHeight: '1.2' }}>
             <p>
               Il a été convenu entre les parties ce qui suit, conformément aux dispositions du Code du travail 
-              et de la convention collective applicable à l'entreprise.
+              {company.conventionCollective && displayOptions.showConventionCollective ? (
+                <> et de la convention collective applicable à l'entreprise : <span className="variable-field">{company.conventionCollective}</span></>
+              ) : (
+                <> et de la convention collective applicable à l'entreprise</>
+              )}.
             </p>
             <p>
               Le présent contrat est conclu dans le contexte suivant :
             </p>
-            <ul style={{ listStyleType: 'disc', paddingLeft: '20px', marginTop: '5px' }}>
+            <ul style={{ listStyleType: 'disc', paddingLeft: '15px', marginTop: '3px' }}>
               <li>Développement des activités de l'entreprise</li>
               <li>Besoin de compétences spécifiques</li>
               <li>Volonté d'établir une relation de travail {isCDI ? 'durable' : 'temporaire'} et mutuellement bénéfique</li>
@@ -311,7 +314,7 @@ export function ContractTemplate({
             {contractDetails.trialPeriod && (
               <>
                 <br /><br />
-                Une période d'essai de <span className="variable-field">{contractDetails.trialPeriodDuration}</span> est prévue. 
+                Une période d'essai de <span className="variable-field">{contractDetails.trialPeriodDuration}</span> est prvue. 
                 Durant cette période, chacune des parties peut rompre le contrat de travail sans indemnité ni préavis, 
                 dans les conditions prévues par la loi.
                 <br />
@@ -332,11 +335,13 @@ export function ContractTemplate({
         <div className="contract-article-title">ARTICLE 3 – FONCTIONS</div>
         <div className="contract-article-content">
           <p>
-            {genreFlex("Le Salarié", "La Salariée", "L'Employé·e")} est engagé{genreAccord("é")} en qualité de <span className="variable-field">{contractDetails.position}</span>,
+            {genreFlex("Le Salarié", "La Salariée", "L'Employé·e")} est engagé{genreAccord("e")} en qualité de <span className="variable-field">{contractDetails.position}</span>,
             {contractDetails.classification && (
               <> relevant de la classification <span className="variable-field">{contractDetails.classification}</span> 
               {contractDetails.coefficient && (<> (coefficient <span className="variable-field">{contractDetails.coefficient}</span>)</>)} selon la convention collective</>
             )}.
+            <br />
+            <strong>Statut : </strong><span className="variable-field">{isCadre ? 'Cadre' : 'Non cadre'}</span>
             <br /><br />
             Dans le cadre de ses fonctions, {genreFlex("le Salarié", "la Salariée", "l'employé·e")} sera notamment chargé{genreAccord("e")} de :
             <br />
@@ -357,7 +362,7 @@ export function ContractTemplate({
             {contractDetails.mobilityClause ? (
               <>
                 <br /><br />
-                <strong>Clause de mobilité :</strong> {genreFlex("Le Salarié", "La Salariée", "L'Employé·e")} pourra être amené{genreAccord("é")} à exercer ses fonctions dans un autre établissement 
+                <strong>Clause de mobilité :</strong> {genreFlex("Le Salarié", "La Salariée", "L'Employé·e")} pourra être amené{genreAccord("e")} à exercer ses fonctions dans un autre établissement 
                 de l'entreprise dans un rayon de <span className="variable-field">{contractDetails.mobilityRadius}</span> km autour du lieu 
                 de travail principal, en fonction des nécessités de service.
                 <br />
@@ -390,7 +395,7 @@ export function ContractTemplate({
                 </>
               )}
               <br /><br />
-              Cette répartition ne pourra être modifiée qu'avec l'accord écrit {genreAccord("de")}, sauf circonstances exceptionnelles, 
+              Cette répartition ne pourra être modifiée qu'avec l'accord écrit de {genreFlex("l'intéressé", "l'intéressée", "la personne")}, sauf circonstances exceptionnelles, 
               et moyennant un délai de prévenance de 7 jours calendaires minimum.
               <br /><br />
               Le recours aux heures complémentaires est possible dans la limite de 1/3 de la durée contractuelle, avec une 
@@ -425,7 +430,7 @@ export function ContractTemplate({
               Ces horaires pourront être modifiés selon les nécessités de service, dans le respect des dispositions légales 
               et conventionnelles relatives à la durée du travail.
               <br /><br />
-              {genreFlex("Le Salarié", "La Salariée", "L'Employé·e")} pourra être amené{genreAccord("é")} à effectuer des heures supplémentaires en fonction des besoins de l'entreprise,
+              {genreFlex("Le Salarié", "La Salariée", "L'Employé·e")} pourra être amené{genreAccord("e")} à effectuer des heures supplémentaires en fonction des besoins de l'entreprise,
               dans le respect des dispositions légales et conventionnelles. Ces heures seront indemnisées conformément à la législation en vigueur.
             </p>
           )}
@@ -522,7 +527,7 @@ export function ContractTemplate({
             )}
             <br /><br />
             Les dates de congés seront déterminées en accord avec l'employeur, en fonction des nécessités du service 
-            et en tenant compte, dans la mesure du possible, des souhaits {genreAccord("de")}.
+            et en tenant compte, dans la mesure du possible, des souhaits de {genreFlex("l'intéressé", "l'intéressée", "la personne")}.
             {contractDetails.customLeaves && contractDetails.customLeavesDetails && (
               <>
                 <br /><br />
@@ -564,7 +569,7 @@ export function ContractTemplate({
           ) : (
             <p>
               Le contrat ne peut être rompu avant son terme que dans les cas suivants : accord commun, faute grave, 
-              force majeure, inaptitude constatée par le médecin du travail, ou embauche {genreAccord("de")} en CDI.
+              force majeure, inaptitude constatée par le médecin du travail, ou embauche de {genreFlex("l'intéressé", "l'intéressée", "la personne")} en CDI.
               <br /><br />
               La rupture anticipée du contrat en dehors de ces cas entraîne, selon la partie à l'origine de la rupture :
               <br />
@@ -608,7 +613,7 @@ export function ContractTemplate({
             <p>
               {genreFlex("Le Salarié", "La Salariée", "L'Employé·e")} s'engage à respecter les consignes internes de l'entreprise, notamment 
               {displayOptions.includeInternalRules && (
-                <> le règlement intérieur dont {genreAccord("il")} reconnaît avoir pris connaissance</>
+                <> le règlement intérieur dont {genrePronom()} reconnaît avoir pris connaissance</>
               )}
               {(displayOptions.includeInternalRules && displayOptions.includeWorkClothes) && (
                 <> et</>
@@ -657,7 +662,7 @@ export function ContractTemplate({
                   <strong>Propriété intellectuelle :</strong> Toute création (écrite, visuelle, technique, informatique) réalisée par {genreFlex("le Salarié", "la Salariée", "l'employé·e")} 
                   dans le cadre de son contrat de travail appartient intégralement à l'Employeur, conformément aux dispositions du Code de la propriété intellectuelle.
                   <br />
-                  {genreFlex("Le Salarié", "La Salariée", "L'Employé·e")} cède à l'Employeur tous les droits patrimoniaux sur les œuvres qu'{genreAccord("il")} pourrait être amené{genreAccord("é")} à créer
+                  {genreFlex("Le Salarié", "La Salariée", "L'Employé·e")} cède à l'Employeur tous les droits patrimoniaux sur les œuvres que {genrePronom()} pourrait être amené{genreAccord("e")} à créer
                   dans le cadre de ses fonctions, et ce pour toute la durée légale de protection du droit d'auteur.
                 </>
               )}
@@ -690,7 +695,7 @@ export function ContractTemplate({
                   <br /><br />
                   <strong>Clause de non-sollicitation :</strong> {genreFlex("Le Salarié", "La Salariée", "L'Employé·e")} s'engage, pendant une période de 12 mois suivant la cessation 
                   de son contrat de travail, à ne pas solliciter directement ou indirectement les clients, collaborateurs ou fournisseurs
-                  de l'Employeur avec lesquels {genreAccord("il")} a été en relation dans le cadre de ses fonctions.
+                  de l'Employeur avec lesquels {genrePronom()} a été en relation dans le cadre de ses fonctions.
                 </>
               )}
             </p>
@@ -714,9 +719,9 @@ export function ContractTemplate({
               <strong>Organisation :</strong> Les jours, horaires et modalités précises du télétravail feront l'objet d'un accord spécifique 
               entre les parties. {genreFlex("Le Salarié", "La Salariée", "L'Employé·e")} devra être joignable et disponible pendant les horaires habituels de travail.
               <br /><br />
-              <strong>Équipements :</strong> {displayOptions.employerProvidesEquipment ? 
-                `L'employeur fournira ${genreAccord("à")} {genreAccord("la")} {genreAccord("l'employé·e")} les équipements nécessaires à l'exercice de ses fonctions en télétravail (ordinateur, téléphone, etc.).` :
-                `${genreFlex("Le Salarié", "La Salariée", "L'Employé·e")} utilisera ses propres équipements pour l'exercice de ses fonctions en télétravail.`
+              <strong>Équipements :</strong> {displayOptions.employerProvidesEquipment 
+                ? <>L&apos;employeur fournira à {genreFlex("l'intéressé", "l'intéressée", "la personne")} les équipements nécessaires à l&apos;exercice de ses fonctions en télétravail (ordinateur, téléphone, etc.).</>
+                : <>{genreFlex("Le Salarié", "La Salariée", "L'Employé·e")} utilisera ses propres équipements pour l&apos;exercice de ses fonctions en télétravail.</>
               }
               <br /><br />
               <strong>Frais :</strong> L'Employeur prendra en charge les coûts directement engendrés par le télétravail, notamment 
@@ -761,7 +766,7 @@ export function ContractTemplate({
       )}
       
       <div className="contract-footer">
-        Le présent contrat est établi en deux exemplaires originaux dont un est remis {genreAccord("à")} {genreAccord("la")} {genreAccord("l'employé·e")}.
+        Le présent contrat est établi en deux exemplaires originaux dont un est remis à {genreFlex("l'intéressé", "l'intéressée", "la personne")}.
       </div>
     </div>
   );
