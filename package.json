@@ -1,6 +1,6 @@
 {
   "name": "hellopay",
-  "version": "0.51.0",
+  "version": "0.59.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -49,6 +49,7 @@
     "decimal.js": "^10.5.0",
     "firebase": "^11.6.0",
     "firebase-admin": "^13.2.0",
+    "html2canvas": "^1.4.1",
     "jspdf": "^3.0.1",
     "jspdf-autotable": "^5.0.2",
     "jszip": "^3.10.1",
