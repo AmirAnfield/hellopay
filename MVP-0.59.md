@@ -4,27 +4,27 @@ Suite à l'audit du projet HelloPay, cette version a pour objectif d'améliorer 
 
 ## 1. Consolidation des services
 
-- [ ] Regrouper les services liés aux articles de contrat
-- [ ] Unifier les services d'entreprise et d'employé
-- [ ] Centraliser la logique commune
+- [x] Regrouper les services liés aux articles de contrat
+- [x] Unifier les services d'entreprise et d'employé
+- [x] Centraliser la logique commune
 
 ## 2. Standardisation des nommages
 
-- [ ] Adopter une convention unique (kebab-case) pour tous les fichiers de services
-- [ ] Normaliser les noms d'exportation/importation
-- [ ] Mettre à jour les imports dans les composants
+- [x] Adopter une convention unique (kebab-case) pour tous les fichiers de services
+- [x] Normaliser les noms d'exportation/importation
+- [x] Mettre à jour les imports dans les composants
 
 ## 3. Réduction de la duplication
 
-- [ ] Factoriser les fonctions communes dans les composants dashboard
-- [ ] Créer des hooks pour les logiques répétitives (fetchCompanies, fetchEmployees, etc.)
-- [ ] Éliminer les doublons de code
+- [x] Factoriser les fonctions communes dans les composants dashboard
+- [x] Créer des hooks pour les logiques répétitives (fetchCompanies, fetchEmployees, etc.)
+- [x] Éliminer les doublons de code
 
 ## 4. Nettoyage des fichiers obsolètes
 
-- [ ] Archiver correctement les versions antérieures
-- [ ] Nettoyer le dossier /archive
-- [ ] Documenter l'historique des versions
+- [x] Archiver correctement les versions antérieures
+- [x] Nettoyer le dossier /archive
+- [x] Documenter l'historique des versions
 
 ## 5. Optimisation des performances
 
