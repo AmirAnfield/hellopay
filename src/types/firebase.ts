@@ -115,12 +115,17 @@ export interface Certificate extends FirestoreDocument {
   companyId: string;
   userId: string;  // créateur
   
-  type: 'attestation-travail';  // pour l'instant, un seul type
+  type: 'attestation-travail' | 'attestation-salaire' | 'attestation-presence';
+  
+  title: string;
   
   status: 'draft' | 'generated' | 'signed';
   
   // Contenu brut de l'attestation si besoin
   content: string;
+  
+  // Options spécifiques à chaque type d'attestation
+  options?: Record<string, unknown>;
   
   // URL du PDF stocké dans Firebase Storage
   pdfUrl?: string;

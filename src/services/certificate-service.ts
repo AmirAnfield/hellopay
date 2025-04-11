@@ -1,7 +1,7 @@
 import { auth } from '@/lib/firebase';
 import { getDocument, getDocuments, setDocument, updateDocument, deleteDocument } from './firestore-service';
-import { getEmployee, Employee } from './employee-service';
-import { getCompany, Company } from './company-service';
+import { Employee } from './employee-service';
+import { Company } from './company-service';
 import { uploadCertificate } from './storage-service';
 import { Certificate } from '@/types/firebase';
 import { jsPDF } from 'jspdf';
@@ -13,8 +13,27 @@ import 'jspdf-autotable';
 export interface CertificateInput {
   employeeId: string;
   companyId: string;
-  type: 'attestation-travail';
+  type: 'attestation-travail' | 'attestation-salaire' | 'attestation-presence';
   content?: string;
+  options?: Record<string, unknown>;
+  title?: string;
+}
+
+// Fonctions pour récupérer les données d'un employé et d'une entreprise
+export async function getEmployee(companyId: string, employeeId: string): Promise<Employee | null> {
+  if (!auth.currentUser) {
+    throw new Error("Utilisateur non authentifié");
+  }
+  
+  return getDocument<Employee>(`users/${auth.currentUser.uid}/employees`, employeeId);
+}
+
+export async function getCompany(companyId: string): Promise<Company | null> {
+  if (!auth.currentUser) {
+    throw new Error("Utilisateur non authentifié");
+  }
+  
+  return getDocument<Company>(`users/${auth.currentUser.uid}/companies`, companyId);
 }
 
 /**
@@ -27,7 +46,7 @@ export async function getEmployeeCertificates(companyId: string, employeeId: str
   
   try {
     // Vérifier si la collection certificates existe dans Firestore
-    const certs = await getDocuments<Certificate>('certificates', {
+    const certs = await getDocuments<Certificate>(`users/${auth.currentUser.uid}/certificates`, {
       where: [
         { field: 'employeeId', operator: '==', value: employeeId },
         { field: 'companyId', operator: '==', value: companyId }
@@ -68,26 +87,56 @@ export async function createCertificate(data: CertificateInput): Promise<string>
     throw new Error("Utilisateur non authentifié");
   }
   
+  console.log("Création d'un nouveau certificat avec les données:", {
+    employeeId: data.employeeId,
+    companyId: data.companyId,
+    type: data.type,
+    title: data.title,
+    optionsSize: data.options ? Object.keys(data.options).length : 0
+  });
+  
   try {
-    // Créer le certificat dans Firestore sans typage explicite
-    // Les timestamps seront ajoutés automatiquement par setDocument
+    // Générer un titre par défaut si non fourni
+    const title = data.title || `Attestation - ${data.type.split('-')[1]}`;
+    
+    // Nettoyer les options pour éviter les valeurs undefined
+    let cleanOptions: Record<string, unknown> = {};
+    if (data.options) {
+      cleanOptions = { ...data.options };
+      Object.keys(cleanOptions).forEach(key => {
+        if (cleanOptions[key] === undefined) {
+          delete cleanOptions[key];
+        }
+      });
+    }
+    
+    // Créer le certificat dans Firestore
     const certificateData = {
       employeeId: data.employeeId,
       companyId: data.companyId,
       type: data.type,
+      title: title,
       content: data.content || '',
+      options: cleanOptions,
       status: 'draft',
       userId: auth.currentUser.uid,
       createdBy: auth.currentUser.uid,
-      pdfUrl: ''
+      pdfUrl: '',
+      createdAt: new Date()
     };
     
-    // Vérifier si la collection certificates existe et la créer si nécessaire
-    const certificateId = await setDocument('certificates', certificateData);
+    console.log("Données du certificat à enregistrer:", certificateData);
+    
+    // Utiliser la collection appropriée de l'utilisateur
+    const collectionPath = `users/${auth.currentUser.uid}/certificates`;
+    console.log("Chemin de collection:", collectionPath);
+    
+    const certificateId = await setDocument(collectionPath, certificateData);
+    console.log("Certificat créé avec succès, ID:", certificateId);
     
     return certificateId;
   } catch (error) {
-    console.error("Erreur lors de la création du certificat:", error);
+    console.error("Erreur détaillée lors de la création du certificat:", error);
     throw new Error("Impossible de créer le certificat. Veuillez réessayer.");
   }
 }
@@ -108,6 +157,42 @@ export async function updateCertificateStatus(certificateId: string, status: 'dr
   
   const updateData: Partial<Certificate> = { status };
   if (pdfUrl) updateData.pdfUrl = pdfUrl;
+  
+  // Mettre à jour le certificat
+  await updateDocument(
+    `users/${auth.currentUser.uid}/certificates`, 
+    certificateId, 
+    updateData
+  );
+}
+
+/**
+ * Mettre à jour les données d'un certificat
+ */
+export async function updateCertificate(certificateId: string, data: Partial<CertificateInput>): Promise<void> {
+  if (!auth.currentUser) {
+    throw new Error("Utilisateur non authentifié");
+  }
+  
+  // Vérifier que le certificat existe
+  const certificate = await getCertificate(certificateId);
+  if (!certificate) {
+    throw new Error("Certificat non trouvé");
+  }
+  
+  // Préparer les données à mettre à jour
+  const updateData: Partial<Certificate> = {};
+  
+  if (data.title) updateData.title = data.title;
+  if (data.content) updateData.content = data.content;
+  
+  if (data.options) {
+    // Fusion des options existantes avec les nouvelles
+    updateData.options = {
+      ...certificate.options,
+      ...data.options
+    };
+  }
   
   // Mettre à jour le certificat
   await updateDocument(
@@ -387,6 +472,349 @@ export async function generateWorkCertificatePDF(certificateId: string): Promise
   // Convertir en Blob
   const pdfBlob = doc.output('blob');
   const file = new File([pdfBlob], `attestation_travail_${employee.id}.pdf`, { type: 'application/pdf' });
+  
+  // Upload du fichier PDF
+  const downloadUrl = await uploadCertificate(file, certificate.employeeId, certificate.id, certificate.companyId);
+  
+  // Mettre à jour le certificat avec l'URL du PDF
+  await updateCertificateStatus(certificateId, 'generated', downloadUrl);
+  
+  return downloadUrl;
+}
+
+/**
+ * Générer un PDF pour un certificat en fonction de son type
+ */
+export async function generateCertificatePDF(certificateId: string): Promise<string> {
+  if (!auth.currentUser) {
+    throw new Error("Utilisateur non authentifié");
+  }
+  
+  console.log("Début de génération du PDF pour certificat:", certificateId);
+  
+  // Récupérer le certificat
+  const certificate = await getCertificate(certificateId);
+  console.log("Certificat récupéré:", certificate);
+  
+  if (!certificate) {
+    throw new Error("Certificat non trouvé");
+  }
+  
+  // Vérifier que le type du certificat est valide
+  if (!certificate.type || 
+      !['attestation-travail', 'attestation-salaire', 'attestation-presence'].includes(certificate.type)) {
+    throw new Error(`Type d'attestation invalide ou manquant: ${certificate.type}`);
+  }
+  
+  // Générer le PDF selon le type d'attestation
+  try {
+    console.log("Génération du PDF pour le type:", certificate.type);
+    let url;
+    
+    switch (certificate.type) {
+      case 'attestation-travail':
+        url = await generateWorkCertificatePDF(certificateId);
+        break;
+      case 'attestation-salaire':
+        url = await generateSalaryCertificatePDF(certificateId);
+        break;
+      case 'attestation-presence':
+        url = await generatePresenceCertificatePDF(certificateId);
+        break;
+      default:
+        throw new Error(`Type d'attestation non pris en charge: ${certificate.type}`);
+    }
+    
+    console.log("PDF généré avec succès, URL:", url);
+    return url;
+  } catch (error) {
+    console.error("Erreur lors de la génération du PDF:", error);
+    throw error; // Rethrow pour permettre la gestion en amont
+  }
+}
+
+/**
+ * Générer un PDF d'attestation de salaire
+ */
+export async function generateSalaryCertificatePDF(certificateId: string): Promise<string> {
+  if (!auth.currentUser) {
+    throw new Error("Utilisateur non authentifié");
+  }
+  
+  // Récupérer le certificat
+  const certificate = await getCertificate(certificateId);
+  if (!certificate) {
+    throw new Error("Certificat non trouvé");
+  }
+  
+  // Récupérer les données de l'entreprise et de l'employé
+  const company = await getCompany(certificate.companyId);
+  if (!company) {
+    throw new Error("Entreprise non trouvée");
+  }
+  
+  const employee = await getEmployee(certificate.companyId, certificate.employeeId);
+  if (!employee) {
+    throw new Error("Employé non trouvé");
+  }
+  
+  // Extraire les options spécifiques
+  const options = certificate.options || {};
+  const grossSalary = options.grossSalary as number || 0;
+  const netSalary = options.netSalary as number || 0;
+  const taxableSalary = options.taxableSalary as number || 0;
+  const startDate = options.startDate as string || '';
+  const endDate = options.endDate as string || '';
+  const salaryDetail = options.salaryDetail as string || 'detailed';
+  const language = options.language as string || 'fr';
+  
+  // Générer le PDF avec jsPDF
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4'
+  });
+  
+  // Variables pour le positionnement
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const marginLeft = 20;
+  const marginTop = 20;
+  const contentWidth = pageWidth - (marginLeft * 2);
+  
+  // Entête
+  doc.setFontSize(18);
+  doc.setFont('helvetica', 'bold');
+  doc.text(company.name, pageWidth / 2, marginTop, { align: 'center' });
+  
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`${company.address}, ${company.postalCode} ${company.city}`, pageWidth / 2, marginTop + 10, { align: 'center' });
+  doc.text(`SIRET: ${company.siret}`, pageWidth / 2, marginTop + 15, { align: 'center' });
+  
+  // Titre
+  doc.setFontSize(16);
+  doc.setFont('helvetica', 'bold');
+  doc.text('ATTESTATION DE SALAIRE', pageWidth / 2, marginTop + 30, { align: 'center' });
+  
+  // Contenu principal
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'normal');
+  
+  let yPosition = marginTop + 45;
+  
+  // Date du jour
+  const today = new Date();
+  const formattedDate = today.toLocaleDateString(language === 'fr' ? 'fr-FR' : 'en-US', {
+    day: 'numeric',
+    month: 'long', 
+    year: 'numeric'
+  });
+  
+  // Introduction
+  doc.text(`Je soussigné(e), représentant légal de l'entreprise ${company.name}, atteste que :`, marginLeft, yPosition);
+  
+  // Informations de l'employé
+  yPosition += 15;
+  doc.setFont('helvetica', 'bold');
+  doc.text(`${employee.firstName} ${employee.lastName}`, marginLeft + 10, yPosition);
+  doc.setFont('helvetica', 'normal');
+  
+  yPosition += 10;
+  doc.text(`Employé(e) depuis le ${startDate ? new Date(startDate).toLocaleDateString(language === 'fr' ? 'fr-FR' : 'en-US', { 
+    day: 'numeric', month: 'long', year: 'numeric' 
+  }) : "N/A"}`, marginLeft + 10, yPosition);
+  
+  yPosition += 5;
+  doc.text(`En qualité de ${employee.position || "employé(e)"}`, marginLeft + 10, yPosition);
+  
+  // Informations salariales
+  yPosition += 15;
+  doc.text(`A perçu les rémunérations suivantes au cours de la période du ${startDate ? new Date(startDate).toLocaleDateString(language === 'fr' ? 'fr-FR' : 'en-US', { 
+    day: 'numeric', month: 'long', year: 'numeric' 
+  }) : "N/A"} au ${endDate ? new Date(endDate).toLocaleDateString(language === 'fr' ? 'fr-FR' : 'en-US', { 
+    day: 'numeric', month: 'long', year: 'numeric' 
+  }) : "N/A"} :`, marginLeft, yPosition);
+  
+  // Détails du salaire
+  yPosition += 10;
+  
+  if (salaryDetail === 'detailed') {
+    doc.text(`Salaire brut mensuel: ${grossSalary.toLocaleString()} €`, marginLeft + 10, yPosition);
+    yPosition += 5;
+    doc.text(`Salaire net mensuel: ${netSalary.toLocaleString()} €`, marginLeft + 10, yPosition);
+    yPosition += 5;
+    doc.text(`Salaire net imposable: ${taxableSalary.toLocaleString()} €`, marginLeft + 10, yPosition);
+  } else {
+    doc.text(`Salaire net mensuel: ${netSalary.toLocaleString()} €`, marginLeft + 10, yPosition);
+  }
+  
+  // Phrase de conclusion
+  yPosition += 15;
+  doc.text("Cette attestation est délivrée à la demande de l'intéressé(e) pour servir et valoir ce que de droit.", marginLeft, yPosition, {
+    maxWidth: contentWidth
+  });
+  
+  // Signature
+  yPosition += 30;
+  doc.text(`Fait à ${company.city}, le ${formattedDate}`, pageWidth - marginLeft, yPosition, { align: 'right' });
+  
+  yPosition += 15;
+  doc.text("Signature et cachet de l'entreprise", pageWidth - marginLeft, yPosition, { align: 'right' });
+  
+  // Pied de page
+  doc.setFontSize(8);
+  doc.text("Document généré automatiquement par HelloPay - Ne pas modifier", pageWidth / 2, doc.internal.pageSize.getHeight() - 10, { align: 'center' });
+  
+  // Convertir en Blob
+  const pdfBlob = doc.output('blob');
+  const file = new File([pdfBlob], `attestation_salaire_${employee.id}.pdf`, { type: 'application/pdf' });
+  
+  // Upload du fichier PDF
+  const downloadUrl = await uploadCertificate(file, certificate.employeeId, certificate.id, certificate.companyId);
+  
+  // Mettre à jour le certificat avec l'URL du PDF
+  await updateCertificateStatus(certificateId, 'generated', downloadUrl);
+  
+  return downloadUrl;
+}
+
+/**
+ * Générer un PDF d'attestation de présence
+ */
+export async function generatePresenceCertificatePDF(certificateId: string): Promise<string> {
+  if (!auth.currentUser) {
+    throw new Error("Utilisateur non authentifié");
+  }
+  
+  // Récupérer le certificat
+  const certificate = await getCertificate(certificateId);
+  if (!certificate) {
+    throw new Error("Certificat non trouvé");
+  }
+  
+  // Récupérer les données de l'entreprise et de l'employé
+  const company = await getCompany(certificate.companyId);
+  if (!company) {
+    throw new Error("Entreprise non trouvée");
+  }
+  
+  const employee = await getEmployee(certificate.companyId, certificate.employeeId);
+  if (!employee) {
+    throw new Error("Employé non trouvé");
+  }
+  
+  // Extraire les options spécifiques
+  const options = certificate.options || {};
+  const startDate = options.startDate as string || '';
+  const endDate = options.endDate as string || '';
+  const showAddress = options.showAddress as boolean || false;
+  const showRegularAttendance = options.showRegularAttendance as boolean || true;
+  const showAbsences = options.showAbsences as boolean || false;
+  const absenceText = options.absenceText as string || '';
+  
+  // Générer le PDF avec jsPDF
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4'
+  });
+  
+  // Variables pour le positionnement
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const marginLeft = 20;
+  const marginTop = 20;
+  const contentWidth = pageWidth - (marginLeft * 2);
+  
+  // Entête
+  doc.setFontSize(18);
+  doc.setFont('helvetica', 'bold');
+  doc.text(company.name, pageWidth / 2, marginTop, { align: 'center' });
+  
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`${company.address}, ${company.postalCode} ${company.city}`, pageWidth / 2, marginTop + 10, { align: 'center' });
+  doc.text(`SIRET: ${company.siret}`, pageWidth / 2, marginTop + 15, { align: 'center' });
+  
+  // Titre
+  doc.setFontSize(16);
+  doc.setFont('helvetica', 'bold');
+  doc.text('ATTESTATION DE PRÉSENCE', pageWidth / 2, marginTop + 30, { align: 'center' });
+  
+  // Contenu principal
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'normal');
+  
+  let yPosition = marginTop + 45;
+  
+  // Date du jour
+  const today = new Date();
+  const formattedDate = today.toLocaleDateString('fr-FR', {
+    day: 'numeric',
+    month: 'long', 
+    year: 'numeric'
+  });
+  
+  // Introduction
+  doc.text(`Je soussigné(e), représentant légal de l'entreprise ${company.name}, certifie que :`, marginLeft, yPosition);
+  
+  // Informations de l'employé
+  yPosition += 15;
+  doc.setFont('helvetica', 'bold');
+  doc.text(`${employee.firstName} ${employee.lastName}`, marginLeft + 10, yPosition);
+  doc.setFont('helvetica', 'normal');
+  
+  // Afficher l'adresse si demandé
+  if (showAddress && employee.address) {
+    yPosition += 5;
+    doc.text(`Demeurant à ${employee.address}, ${employee.postalCode} ${employee.city}`, marginLeft + 10, yPosition);
+  }
+  
+  // Période de présence
+  yPosition += 10;
+  doc.text(`A été présent(e) dans notre entreprise du ${startDate ? new Date(startDate).toLocaleDateString('fr-FR', { 
+    day: 'numeric', month: 'long', year: 'numeric' 
+  }) : "N/A"} au ${endDate ? new Date(endDate).toLocaleDateString('fr-FR', { 
+    day: 'numeric', month: 'long', year: 'numeric' 
+  }) : "N/A"},`, marginLeft, yPosition);
+  
+  yPosition += 5;
+  doc.text(`En qualité de ${employee.position || "employé(e)"}, sous contrat ${employee.contractType || "CDI"}.`, marginLeft, yPosition);
+  
+  // Assiduité
+  if (showRegularAttendance) {
+    yPosition += 10;
+    doc.text("Durant cette période, le salarié a exercé ses fonctions de manière régulière.", marginLeft, yPosition);
+  }
+  
+  // Absences
+  if (showAbsences && absenceText) {
+    yPosition += 10;
+    doc.text(`Absences constatées : ${absenceText}`, marginLeft, yPosition);
+  } else if (showRegularAttendance) {
+    yPosition += 5;
+    doc.text("Aucune absence significative n'a été constatée sur cette période, hormis les congés légaux.", marginLeft, yPosition);
+  }
+  
+  // Phrase de conclusion
+  yPosition += 15;
+  doc.text("Cette attestation est remise à la demande de l'intéressé(e) pour servir et valoir ce que de droit.", marginLeft, yPosition, {
+    maxWidth: contentWidth
+  });
+  
+  // Signature
+  yPosition += 30;
+  doc.text(`Fait à ${company.city}, le ${formattedDate}`, pageWidth - marginLeft, yPosition, { align: 'right' });
+  
+  yPosition += 15;
+  doc.text("Signature et cachet de l'entreprise", pageWidth - marginLeft, yPosition, { align: 'right' });
+  
+  // Pied de page
+  doc.setFontSize(8);
+  doc.text("Document généré automatiquement par HelloPay - Ne pas modifier", pageWidth / 2, doc.internal.pageSize.getHeight() - 10, { align: 'center' });
+  
+  // Convertir en Blob
+  const pdfBlob = doc.output('blob');
+  const file = new File([pdfBlob], `attestation_presence_${employee.id}.pdf`, { type: 'application/pdf' });
   
   // Upload du fichier PDF
   const downloadUrl = await uploadCertificate(file, certificate.employeeId, certificate.id, certificate.companyId);

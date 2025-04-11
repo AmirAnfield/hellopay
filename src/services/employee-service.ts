@@ -102,9 +102,9 @@ export async function getUserEmployees(userId?: string): Promise<Employee[]> {
   try {
     // Si userId n'est pas fourni, utiliser l'utilisateur authentifié
     if (!userId) {
-      if (!auth.currentUser) {
-        throw new Error("Utilisateur non authentifié");
-      }
+  if (!auth.currentUser) {
+    throw new Error("Utilisateur non authentifié");
+  }
       userId = auth.currentUser.uid;
     }
 
@@ -236,18 +236,18 @@ export async function getCompanyEmployees(companyId: string, userId?: string): P
   try {
     // Si userId n'est pas fourni, utiliser l'utilisateur authentifié
     if (!userId) {
-      if (!auth.currentUser) {
-        throw new Error("Utilisateur non authentifié");
+  if (!auth.currentUser) {
+    throw new Error("Utilisateur non authentifié");
       }
       userId = auth.currentUser.uid;
-    }
-    
+  }
+  
     // Vérifier que l'entreprise existe
     const company = await getCompanyDetails(companyId, userId);
-    if (!company) {
-      throw new Error("Entreprise non trouvée");
-    }
-
+  if (!company) {
+    throw new Error("Entreprise non trouvée");
+  }
+  
     // Récupérer les employés de l'entreprise avec tri par nom puis prénom
     const employeesRef = collection(db, `users/${userId}/employees`);
     const employeesQuery = query(
@@ -320,12 +320,12 @@ export async function createEmployee(employeeData: EmployeeInput, userId?: strin
   try {
     // Si userId n'est pas fourni, utiliser l'utilisateur authentifié
     if (!userId) {
-      if (!auth.currentUser) {
-        throw new Error("Utilisateur non authentifié");
+  if (!auth.currentUser) {
+    throw new Error("Utilisateur non authentifié");
       }
       userId = auth.currentUser.uid;
-    }
-    
+  }
+
     // Préparation des données de l'employé
     const data = {
       ...employeeData,
@@ -364,24 +364,24 @@ export async function updateEmployee(employeeId: string, employeeData: Partial<E
   try {
     // Si userId n'est pas fourni, utiliser l'utilisateur authentifié
     if (!userId) {
-      if (!auth.currentUser) {
-        throw new Error("Utilisateur non authentifié");
-      }
+  if (!auth.currentUser) {
+    throw new Error("Utilisateur non authentifié");
+  }
       userId = auth.currentUser.uid;
-    }
-    
-    // Vérifier que l'employé existe
+  }
+  
+  // Vérifier que l'employé existe
     const existingEmployee = await getEmployeeDetails(employeeId, userId);
     if (!existingEmployee) {
-      throw new Error("Employé non trouvé");
+    throw new Error("Employé non trouvé");
+  }
+  
+    // Si le numéro de sécurité sociale est modifié, vérifier qu'il est valide et unique
+  if (employeeData.socialSecurityNumber) {
+    if (!/^\d{15}$/.test(employeeData.socialSecurityNumber)) {
+      throw new Error("Le numéro de sécurité sociale doit comporter exactement 15 chiffres");
     }
     
-    // Si le numéro de sécurité sociale est modifié, vérifier qu'il est valide et unique
-    if (employeeData.socialSecurityNumber) {
-      if (!/^\d{15}$/.test(employeeData.socialSecurityNumber)) {
-        throw new Error("Le numéro de sécurité sociale doit comporter exactement 15 chiffres");
-      }
-      
       // Vérifier que ce numéro n'est pas utilisé par un autre employé
       const employeesRef = collection(db, `users/${userId}/employees`);
       const duplicateQuery = query(
@@ -392,13 +392,13 @@ export async function updateEmployee(employeeId: string, employeeData: Partial<E
       
       const snapshot = await getDocs(duplicateQuery);
       if (!snapshot.empty) {
-        throw new Error(`Un employé avec le numéro de sécurité sociale ${employeeData.socialSecurityNumber} existe déjà`);
-      }
+      throw new Error(`Un employé avec le numéro de sécurité sociale ${employeeData.socialSecurityNumber} existe déjà`);
     }
-    
+  }
+  
     // Préparer les données à mettre à jour
     const data = {
-      ...employeeData,
+    ...employeeData,
       updatedAt: serverTimestamp()
     };
     
@@ -422,8 +422,8 @@ export async function deleteEmployee(employeeId: string, userId?: string): Promi
   try {
     // Si userId n'est pas fourni, utiliser l'utilisateur authentifié
     if (!userId) {
-      if (!auth.currentUser) {
-        throw new Error("Utilisateur non authentifié");
+  if (!auth.currentUser) {
+    throw new Error("Utilisateur non authentifié");
       }
       userId = auth.currentUser.uid;
     }

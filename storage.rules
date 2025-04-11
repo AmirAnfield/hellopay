@@ -43,6 +43,14 @@ service firebase.storage {
       allow write: if isOwner(userId) || isAdmin();
     }
     
+    // Règles pour les certificats
+    match /users/{userId}/companies/{companyId}/employees/{employeeId}/certificates/{certificateId} {
+      allow read: if isOwner(userId) || 
+                   isAdmin() || 
+                   request.auth.uid == employeeId;
+      allow write: if isOwner(userId) || isAdmin();
+    }
+    
     // Règles pour les documents d'entreprise
     match /users/{userId}/companies/{companyId}/documents/{docId} {
       allow read: if isOwner(userId) || isAdmin();

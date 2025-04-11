@@ -55,6 +55,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 // Types pour les documents
 interface Document {
@@ -105,6 +106,8 @@ export default function DocumentsPage() {
   const [startDate, setStartDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState<string>("");
   const [baseSalary, setBaseSalary] = useState<string>("");
+
+  const router = useRouter();
 
   // Fonction pour créer un nouveau contrat
   const createContract = (e: React.MouseEvent) => {
@@ -420,26 +423,37 @@ export default function DocumentsPage() {
           </CardContent>
         </Card>
 
-        {/* Configurer un document */}
+        {/* Créer une attestation */}
         <Card className="shadow-sm border border-gray-100 hover:border-gray-200 transition-colors">
           <CardHeader className="p-4 pb-2">
             <CardTitle className="text-base font-medium flex items-center">
               <FileBadge className="h-4 w-4 mr-2 text-amber-500" />
-              Configurer des documents
+              Créer une attestation
             </CardTitle>
             <CardDescription className="text-xs text-muted-foreground">
-              Personnalisez vos attestations selon vos besoins
+              Générez des attestations pour vos employés (travail, salaire, présence)
             </CardDescription>
           </CardHeader>
           <CardContent className="p-4 pt-0">
             <Button 
-              variant="ghost" 
-              className="w-full justify-start text-sm pl-0 font-normal text-muted-foreground hover:text-foreground" 
-              onClick={(e) => handleDocumentTypeSelect('attestation', e)}
+              size="sm" 
+              className="w-full text-xs"
+              onClick={() => router.push('/dashboard/documents/certificates/builder')}
             >
-              <Plus className="h-3.5 w-3.5 mr-1.5" />
-              Configurer une attestation
+              Nouveau certificat
             </Button>
+            <div className="mt-2">
+              <Button
+                variant="link"
+                size="sm"
+                className="text-xs p-0 h-auto"
+                asChild
+              >
+                <Link href="/dashboard/documents/certificates">
+                  Voir toutes les attestations
+                </Link>
+              </Button>
+            </div>
           </CardContent>
         </Card>
 

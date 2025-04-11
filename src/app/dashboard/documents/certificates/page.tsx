@@ -10,7 +10,8 @@ import {
   FileBadge,
   Plus,
   AlertCircle,
-  Eye
+  Eye,
+  PencilIcon
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -30,6 +31,10 @@ import {
 } from "@/components/ui/dialog";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
+import { collection, getDocs, query } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { useAuth } from "@/hooks/useAuth";
+import { useRouter } from "next/navigation";
 
 // Types pour les documents
 interface Document {
@@ -52,10 +57,10 @@ interface Document {
   };
 }
 
-type DocumentData = Record<string, unknown>;
-
 export default function CertificatesPage() {
   const { toast } = useToast();
+  const { user } = useAuth();
+  const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
@@ -64,45 +69,65 @@ export default function CertificatesPage() {
 
   // Chargement des données
   useEffect(() => {
-    try {
-      setIsLoading(true);
+    const fetchCertificates = async () => {
+      if (!user || !user.uid) {
+        setIsLoading(false);
+        return;
+      }
       
-      // Charger les documents depuis le localStorage
-      const savedDocs = localStorage.getItem('userDocuments');
-      const parsedDocs: DocumentData[] = savedDocs ? JSON.parse(savedDocs) : [];
-      
-      // Convertir les dates de string à Date
-      const documentsList = parsedDocs.map((doc: DocumentData) => ({
-        id: String(doc.id || ''),
-        type: (doc.type || 'autre') as 'attestation' | 'contrat' | 'autre',
-        title: String(doc.title || ''),
-        date: new Date(doc.date ? String(doc.date) : Date.now()),
-        employeeName: String(doc.employeeName || ''),
-        companyName: String(doc.companyName || ''),
-        status: (doc.status || 'draft') as 'generated' | 'pending' | 'validated' | 'draft' | 'signed' | 'archived',
-        pdfUrl: doc.pdfUrl ? String(doc.pdfUrl) : undefined,
-        config: doc.config as Document['config']
-      }));
-      
-      // N'afficher que les attestations créées par l'utilisateur
-      const userCertificates = documentsList.filter(doc => 
-        doc.id.startsWith('doc-') && doc.type === 'attestation'
-      );
-      
-      setDocuments(userCertificates);
-      setError(null);
-    } catch (err) {
-      console.error("Erreur lors du chargement des attestations:", err);
-      setError("Impossible de charger les attestations. Veuillez réessayer.");
-      toast({
-        variant: "destructive",
-        title: "Erreur",
-        description: "Impossible de charger les attestations. Veuillez réessayer."
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  }, [toast]);
+      try {
+        setIsLoading(true);
+        
+        // Charger les attestations depuis Firestore
+        const certificatesRef = collection(db, `users/${user.uid}/certificates`);
+        const certificatesQuery = query(certificatesRef);
+        const snapshot = await getDocs(certificatesQuery);
+        
+        // Pour débogage - vérifier si Firestore retourne des documents
+        console.log("Documents trouvés dans Firestore :", snapshot.size);
+        
+        const certificatesList: Document[] = [];
+        
+        snapshot.forEach((doc) => {
+          const data = doc.data();
+          certificatesList.push({
+            id: doc.id,
+            type: 'attestation',
+            title: data.title || 'Attestation sans titre',
+            date: data.createdAt?.toDate() || new Date(),
+            employeeName: data.options?.employeeName || '',
+            companyName: data.options?.companyName || '',
+            status: data.status || 'draft',
+            pdfUrl: data.pdfUrl,
+            config: {
+              showSalary: data.options?.showSalary || false,
+              salaryType: data.options?.salaryType || 'monthly',
+              salaryAmount: data.options?.salaryAmount || 0,
+              startDate: data.options?.startDate || '',
+              position: data.options?.position || '',
+              contractType: data.options?.contractType || 'CDI',
+              noEndDate: data.options?.noEndDate || true
+            }
+          });
+        });
+        
+        setDocuments(certificatesList);
+        setError(null);
+      } catch (err) {
+        console.error("Erreur lors du chargement des attestations:", err);
+        setError("Impossible de charger les attestations. Veuillez réessayer.");
+        toast({
+          variant: "destructive",
+          title: "Erreur",
+          description: "Impossible de charger les attestations. Veuillez réessayer."
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchCertificates();
+  }, [toast, user]);
 
   // Obtenir le document sélectionné pour les détails
   const selectedDocument = selectedDocId ? documents.find(d => d.id === selectedDocId) : null;
@@ -188,14 +213,25 @@ export default function CertificatesPage() {
 
   return (
     <PageContainer>
-      <PageHeader 
-        title="Attestations de travail"
-        description="Consultez et gérez vos attestations de travail"
+      <PageHeader
+        title="Attestations"
+        description="Gérez les attestations de travail, de salaire et de présence"
         actions={
-          <Button onClick={() => window.location.href = '/dashboard/documents?documentType=attestation&openCreateDialog=true'}>
-            <Plus className="h-4 w-4 mr-2" />
-            Créer une attestation
-          </Button>
+          <div className="flex space-x-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => router.push('/dashboard/documents')}
+            >
+              Retour
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => router.push('/dashboard/documents/certificates/builder')}
+            >
+              Nouveau certificat
+            </Button>
+          </div>
         }
       />
 
@@ -332,12 +368,19 @@ export default function CertificatesPage() {
                         <Button variant="ghost" size="icon" onClick={() => handleViewDetails(doc.id)}>
                           <Eye className="h-4 w-4" />
                         </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={() => router.push(`/dashboard/documents/certificates/edit/${doc.id}`)}
+                        >
+                          <PencilIcon className="h-4 w-4" />
+                        </Button>
                         {doc.pdfUrl && (
                           <Button variant="ghost" size="icon" onClick={() => generatePdf(doc)}>
                             <Download className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
+                          </Button>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -349,7 +392,7 @@ export default function CertificatesPage() {
               description="Vous n'avez pas encore généré d'attestation de travail."
               icon={FileBadge}
                 action={
-                <Button onClick={() => window.location.href = '/dashboard/documents?documentType=attestation&openCreateDialog=true'}>
+                <Button onClick={() => window.location.href = '/dashboard/documents/certificates/new'}>
                   <Plus className="h-4 w-4 mr-2" />
                     Créer une attestation
                   </Button>

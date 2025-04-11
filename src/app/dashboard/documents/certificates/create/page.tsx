@@ -7,13 +7,13 @@ export default function CreateCertificateRedirectPage() {
   const router = useRouter();
   
   useEffect(() => {
-    // Rediriger vers la page de documents avec l'option pour créer une attestation
-    router.push('/dashboard/documents?openCreateDialog=true&documentType=attestation');
+    // Rediriger vers la page de création d'attestation
+    router.push('/dashboard/documents/certificates/new');
   }, [router]);
   
   return (
     <div className="flex items-center justify-center h-screen">
-      <p className="text-muted-foreground">Redirection vers le formulaire de création d'attestation...</p>
+      <p className="text-muted-foreground">Redirection vers le formulaire de création d&apos;attestation...</p>
     </div>
   );
 } 

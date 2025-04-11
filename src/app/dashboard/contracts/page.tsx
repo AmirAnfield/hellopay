@@ -204,8 +204,8 @@ export default function ContractsPage() {
           <Button onClick={() => router.push('/dashboard/contracts/create')}>
             <Plus className="mr-2 h-4 w-4" /> Nouveau contrat
           </Button>
-        </div>
-        
+      </div>
+      
         <div className="flex items-center mb-4">
           <div className="relative flex-1">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -288,12 +288,12 @@ export default function ContractsPage() {
                     <CardFooter className="flex justify-between pt-2">
                       <Button variant="ghost" size="sm" onClick={() => downloadPdf(contract)} disabled={!contract.pdfUrl}>
                         <Download className="h-4 w-4 mr-1" /> PDF
-                      </Button>
+            </Button>
                       <div className="flex space-x-1">
                         <Button variant="ghost" size="sm" asChild>
                           <Link href={`/dashboard/contracts/edit/${contract.id}`}>
                             <Edit className="h-4 w-4" />
-                          </Link>
+          </Link>
                         </Button>
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
@@ -323,7 +323,7 @@ export default function ContractsPage() {
                     </CardFooter>
                   </Card>
                 ))}
-              </div>
+        </div>
             )}
           </TabsContent>
         </Tabs>

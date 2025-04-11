@@ -343,6 +343,14 @@ export async function uploadCertificate(
   const user = auth.currentUser;
   if (!user) throw new Error("Utilisateur non authentifié");
   
+  console.log("Début d'upload du certificat:", {
+    fileSize: file.size,
+    fileName: file.name,
+    employeeId,
+    certificateId,
+    companyId
+  });
+  
   // Validation du type de fichier (PDF uniquement)
   if (!validateFileType(file, ACCEPTED_FILE_TYPES.pdf)) {
     throw new Error("Seuls les fichiers PDF sont acceptés pour les certificats");
@@ -355,6 +363,7 @@ export async function uploadCertificate(
   
   // Chemin du certificat dans le Storage
   const certificatePath = `users/${user.uid}/companies/${companyId}/employees/${employeeId}/certificates/${certificateId}.pdf`;
+  console.log("Chemin du fichier dans Storage:", certificatePath);
   
   try {
     // Upload du fichier
@@ -370,11 +379,15 @@ export async function uploadCertificate(
       }
     };
     
+    console.log("Début du téléchargement du fichier...");
     await uploadBytes(fileRef, file, metadata);
+    console.log("Fichier téléchargé avec succès, obtention de l'URL...");
     const downloadURL = await getDownloadURL(fileRef);
+    console.log("URL de téléchargement obtenue:", downloadURL);
     
     return downloadURL;
   } catch (error) {
+    console.error("Erreur détaillée lors du téléchargement:", error);
     const handledError = handleStorageError(error);
     throw new Error(`Erreur lors du téléchargement du certificat: ${handledError.message}`);
   }
