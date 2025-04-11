@@ -1,0 +1,178 @@
+/* Styles pour le template A4 du contrat de travail */
+
+@media print {
+  @page {
+    size: A4;
+    margin: 20mm 15mm;
+  }
+
+  body {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+}
+
+/* Styles de base pour le contrat */
+.contract-a4-page {
+  background-color: white;
+  width: 210mm;
+  min-height: 297mm;
+  padding: 20mm 15mm;
+  margin: 0 auto;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+  font-family: 'Arial', sans-serif;
+  line-height: 1.5;
+  color: #333;
+  position: relative;
+  box-sizing: border-box;
+  overflow: hidden;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+/* Styles conditionnels selon le type de contrat */
+.contract-cdi {
+  border-top: 4px solid #4a6da7; /* Bleu pour les CDI */
+}
+
+.contract-cdd {
+  border-top: 4px solid #d97706; /* Orange pour les CDD */
+}
+
+.contract-cadre {
+  border-left: 4px solid #4a6da7; /* Bordure latérale pour indiquer statut cadre */
+}
+
+.contract-temps-partiel {
+  background: linear-gradient(to right, white 95%, #f0f0f0 5%);
+  background-size: 100% 100%;
+}
+
+/* Mise en évidence des clauses importantes */
+.contract-key-clause {
+  background-color: #fef9c3;
+  padding: 8px;
+  border-left: 3px solid #ca8a04;
+}
+
+.contract-header {
+  text-align: center;
+  margin-bottom: 20px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #ddd;
+}
+
+.contract-title {
+  font-size: 24px;
+  font-weight: bold;
+  margin-bottom: 5px;
+  text-transform: uppercase;
+}
+
+.contract-subtitle {
+  font-size: 16px;
+  margin-bottom: 10px;
+}
+
+.contract-parties {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.contract-party {
+  width: 48%;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.contract-party-title {
+  font-weight: bold;
+  margin-bottom: 5px;
+  font-size: 14px;
+  text-transform: uppercase;
+}
+
+.contract-article {
+  margin-bottom: 15px;
+  max-width: 100%;
+}
+
+.contract-article-title {
+  font-weight: bold;
+  font-size: 16px;
+  margin-bottom: 8px;
+}
+
+.contract-article-content {
+  font-size: 12px;
+  text-align: justify;
+  white-space: normal;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  overflow: visible;
+  width: 100%;
+  max-width: 100%;
+}
+
+.contract-article-content p {
+  margin-bottom: 8px;
+  white-space: normal;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  max-width: 100%;
+}
+
+.contract-footer {
+  position: absolute;
+  bottom: 20mm;
+  width: calc(100% - 30mm);
+  text-align: center;
+  font-size: 10px;
+  color: #777;
+  border-top: 1px solid #ddd;
+  padding-top: 10px;
+}
+
+.contract-signatures {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 40px;
+  page-break-inside: avoid;
+}
+
+.signature-block {
+  width: 45%;
+}
+
+.signature-title {
+  font-weight: bold;
+  margin-bottom: 60px;
+  font-size: 14px;
+}
+
+.signature-line {
+  border-top: 1px solid #333;
+  margin-bottom: 5px;
+}
+
+/* Utilitaires pour page break */
+.page-break {
+  page-break-after: always;
+  break-after: page;
+}
+
+.avoid-break {
+  page-break-inside: avoid;
+  break-inside: avoid;
+}
+
+/* Styles pour les champs variables */
+.variable-field {
+  font-weight: bold;
+  color: #0056b3;
+} 
