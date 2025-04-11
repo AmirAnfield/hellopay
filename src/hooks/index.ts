@@ -14,6 +14,8 @@ export { useFirestorePagination } from './useFirestorePagination';
 export { useAuth } from './useAuth';
 export { useEmployees } from './useEmployees';
 export { useAIContractMemory } from './useAIContractMemory';
+export { useCompanyEmployees } from './useCompanyEmployees';
+export { useCompanyCache } from './useCompanyCache';
 
 // Hooks utilitaires
 export { useRecaptcha } from './useRecaptcha';
