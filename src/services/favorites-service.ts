@@ -99,7 +99,6 @@ export async function addCompanyToFavorites(company: Company): Promise<string> {
     const favoriteRef = doc(db, `users/${userId}/favorites`, favoriteId);
     await setDoc(favoriteRef, favoriteData);
     
-    console.log("Entreprise ajoutée aux favoris:", favoriteId);
     return favoriteId;
   } catch (error) {
     console.error("Erreur lors de l'ajout aux favoris:", error);
@@ -124,7 +123,6 @@ export async function removeCompanyFromFavorites(companyId: string): Promise<voi
     const favoriteRef = doc(db, `users/${userId}/favorites`, favoriteId);
     await deleteDoc(favoriteRef);
     
-    console.log("Entreprise supprimée des favoris:", favoriteId);
   } catch (error) {
     console.error("Erreur lors de la suppression des favoris:", error);
     throw new Error("Impossible de supprimer l'entreprise des favoris. Veuillez réessayer.");

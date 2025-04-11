@@ -51,7 +51,6 @@ export default function ContactPage() {
       await new Promise(resolve => setTimeout(resolve, 1000));
       
       // Dans une application réelle, vous enverriez les données à une API
-      console.log("Données du formulaire envoyées:", data);
       
       // Afficher un message de succès
       toast({

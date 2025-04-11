@@ -62,16 +62,13 @@ export default function RegisterForm() {
     if (loading) return;
     
     setLoading(true);
-    console.log("Démarrage du processus d'inscription...");
     
     try {
       // Étape 1: Créer l'utilisateur dans Firebase Auth
-      console.log("Création de l'utilisateur dans Firebase Auth...");
       const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
       const { user } = userCredential;
       
       // Étape 2: Envoyer l'email de vérification
-      console.log("Envoi de l'email de vérification...");
       await sendEmailVerification(user);
       
       // Étape 3: Extraire le prénom et le nom
@@ -80,7 +77,6 @@ export default function RegisterForm() {
       const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
       
       // Étape 4: Créer le document utilisateur dans Firestore
-      console.log("Création du profil utilisateur dans Firestore...");
       await setDoc(doc(db, 'users', user.uid), {
         uid: user.uid,
         email: user.email,
@@ -96,7 +92,6 @@ export default function RegisterForm() {
       });
       
       // Étape 5: Créer un cookie de session pour le middleware
-      console.log("Création du cookie de session...");
       const idToken = await user.getIdToken();
       
       const sessionResponse = await fetch('/api/auth/session', {
@@ -113,13 +108,11 @@ export default function RegisterForm() {
       }
 
       // Étape 6: Notification de succès et redirection
-      console.log("Inscription réussie!");
       toast.success("Inscription réussie! Un email de vérification a été envoyé à votre adresse.");
       setRegistrationComplete(true);
       
       // Attendre 3 secondes avant de rediriger
       setTimeout(() => {
-        console.log("Redirection vers le tableau de bord...");
         window.location.href = "/dashboard";
       }, 3000);
       

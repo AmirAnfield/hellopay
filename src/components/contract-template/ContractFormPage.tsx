@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { 
@@ -21,7 +21,7 @@ import {
 import { Checkbox } from '@/components/ui/checkbox';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
+import { z } from 'zod';
 import { 
   Building, 
   ClipboardList,
@@ -29,8 +29,10 @@ import {
 } from 'lucide-react';
 import { ContractTemplate } from './ContractTemplate';
 import { auth } from '@/lib/firebase';
-import { firestore } from '@/lib/firebase/config';
-import { collection, getDocs } from 'firebase/firestore';
+import { getFirestore, collection, doc, getDocs, setDoc } from 'firebase/firestore';
+import { getStorage, ref, uploadString } from 'firebase/storage';
+import { v4 as uuidv4 } from 'uuid';
+import { generatePDF, PDFDocument } from '../../services/pdf-generation-service';
 import { useToast } from '@/components/ui/use-toast';
 
 // Type pour les entreprises
@@ -58,7 +60,6 @@ interface EmployeeOption {
     birthDate?: string;
     nationality?: string;
     socialSecurityNumber?: string;
-    gender?: 'M' | 'F' | 'U';
   };
 }
 
@@ -81,8 +82,7 @@ const contractFormSchema = z.object({
     address: z.string().min(1, { message: 'L\'adresse est requise' }),
     birthDate: z.string().optional(),
     nationality: z.string().optional(),
-    socialSecurityNumber: z.string().optional(),
-    gender: z.enum(['M', 'F', 'U']).optional()
+    socialSecurityNumber: z.string().optional()
   }),
   
   // Détails du contrat
@@ -163,8 +163,7 @@ const defaultValues: ContractFormValues = {
     address: '',
     birthDate: '',
     nationality: '',
-    socialSecurityNumber: '',
-    gender: 'U'
+    socialSecurityNumber: ''
   },
   contractDetails: {
     type: 'CDI',
@@ -222,31 +221,82 @@ const defaultValues: ContractFormValues = {
   }
 };
 
-export function ContractFormPage() {
+interface ContractFormPageProps {
+  initialData?: ContractFormValues;
+  contractId?: string;
+}
+
+// Hook personnalisé pour la génération de PDF
+export const usePdfGenerator = (contractRef: React.RefObject<HTMLDivElement | null>) => {
+  const { toast } = useToast();
+  
+  const generatePDFDoc = async (): Promise<PDFDocument | null> => {
+    try {
+      // Vérifier si l'élément est disponible
+      if (!contractRef.current) {
+        throw new Error("L'élément de contrat n'est pas disponible");
+      }
+      
+      // Afficher un message de début de génération
+      toast({
+        title: "Génération du PDF",
+        description: "Création du document en cours...",
+      });
+      
+      // Utiliser notre service simplifié
+      if (contractRef.current) {
+        const pdf = await generatePDF(contractRef.current);
+        
+        if (!pdf) {
+          throw new Error("Échec de la génération du PDF");
+        }
+        
+        return pdf;
+      }
+      
+      throw new Error("Référence du contrat invalide");
+    } catch (error) {
+      console.error("Erreur lors de la génération du PDF:", error);
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: "Impossible de générer le PDF. Veuillez réessayer."
+      });
+      return null;
+    }
+  };
+
+  return { generatePDF: generatePDFDoc };
+};
+
+export function ContractFormPage({ initialData, contractId }: ContractFormPageProps = {}) {
   const [activeTab, setActiveTab] = useState('identification');
   const [companies, setCompanies] = useState<CompanyOption[]>([]);
   const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   const [selectedEmployee, setSelectedEmployee] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [contractIdState, setContractIdState] = useState<string>(contractId || '');
+  const [showPreview, setShowPreview] = useState(false);
+  const contractRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   
-  // Configuration du formulaire
+  // Configuration du formulaire avec les données initiales ou les valeurs par défaut
   const form = useForm<ContractFormValues>({
     resolver: zodResolver(contractFormSchema),
-    defaultValues
+    defaultValues: initialData || defaultValues
   });
   
-  // Observer les changements du formulaire en temps réel
-  const formValues = form.watch();
+  // Référence Firestore
+  const firestore = getFirestore();
+  const storage = getStorage();
   
   // Fonction pour charger les entreprises
   const loadCompanies = async () => {
     setIsLoading(true);
     try {
       // Vérifier si l'utilisateur est connecté
-      console.log("Auth state:", auth);
-      console.log("User:", auth.currentUser);
       
       const userId = auth.currentUser?.uid;
       
@@ -260,19 +310,15 @@ export function ContractFormPage() {
         return;
       }
       
-      console.log("Chargement des entreprises pour l'utilisateur:", userId);
       
       const companiesRef = collection(firestore, `users/${userId}/companies`);
-      console.log("Chemin Firestore:", `users/${userId}/companies`);
       
       const snapshot = await getDocs(companiesRef);
-      console.log("Nombre de documents:", snapshot.size);
       
       const companyOptions: CompanyOption[] = [];
       
       snapshot.forEach((doc) => {
         const data = doc.data();
-        console.log("Entreprise trouvée:", doc.id, data);
         companyOptions.push({
           value: doc.id,
           label: data.name || "Entreprise sans nom",
@@ -295,7 +341,6 @@ export function ContractFormPage() {
           description: `${companyOptions.length} entreprises disponibles`,
         });
       } else {
-        console.log("Aucune entreprise trouvée");
         toast({
           title: "Aucune entreprise",
           description: "Vous n'avez pas encore créé d'entreprise",
@@ -318,7 +363,6 @@ export function ContractFormPage() {
     setIsLoading(true);
     try {
       // Vérifier si l'utilisateur est connecté
-      console.log("Chargement des employés...");
       
       const userId = auth.currentUser?.uid;
       
@@ -327,19 +371,15 @@ export function ContractFormPage() {
         return;
       }
       
-      console.log("Chargement des employés pour l'utilisateur:", userId);
       
       const employeesRef = collection(firestore, `users/${userId}/employees`);
-      console.log("Chemin Firestore:", `users/${userId}/employees`);
       
       const snapshot = await getDocs(employeesRef);
-      console.log("Nombre d'employés:", snapshot.size);
       
       const employeeOptions: EmployeeOption[] = [];
       
       snapshot.forEach((doc) => {
         const data = doc.data();
-        console.log("Employé trouvé:", doc.id, data);
         employeeOptions.push({
           value: doc.id,
           label: `${data.firstName || ""} ${data.lastName || ""}`.trim() || "Employé sans nom",
@@ -350,7 +390,6 @@ export function ContractFormPage() {
             birthDate: data.birthDate || "",
             nationality: data.nationality || "",
             socialSecurityNumber: data.socialSecurityNumber || "",
-            gender: data.gender || "U",
           }
         });
       });
@@ -363,7 +402,6 @@ export function ContractFormPage() {
           description: `${employeeOptions.length} employés disponibles`,
         });
       } else {
-        console.log("Aucun employé trouvé");
       }
     } catch (error) {
       console.error("Erreur lors du chargement des employés:", error);
@@ -421,17 +459,161 @@ export function ContractFormPage() {
       if (selectedEmployeeData.data.socialSecurityNumber) {
         form.setValue('employee.socialSecurityNumber', selectedEmployeeData.data.socialSecurityNumber);
       }
-      
-      if (selectedEmployeeData.data.gender) {
-        form.setValue('employee.gender', selectedEmployeeData.data.gender);
-      }
     }
   };
   
+  // Fonction pour générer un PDF à partir du contrat HTML
+  const { generatePDF } = usePdfGenerator(contractRef);
+
+  // Fonction pour sauvegarder le contrat dans Firestore
+  const saveContract = async (data: ContractFormValues) => {
+    setIsSaving(true);
+    
+    try {
+      const userId = auth.currentUser?.uid;
+      
+      if (!userId) {
+        toast({
+          variant: "destructive",
+          title: "Non connecté",
+          description: "Vous devez être connecté pour sauvegarder le contrat"
+        });
+        setIsSaving(false);
+        return;
+      }
+      
+      // Générer un ID unique si c'est un nouveau contrat
+      const newContractId = contractIdState || uuidv4();
+      setContractIdState(newContractId);
+      
+      // Chemin de sauvegarde: users/{userId}/contracts/{contractId}
+      const contractDocRef = doc(firestore, `users/${userId}/contracts/${newContractId}`);
+      
+      // Sauvegarder les données du contrat
+      await setDoc(contractDocRef, {
+        ...data,
+        updatedAt: new Date().toISOString(),
+        createdAt: contractIdState ? undefined : new Date().toISOString(),
+        id: newContractId
+      }, { merge: true });
+      
+      // Notifier l'utilisateur que les données sont sauvegardées
+      toast({
+        title: "Données sauvegardées",
+        description: "Les données du contrat ont été sauvegardées"
+      });
+      
+      // Générer et sauvegarder le PDF de manière indépendante pour éviter le blocage
+      try {
+        const pdf = await generatePDF();
+        
+        if (pdf) {
+          // Chemin dans Storage: users/{userId}/Documents/contratdetravail-{contractId}.pdf
+          const pdfRef = ref(storage, `users/${userId}/Documents/contratdetravail-${newContractId}.pdf`);
+          
+          // Convertir le PDF en blob puis en data URI
+          const pdfBlob = pdf.output('blob') as Blob;
+          const reader = new FileReader();
+          
+          // Utiliser une promesse pour attendre la conversion
+          const dataUrl = await new Promise<string>((resolve) => {
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.readAsDataURL(pdfBlob);
+          });
+          
+          // Uploader le PDF avec le data URI
+          try {
+            await uploadString(pdfRef, dataUrl, 'data_url');
+            
+            // Mettre à jour le document avec le lien du PDF
+            await setDoc(contractDocRef, {
+              pdfUrl: `users/${userId}/Documents/contratdetravail-${newContractId}.pdf`
+            }, { merge: true });
+            
+            toast({
+              title: "PDF généré",
+              description: "Le PDF du contrat a été généré et sauvegardé"
+            });
+          } catch (uploadError) {
+            console.error("Erreur lors de l'upload du PDF:", uploadError);
+            toast({
+              variant: "destructive",
+              title: "Erreur d'upload",
+              description: `Impossible d'uploader le PDF: ${uploadError instanceof Error ? uploadError.message : "Erreur inconnue"}`
+            });
+          }
+        }
+      } catch (pdfError) {
+        console.error("Erreur lors de la génération du PDF:", pdfError);
+        toast({
+          variant: "warning",
+          title: "Attention",
+          description: "Les données sont sauvegardées mais le PDF n'a pas pu être généré"
+        });
+        // Ne pas bloquer la sauvegarde si le PDF échoue
+      }
+    } catch (error) {
+      console.error("Erreur lors de la sauvegarde:", error);
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: "Une erreur s'est produite lors de la sauvegarde du contrat"
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Fonction pour prévisualiser le contrat
+  const previewContract = () => {
+    if (form.formState.isValid) {
+      setShowPreview(true);
+    } else {
+      // Déclenche les validations pour montrer les erreurs
+      form.trigger();
+      toast({
+        variant: "destructive",
+        title: "Formulaire incomplet",
+        description: "Veuillez compléter tous les champs requis avant de prévisualiser le contrat"
+      });
+    }
+  };
+
+  // Fonction pour télécharger le PDF
+  const downloadPDF = async () => {
+    try {
+      setIsLoading(true);
+      const pdf = await generatePDF();
+      
+      if (pdf) {
+        // Générer un nom de fichier basé sur l'employé et la date
+        const employeeName = `${form.getValues('employee.firstName')}-${form.getValues('employee.lastName')}`.replace(/\s+/g, '-');
+        const date = new Date().toISOString().split('T')[0];
+        const filename = `contrat-${employeeName}-${date}.pdf`;
+        
+        // Télécharger le PDF
+        pdf.save(filename);
+        
+        toast({
+          title: "Téléchargement réussi",
+          description: "Le contrat a été téléchargé avec succès"
+        });
+      }
+    } catch (error) {
+      console.error("Erreur lors du téléchargement:", error);
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: "Impossible de télécharger le PDF. Veuillez réessayer."
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Fonction de soumission du formulaire
   const onSubmit = (data: ContractFormValues) => {
-    console.log('Formulaire soumis:', data);
-    // Ici, vous pourriez sauvegarder les données ou générer le PDF
+    saveContract(data);
   };
   
   // Observer l'état de validité du formulaire pour mettre à jour le style du bouton Valider
@@ -511,6 +693,57 @@ export function ContractFormPage() {
   return (
     <div className="overflow-x-hidden w-full max-w-full">
       <div className="min-h-screen overflow-x-hidden flex flex-col">
+        {/* Barre de navigation avec boutons fonctionnels */}
+        <div className="bg-white border-b p-2 flex justify-between items-center sticky top-0 z-50">
+          <div className="flex items-center space-x-4">
+            <button 
+              onClick={() => window.history.back()}
+              className="px-3 py-1 rounded border hover:bg-slate-50 flex items-center text-sm"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1"><path d="m15 18-6-6 6-6"/></svg>
+              Retour
+            </button>
+          </div>
+          <div className="flex items-center space-x-2">
+            <button 
+              onClick={previewContract}
+              className="px-3 py-1 rounded border hover:bg-slate-50 flex items-center text-sm"
+              disabled={isLoading || isSaving}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+              Aperçu
+            </button>
+            <button 
+              onClick={downloadPDF}
+              className="px-3 py-1 rounded border hover:bg-slate-50 flex items-center text-sm"
+              disabled={isLoading || isSaving}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+              Télécharger
+            </button>
+            <button 
+              onClick={form.handleSubmit(onSubmit)}
+              className="px-3 py-1 rounded border bg-primary text-white hover:bg-primary/90 flex items-center text-sm"
+              disabled={isLoading || isSaving}
+            >
+              {isSaving ? (
+                <>
+                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Sauvegarde...
+                </>
+              ) : (
+                <>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                  Sauvegarder
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+        
         <div className="flex flex-row flex-1">
           {/* Menu de configuration à gauche - Design amélioré */}
           <div className="w-[400px] min-w-[400px] border-r p-3 h-[calc(100vh-60px)] overflow-y-auto bg-gray-50/50">
@@ -684,40 +917,6 @@ export function ContractFormPage() {
                               ))}
                             </SelectContent>
                           </Select>
-                        </div>
-                        
-                        {/* Sélection du genre grammatical */}
-                        <div className="space-y-1">
-                          <FormLabel className="text-xs">Forme grammaticale</FormLabel>
-                          <FormField
-                            control={form.control}
-                            name="employee.gender"
-                            render={({ field }) => (
-                              <div className="grid grid-cols-3 gap-1">
-                                <div 
-                                  className={`border rounded p-2 text-center text-xs cursor-pointer ${field.value === 'M' ? 'bg-primary text-white' : 'bg-slate-50 hover:bg-slate-100'}`}
-                                  onClick={() => field.onChange('M')}
-                                >
-                                  <div>Masculin</div>
-                                  <div className="font-semibold mt-1">Le salarié</div>
-                                </div>
-                                <div 
-                                  className={`border rounded p-2 text-center text-xs cursor-pointer ${field.value === 'F' ? 'bg-primary text-white' : 'bg-slate-50 hover:bg-slate-100'}`}
-                                  onClick={() => field.onChange('F')}
-                                >
-                                  <div>Féminin</div>
-                                  <div className="font-semibold mt-1">La salariée</div>
-                                </div>
-                                <div 
-                                  className={`border rounded p-2 text-center text-xs cursor-pointer ${field.value === 'U' ? 'bg-primary text-white' : 'bg-slate-50 hover:bg-slate-100'}`}
-                                  onClick={() => field.onChange('U')}
-                                >
-                                  <div>Inclusif</div>
-                                  <div className="font-semibold mt-1">L&apos;employé·e</div>
-                                </div>
-                              </div>
-                            )}
-                          />
                         </div>
                       </div>
                     </div>
@@ -1447,18 +1646,79 @@ export function ContractFormPage() {
             </Form>
           </div>
           
-          {/* Aperçu du contrat - Ajusté pour voir le début */}
-          <div className="flex-1 p-2 overflow-auto h-[calc(100vh-60px)] flex items-start justify-center">
-            <div className="shadow-xl transform scale-[0.8] origin-top mt-0">
+          {/* Aperçu du contrat à droite */}
+          <div className="flex-1 max-w-[calc(100%-400px)] overflow-auto h-[calc(100vh-60px)]">
+            <div ref={contractRef}>
               <ContractTemplate 
-                company={formValues.company}
-                employee={formValues.employee}
-                contractDetails={formValues.contractDetails}
-                displayOptions={formValues.displayOptions}
+                company={form.getValues('company')}
+                employee={form.getValues('employee')}
+                contractDetails={form.getValues('contractDetails')}
+                displayOptions={form.getValues('displayOptions')}
               />
             </div>
           </div>
         </div>
+        
+        {/* Modal d'aperçu */}
+        {showPreview && (
+          <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center">
+            <div className="bg-white p-4 rounded-md w-11/12 max-w-4xl h-5/6 overflow-hidden flex flex-col">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-semibold">Aperçu du contrat</h2>
+                <button 
+                  onClick={() => setShowPreview(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+              </div>
+              <div className="flex-1 overflow-auto">
+                <ContractTemplate 
+                  company={form.getValues('company')}
+                  employee={form.getValues('employee')}
+                  contractDetails={form.getValues('contractDetails')}
+                  displayOptions={form.getValues('displayOptions')}
+                />
+              </div>
+              <div className="mt-4 flex justify-end space-x-2">
+                <button
+                  onClick={() => setShowPreview(false)}
+                  className="px-4 py-2 border rounded-md text-gray-700 hover:bg-gray-50"
+                >
+                  Fermer
+                </button>
+                <button
+                  onClick={downloadPDF}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center"
+                  disabled={isLoading || isSaving}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+                  Télécharger PDF
+                </button>
+                <button
+                  onClick={form.handleSubmit(onSubmit)}
+                  className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center"
+                  disabled={isLoading || isSaving}
+                >
+                  {isSaving ? (
+                    <>
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Sauvegarde...
+                    </>
+                  ) : (
+                    <>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                      Sauvegarder
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -54,6 +54,7 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import Link from "next/link";
 
 // Types pour les documents
 interface Document {
@@ -398,13 +399,24 @@ export default function DocumentsPage() {
           </CardHeader>
           <CardContent className="p-4 pt-0">
             <Button 
-              variant="ghost" 
-              className="w-full justify-start text-sm pl-0 font-normal text-muted-foreground hover:text-foreground" 
+              size="sm" 
+              className="w-full text-xs"
               onClick={createContract}
             >
-              <Plus className="h-3.5 w-3.5 mr-1.5" />
-              Créer un contrat
+              Nouveau contrat
             </Button>
+            <div className="mt-2">
+              <Button
+                variant="link"
+                size="sm"
+                className="text-xs p-0 h-auto"
+                asChild
+              >
+                <Link href="/dashboard/documents/contracts">
+                  Voir tous les contrats
+                </Link>
+              </Button>
+            </div>
           </CardContent>
         </Card>
 

@@ -45,7 +45,6 @@ export default function CompaniesPage() {
     
     try {
       if (!auth.currentUser) {
-        console.log("Utilisateur non authentifié");
         setIsLoading(false);
         setIsRefreshing(false);
         return;

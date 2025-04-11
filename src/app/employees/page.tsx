@@ -10,7 +10,6 @@ export default function EmployeesPage() {
         <h2 className="text-xl font-semibold mb-4">Ajouter un employé</h2>
         <EmployeeForm 
           onSubmit={(data) => {
-            console.log('Employé soumis:', data);
             // Ici vous appelleriez votre API pour sauvegarder l'employé
           }} 
         />

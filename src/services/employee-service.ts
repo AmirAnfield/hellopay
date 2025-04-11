@@ -346,7 +346,6 @@ export async function createEmployee(employeeData: EmployeeInput, userId?: strin
     const employeesRef = collection(db, `users/${userId}/employees`);
     const docRef = await addDoc(employeesRef, data);
     
-    console.log("Employé créé avec succès:", docRef.id);
     return docRef.id;
   } catch (error) {
     console.error("Erreur lors de la création de l'employé:", error);
@@ -407,7 +406,6 @@ export async function updateEmployee(employeeId: string, employeeData: Partial<E
     const employeeRef = doc(db, `users/${userId}/employees/${employeeId}`);
     await updateDoc(employeeRef, data);
     
-    console.log("Employé mis à jour avec succès:", employeeId);
   } catch (error) {
     console.error("Erreur lors de la mise à jour de l'employé:", error);
     throw new Error("Impossible de mettre à jour l'employé. Veuillez réessayer.");
@@ -440,7 +438,6 @@ export async function deleteEmployee(employeeId: string, userId?: string): Promi
     const employeeRef = doc(db, `users/${userId}/employees/${employeeId}`);
     await deleteDoc(employeeRef);
     
-    console.log("Employé supprimé avec succès:", employeeId);
   } catch (error) {
     console.error("Erreur lors de la suppression de l'employé:", error);
     throw new Error("Impossible de supprimer l'employé. Veuillez réessayer.");

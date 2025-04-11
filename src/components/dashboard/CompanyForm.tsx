@@ -211,7 +211,6 @@ export default function CompanyForm({ companyId }: CompanyFormProps) {
       ? `${data.legalFirstName} ${data.legalLastName}`
       : '';
     
-    console.log("Données soumises:", data);
     
     try {
       if (!auth.currentUser) {

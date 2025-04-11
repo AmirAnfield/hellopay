@@ -10,7 +10,6 @@ export async function generatePDF(contentHtml: string): Promise<Buffer> {
   // Note: Ceci est une implémentation fictive.
   // Pour une vraie implémentation, utilisez une bibliothèque comme puppeteer, jsPDF, etc.
   
-  console.log("Génération du PDF à partir du HTML:", contentHtml.substring(0, 100) + "...");
   
   // Simuler un délai de génération
   await new Promise(resolve => setTimeout(resolve, 1000));

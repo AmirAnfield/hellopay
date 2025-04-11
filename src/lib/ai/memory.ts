@@ -151,7 +151,6 @@ export async function addMessageToAIMemory(
   const docSnap = await getDoc(docRef);
   if (!docSnap.exists()) {
     // Initialiser automatiquement la mémoire si elle n'existe pas
-    console.log("Initialisation automatique de la mémoire IA");
     await initAIContractMemory(userId);
     
     // Récupérer la nouvelle mémoire

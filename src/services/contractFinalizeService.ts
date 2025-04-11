@@ -119,7 +119,6 @@ export const downloadContractPDF = async (userId: string, contractId: string): P
   try {
     // Cette fonction devrait faire appel à une API pour générer un PDF
     // Pour l'instant, c'est un placeholder
-    console.log(`Génération du PDF pour le contrat ${contractId} de l'utilisateur ${userId}`);
     
     // Simuler un téléchargement réussi
     return true;

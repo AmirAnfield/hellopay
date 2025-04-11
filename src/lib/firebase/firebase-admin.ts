@@ -27,7 +27,6 @@ if (!apps.length) {
         });
       } catch (error) {
         console.error("Erreur lors de l'initialisation de Firebase Admin:", error);
-        console.log("Utilisez Firestore du client en attendant une configuration complète");
         
         // On arrête la fonction ici pour éviter d'exporter deux fois db
         process.exit(1);

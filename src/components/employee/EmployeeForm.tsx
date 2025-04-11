@@ -180,7 +180,6 @@ export default function EmployeeForm({ employeeId, defaultCompanyId }: EmployeeF
     const fetchCompanies = async () => {
       try {
         if (!auth.currentUser) {
-          console.log("Utilisateur non authentifié");
           return;
         }
         
@@ -235,7 +234,6 @@ export default function EmployeeForm({ employeeId, defaultCompanyId }: EmployeeF
       
       if (employeeDoc.exists()) {
         const employeeData = employeeDoc.data();
-        console.log("Données employé de Firestore:", employeeData);
         
         // Remplir le formulaire avec les données existantes
         form.reset({
@@ -280,7 +278,6 @@ export default function EmployeeForm({ employeeId, defaultCompanyId }: EmployeeF
       }
     });
     
-    console.log("Données soumises:", data);
     
     try {
       // Vérifier que l'utilisateur est connecté
@@ -327,7 +324,6 @@ export default function EmployeeForm({ employeeId, defaultCompanyId }: EmployeeF
           ...employeeData,
           updatedAt: new Date()
         }, { merge: true });
-        console.log("Employé mis à jour dans Firestore");
       } else {
         // Création d'un nouvel employé
         const newEmployeeId = `employee-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
@@ -340,7 +336,6 @@ export default function EmployeeForm({ employeeId, defaultCompanyId }: EmployeeF
           isArchived: false,
           isLocked: false
         });
-        console.log("Nouvel employé créé dans Firestore");
       }
       
       // Notification avec message spécifique pour la création

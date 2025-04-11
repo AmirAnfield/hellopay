@@ -67,10 +67,8 @@ export async function logSecurityEvent(
 
   // Pour le moment, nous allons simplement les afficher dans la console
   if (process.env.NODE_ENV === "development") {
-    console.log(`[${log.level}] [${log.event}] ${log.message}`, log);
   } else {
     // En production, formater le log en JSON pour faciliter son traitement
-    console.log(JSON.stringify(log));
   }
 }
 

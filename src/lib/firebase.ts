@@ -17,6 +17,7 @@ const firebaseConfig = {
   measurementId: "G-1GPDHBPSBB"
 };
 
+// Loguer une version sécurisée de la configuration (masquage de l'API key)
 console.log("🔥 Firebase Config:", {
   apiKey: firebaseConfig.apiKey.substring(0, 8) + '...',
   projectId: firebaseConfig.projectId,

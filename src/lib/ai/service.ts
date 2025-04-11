@@ -17,7 +17,6 @@ export async function suggestClause(
   
   try {
     // Logger l'appel à l'IA pour le débogage
-    console.log(`Appel IA (Genkit) pour l'étape ${stepId} (${step})`, memory.id);
     
     // Appeler la fonction Firebase qui utilise Genkit
     const generateClauseFn = httpsCallable<

@@ -48,16 +48,13 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      console.log("Tentative de connexion avec:", { email: data.email, password: "******" });
       
       // Utiliser Firebase Auth directement pour tester
       try {
         // Récupérer la configuration Firebase
-        console.log("Configuration Firebase chargée");
         
         // Utiliser Firebase Auth via notre hook useAuth
         await loginUser(data.email, data.password);
-        console.log("Connexion réussie!");
         
         toast({
           title: "Connexion réussie",
@@ -65,7 +62,6 @@ export default function LoginPage() {
         });
   
         // Redirection directe vers le tableau de bord ou l'URL de callback
-        console.log("Redirection vers:", callbackUrl);
         
         // Utiliser window.location.href pour une redirection forcée après l'authentification
         window.location.href = callbackUrl;

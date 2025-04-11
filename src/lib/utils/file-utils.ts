@@ -46,7 +46,6 @@ export async function compressFile(file: File, maxSizeMB: number): Promise<File>
     lastModified: new Date().getTime()
   });
   
-  console.log(`Compression simulée: ${file.size} -> ${compressedFile.size} octets`);
   
   return compressedFile;
 }
@@ -66,22 +65,13 @@ export function fileToBase64(file: File): Promise<string> {
 }
 
 /**
- * Formate la taille d'un fichier en unité lisible
- * @param bytes Taille en octets
- * @param decimals Nombre de décimales (par défaut: 2)
- * @returns Taille formatée (ex: "2.5 MB")
- * @deprecated Utilisez formatFileSize de src/lib/utils.ts à la place.
+ * @deprecated La fonction formatFileSize a été déplacée vers src/lib/utils.ts.
+ * Veuillez utiliser import { formatFileSize } from '@/lib/utils' à la place.
  */
-export function formatFileSize(bytes: number, decimals: number = 2): string {
-  if (bytes === 0) return '0 Bytes';
-  
-  const k = 1024;
-  const dm = decimals < 0 ? 0 : decimals;
-  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
-  
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+export function formatFileSize(): never {
+  throw new Error(
+    "Cette fonction est dépréciée. Utilisez import { formatFileSize } from '@/lib/utils' à la place."
+  );
 }
 
 /**

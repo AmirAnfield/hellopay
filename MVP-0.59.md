@@ -28,8 +28,8 @@ Suite à l'audit du projet HelloPay, cette version a pour objectif d'améliorer 
 
 ## 5. Optimisation des performances
 
-- [ ] Réviser les dépendances pour éliminer celles non utilisées
-- [ ] Implémenter plus de chargement paresseux (lazy loading)
-- [ ] Optimiser les requêtes Firestore
+- [x] Réviser les dépendances pour éliminer celles non utilisées
+- [x] Implémenter plus de chargement paresseux (lazy loading)
+- [x] Optimiser les requêtes Firestore
 
 Cette version ne vise pas à ajouter de nouvelles fonctionnalités mais à améliorer la base de code existante pour faciliter les développements futurs. 

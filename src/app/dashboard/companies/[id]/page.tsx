@@ -32,26 +32,21 @@ export default function CompanyClientPage() {
     // Fonction pour récupérer l'entreprise
     const getCompanyFromStorage = () => {
       try {
-        console.log("Recherche de l'entreprise", id, "dans localStorage");
         const companiesStr = localStorage.getItem('companies');
         
         if (!companiesStr) {
-          console.log("Aucune entreprise trouvée dans localStorage");
           setError("Entreprise non trouvée");
           setIsLoading(false);
           return;
         }
 
         const companies = JSON.parse(companiesStr);
-        console.log("Entreprises trouvées:", companies.length);
         
         const foundCompany = companies.find((c: { id: string }) => c.id === id);
         
         if (foundCompany) {
-          console.log("Entreprise trouvée:", foundCompany.name);
           setCompany(foundCompany);
         } else {
-          console.log("Entreprise non trouvée avec l'ID:", id);
           setError("Entreprise non trouvée");
         }
       } catch (error) {

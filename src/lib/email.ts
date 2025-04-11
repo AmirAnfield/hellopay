@@ -77,8 +77,6 @@ export async function sendVerificationEmail(email: string, token: string) {
     
     // En développement, afficher l'URL pour voir l'email
     if (process.env.NODE_ENV !== 'production' && info.messageId) {
-      console.log('Email de vérification envoyé: %s', info.messageId);
-      console.log('URL de prévisualisation: %s', nodemailer.getTestMessageUrl(info));
     }
     
     return { success: true };
@@ -136,8 +134,6 @@ export async function sendPasswordResetEmail(email: string, token: string) {
     
     // En développement, afficher l'URL pour voir l'email
     if (process.env.NODE_ENV !== 'production' && info.messageId) {
-      console.log('Email de réinitialisation envoyé: %s', info.messageId);
-      console.log('URL de prévisualisation: %s', nodemailer.getTestMessageUrl(info));
     }
     
     return { success: true };

@@ -18,7 +18,6 @@ export async function loadUserCompanies(userId: string): Promise<Company[]> {
       return [];
     }
     
-    console.log("Chargement des entreprises pour l'utilisateur:", userId);
     
     const companiesRef = collection(firestore, `users/${userId}/companies`);
     const snapshot = await getDocs(companiesRef);
@@ -38,7 +37,6 @@ export async function loadUserCompanies(userId: string): Promise<Company[]> {
       } as Company);
     });
     
-    console.log("Entreprises chargées:", companies.length);
     return companies;
   } catch (error) {
     console.error("Erreur lors du chargement des entreprises:", error);
@@ -61,7 +59,6 @@ export async function loadUserEmployees(userId: string): Promise<Employee[]> {
       return [];
     }
     
-    console.log("Chargement des employés pour l'utilisateur:", userId);
     
     const employeesRef = collection(firestore, `users/${userId}/employees`);
     const snapshot = await getDocs(employeesRef);
@@ -83,7 +80,6 @@ export async function loadUserEmployees(userId: string): Promise<Employee[]> {
       } as Employee);
     });
     
-    console.log("Employés chargés:", employees.length);
     return employees;
   } catch (error) {
     console.error("Erreur lors du chargement des employés:", error);

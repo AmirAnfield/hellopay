@@ -141,7 +141,6 @@ export default function DashboardPage() {
             }
           });
           
-          console.log(`Nombre total d'employés actifs trouvés: ${totalEmployees}`);
           setEmployeeCount(totalEmployees);
         } catch (error) {
           console.error("Erreur lors de la récupération des employés:", error);

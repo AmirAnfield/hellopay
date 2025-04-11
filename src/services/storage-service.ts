@@ -280,7 +280,6 @@ export async function uploadEmployeeDocument(
     try {
       fileToUpload = await compressFile(file, options?.maxSizeMB || 1);
       compressedSize = fileToUpload.size;
-      console.log(`Fichier compressé: ${originalSize} -> ${compressedSize} octets`);
     } catch (error) {
       console.warn("Impossible de compresser le fichier:", error);
       // On continue avec le fichier original en cas d'erreur

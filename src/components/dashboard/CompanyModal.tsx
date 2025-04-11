@@ -135,7 +135,6 @@ export default function CompanyModal({ open, onOpenChange, onCompanyCreated }: C
   });
 
   async function onSubmit(data: CompanyFormValues) {
-    console.log("Fonction onSubmit appelée avec les données:", data);
     
     if (!user || !user.uid) {
       console.error("Erreur d'authentification: Utilisateur non connecté");
@@ -167,13 +166,11 @@ export default function CompanyModal({ open, onOpenChange, onCompanyCreated }: C
         userId: user.uid
       };
       
-      console.log("Tentative de sauvegarde de l'entreprise:", companyId);
       
       try {
         // Sauvegarder dans Firestore
         const companyRef = doc(db, `users/${user.uid}/companies`, companyId);
         await setDoc(companyRef, companyData);
-        console.log("Entreprise créée avec succès:", companyId);
         
         // Toast standard (moins visible)
         toast({
@@ -232,7 +229,6 @@ export default function CompanyModal({ open, onOpenChange, onCompanyCreated }: C
         <Form {...form}>
           <form 
             onSubmit={(e) => {
-              console.log("Formulaire soumis - Event:", e);
               form.handleSubmit(onSubmit)(e);
             }} 
             className="p-6 pt-2 space-y-1"
@@ -259,7 +255,6 @@ export default function CompanyModal({ open, onOpenChange, onCompanyCreated }: C
                   legalLastName: "Dupont",
                   legalRepresentativeRole: "Gérant"
                 });
-                console.log("Données de test chargées");
               }}
             >
               Remplir avec des données de test

@@ -51,7 +51,6 @@ const logFirestoreOperation = (operation: string, path: string, id: string | nul
       console.error(`   Stack: ${error.stack.split('\n')[0]}`);
     }
   } else {
-    console.log(`🔵 [${timestamp}] Opération Firestore (${operation}) - ${user} - Chemin: ${path}, ID: ${id || 'N/A'} - Succès`);
   }
 };
 

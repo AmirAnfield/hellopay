@@ -46,26 +46,21 @@ export default function EmployeeDetailsPage() {
     // Fonction pour récupérer l'employé
     const getEmployeeFromStorage = () => {
       try {
-        console.log("Recherche de l'employé", id, "dans localStorage");
         const employeesStr = localStorage.getItem('employees');
         
         if (!employeesStr) {
-          console.log("Aucun employé trouvé dans localStorage");
           setError("Employé non trouvé");
           setIsLoading(false);
           return;
         }
 
         const employees = JSON.parse(employeesStr);
-        console.log("Employés trouvés:", employees.length);
         
         const foundEmployee = employees.find((e: { id: string }) => e.id === id);
         
         if (foundEmployee) {
-          console.log("Employé trouvé:", foundEmployee.firstName, foundEmployee.lastName);
           setEmployee(foundEmployee);
         } else {
-          console.log("Employé non trouvé avec l'ID:", id);
           setError("Employé non trouvé");
         }
       } catch (error) {

@@ -92,16 +92,12 @@ export default function RegisterPage() {
     try {
       setErrorMessage(null);
       setIsLoading(true);
-      console.log("Début de l'inscription avec Firebase...");
       const { email, password, firstName, lastName } = values;
 
-      console.log("Tentative de création du compte utilisateur...");
       // Créer l'utilisateur
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      console.log("Compte utilisateur créé avec succès", userCredential.user.uid);
       
       // L'utilisateur vient d'être créé, on initialise son profil avec son nom et prénom
-      console.log("Création du profil utilisateur dans Firestore...");
       try {
         const userDoc = doc(db, 'users', userCredential.user.uid);
         await setDoc(userDoc, {
@@ -132,17 +128,14 @@ export default function RegisterPage() {
             theme: 'system'
           }
         });
-        console.log("Profil utilisateur créé avec succès dans Firestore");
       } catch (firestoreError) {
         console.error("Erreur lors de la création du profil dans Firestore:", firestoreError);
         // Continuer malgré l'erreur Firestore - l'utilisateur est déjà créé dans Auth
       }
       
       // Envoyer l'email de vérification
-      console.log("Envoi de l'email de vérification...");
       try {
         await sendEmailVerification(userCredential.user);
-        console.log("Email de vérification envoyé");
       } catch (emailError) {
         console.error("Erreur lors de l'envoi de l'email de vérification:", emailError);
         // Continuer malgré l'erreur d'email - l'utilisateur est déjà créé
@@ -160,7 +153,6 @@ export default function RegisterPage() {
       setIsLoading(false);
       
       // Attendre un peu avant de rediriger vers le dashboard pour que l'utilisateur puisse voir le message de succès
-      console.log("Redirection vers le dashboard dans 5 secondes...");
       setTimeout(() => {
         window.location.href = '/dashboard'; // Redirection forcée
       }, 5000);

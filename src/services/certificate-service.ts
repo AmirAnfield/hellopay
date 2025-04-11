@@ -84,7 +84,6 @@ export async function createCertificate(data: CertificateInput): Promise<string>
     
     // Vérifier si la collection certificates existe et la créer si nécessaire
     const certificateId = await setDocument('certificates', certificateData);
-    console.log("Certificat créé avec succès, ID:", certificateId);
     
     return certificateId;
   } catch (error) {

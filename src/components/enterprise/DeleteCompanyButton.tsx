@@ -37,7 +37,6 @@ const DeleteCompanyButton: React.FC<DeleteCompanyButtonProps> = ({ companyId }) 
           const companiesStr = localStorage.getItem('companies');
           if (companiesStr) {
             const companies = JSON.parse(companiesStr);
-            console.log("Avant suppression:", companies.length, "entreprises");
             
             // Récupérer le nom de l'entreprise avant de la supprimer
             const companyToDelete = companies.find((c: { id: string }) => c.id === companyId);
@@ -45,7 +44,6 @@ const DeleteCompanyButton: React.FC<DeleteCompanyButtonProps> = ({ companyId }) 
             
             // Filtrer pour supprimer l'entreprise avec l'ID correspondant
             const updatedCompanies = companies.filter((c: { id: string }) => c.id !== companyId);
-            console.log("Après suppression:", updatedCompanies.length, "entreprises");
             
             // Enregistrer le tableau mis à jour dans localStorage
             localStorage.setItem('companies', JSON.stringify(updatedCompanies));
@@ -53,7 +51,6 @@ const DeleteCompanyButton: React.FC<DeleteCompanyButtonProps> = ({ companyId }) 
             // Vérifier que la suppression a fonctionné
             const verificationStr = localStorage.getItem('companies');
             const verification = verificationStr ? JSON.parse(verificationStr) : [];
-            console.log("Vérification:", verification.length, "entreprises");
             
             toast({
               title: "Entreprise supprimée",

@@ -58,5 +58,4 @@ export { analytics, appCheck };
 
 // Log de debug pour le développement
 if (process.env.NODE_ENV === 'development') {
-  console.log('🔥 Firebase initialisé avec le projet:', firebaseConfig.projectId);
 } 

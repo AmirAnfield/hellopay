@@ -63,7 +63,6 @@ export default function ArchivesPage() {
     
     try {
       if (!user || !user.uid) {
-        console.log("Utilisateur non authentifié");
         setIsLoading(false);
         setIsRefreshing(false);
         return;

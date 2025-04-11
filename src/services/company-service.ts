@@ -194,7 +194,6 @@ export async function createCompany(companyData: CompanyInput, userId?: string):
     const companiesRef = collection(db, `users/${userId}/companies`);
     const docRef = await addDoc(companiesRef, data);
     
-    console.log("Entreprise créée avec succès:", docRef.id);
     return docRef.id;
   } catch (error) {
     console.error("Erreur lors de la création de l'entreprise:", error);
@@ -229,7 +228,6 @@ export async function updateCompany(companyId: string, companyData: Partial<Comp
     const companyDoc = doc(db, `users/${userId}/companies/${companyId}`);
     await updateDoc(companyDoc, data);
     
-    console.log("Entreprise mise à jour avec succès:", companyId);
   } catch (error) {
     console.error("Erreur lors de la mise à jour de l'entreprise:", error);
     throw new Error("Impossible de mettre à jour l'entreprise. Veuillez réessayer.");
@@ -256,7 +254,6 @@ export async function deleteCompany(companyId: string, userId?: string): Promise
     const companyDoc = doc(db, `users/${userId}/companies/${companyId}`);
     await deleteDoc(companyDoc);
     
-    console.log("Entreprise supprimée avec succès:", companyId);
   } catch (error) {
     console.error("Erreur lors de la suppression de l'entreprise:", error);
     throw new Error("Impossible de supprimer l'entreprise. Veuillez réessayer.");

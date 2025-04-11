@@ -54,7 +54,6 @@ const logAuthProcess = (message: string, request: NextRequest, error?: unknown) 
     console.error(`🔒 [${timestamp}] Auth Middleware - ${message} - Chemin: ${path}, Cookie: ${sessionCookie}`);
     console.error(`   Erreur: ${error instanceof Error ? error.message : JSON.stringify(error)}`);
   } else {
-    console.log(`🔒 [${timestamp}] Auth Middleware - ${message} - Chemin: ${path}, Cookie: ${sessionCookie}`);
   }
 };
 

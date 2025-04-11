@@ -40,7 +40,6 @@ export async function GET(request: NextRequest) {
       Number(searchParams.get('monthlyHours')) : 151.67;
     const trialPeriodEndDate = searchParams.get('trialPeriodEndDate');
     
-    console.log(`Génération de PDF pour ${type} - ID: ${id}`);
     
     // Créer un nouveau document PDF
     const doc = new jsPDF();
